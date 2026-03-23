@@ -1,0 +1,65 @@
+# Unity generated
+[Ll]ibrary/
+[Tt]emp/
+[Oo]bj/
+[Bb]uild/
+[Bb]uilds/
+[Ll]ogs/
+[Uu]ser[Ss]ettings/
+
+# Memory leaks
+sysinfo.txt
+MemoryCaptures/
+
+# Unity3D generated meta files
+*.pidb.meta
+*.pdb.meta
+*.mdb.meta
+
+# Builds
+*.apk
+*.aab
+*.unitypackage
+*.app
+
+# Crashlytics generated file
+crashlytics-build.properties
+
+# Rider
+.idea/
+
+# Visual Studio
+.vs/
+*.csproj
+*.sln
+
+# Visual Studio Code
+.vscode/
+
+# JetBrains
+*.suo
+
+# OS generated
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Large asset folders — only scripts are tracked
+Assets/Animations/
+Assets/Audio/
+Assets/Cartoon_Texture_Pack/
+Assets/Terrain/
+Assets/TextMesh Pro/
+Assets/Tree.prefab
+Assets/Tree.prefab.meta
+Assets/Tree_Textures/
+Assets/_Recovery/
+Assets/Scenes/
+Assets/Materials/
+Assets/Prefabs/
+Assets/Sprites/
+Assets/Models/
