@@ -1,0 +1,21 @@
+# Unity generated folders — no need for Claude to read these
+Library/
+Temp/
+obj/
+Build/
+Builds/
+Logs/
+UserSettings/
+
+# Unity meta files (usually not needed for code tasks)
+*.meta
+
+# Visual Studio / Rider
+.vs/
+.idea/
+*.csproj
+*.sln
+
+# OS
+.DS_Store
+Thumbs.db

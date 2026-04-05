@@ -1,0 +1,29 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: ebb9304e04a24804d91e3ac7db4d4b75, type: 3}
+  m_Name: Biome_Mountain
+  m_EditorClassIdentifier: Assembly-CSharp::BiomeDefinition
+  biomeName: Mountain
+  mapColor: {r: 0.54901963, g: 0.54901963, b: 0.54901963, a: 1}
+  terrainLayers:
+  - {fileID: 8574412962073106934, guid: 41f0689b447d04542924f23153a82946, type: 2}
+  slopeLayerThreshold: 0.18
+  heightMin: 0.45
+  heightMax: 0.9
+  noiseFrequency: 0.005
+  noiseAmplitude: 300
+  noiseOctaves: 5
+  noisePersistence: 0.5
+  noiseLacunarity: 2.3
+  moisture: 0.2
+  temperature: 0.05
+  blendRadius: 16

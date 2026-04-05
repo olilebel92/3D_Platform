@@ -135,6 +135,10 @@ public class PopupManager : MonoBehaviour
 
     private IEnumerator RunSequence()
     {
+        // Set the first entry's text before fading in so the old message never flashes through
+        if (_queue.Count > 0 && messageText != null)
+            messageText.text = _queue.Peek().message;
+
         yield return StartCoroutine(FadePanel(true));
 
         while (_queue.Count > 0)
@@ -171,7 +175,7 @@ public class PopupManager : MonoBehaviour
         // Count down — player can skip at any point after inputDelay
         while (elapsed < duration)
         {
-            elapsed += Time.deltaTime;
+            elapsed += Time.unscaledDeltaTime;
             SetProgressBar(1f - (elapsed / duration));
 
             if (_inputReady && WasSkipPressed())

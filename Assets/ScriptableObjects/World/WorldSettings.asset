@@ -1,0 +1,26 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: cda0d8adbecb97d4a909426fc4a19935, type: 3}
+  m_Name: WorldSettings
+  m_EditorClassIdentifier: Assembly-CSharp::TerrainGeneratorSettings
+  seed: 4219
+  globalHeightScale: 1
+  globalNoiseOffset: {x: 17, y: 23}
+  splineSamples: 500
+  colorMap: {fileID: 2800000, guid: 48e2b3c2ca19917408b7acc20634d153, type: 3}
+  biomes:
+  - {fileID: 11400000, guid: db136c890e6976c4a8bf04800b7974e0, type: 2}
+  terrainMask: {fileID: 0}
+  maskForcedBiomeIndex: 0
+  maskHeightClamp: 0.5
+  roads: []
+  canyons: []

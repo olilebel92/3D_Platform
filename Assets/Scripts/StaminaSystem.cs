@@ -65,8 +65,6 @@ public class StaminaSystem : MonoBehaviour
             if (isExhausted && currentStamina >= minStaminaToSprint)
                 isExhausted = false;
 
-        
-
             UpdateUI();
         }
     }
@@ -77,17 +75,19 @@ public class StaminaSystem : MonoBehaviour
             staminaBarPanel.SetActive(true);
     }
 
-    void HideBar()
+    /// <summary>
+    /// Called by PlayerUILinker after it wires the UI references at runtime.
+    /// Forces an immediate bar refresh so the first frame shows the correct value.
+    /// </summary>
+    public void RefreshUI()
     {
-        if (staminaBarPanel != null && staminaBarPanel.activeSelf)
-            staminaBarPanel.SetActive(false);
+        ShowBar();
+        UpdateUI();
     }
 
     void UpdateUI()
     {
         if (staminaBarFill != null)
             staminaBarFill.fillAmount = currentStamina / maxStamina;
-        else
-            Debug.LogWarning("[Stamina] staminaBarFill not assigned!");
     }
 }

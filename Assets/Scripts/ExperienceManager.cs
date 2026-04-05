@@ -1,11 +1,11 @@
-﻿using UnityEngine;
+using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
 
 /// <summary>
 /// Manages the player's Level, XP, and three core stats: STR, AGI, INT.
-/// On level-up the game pauses and a stat-choice panel appears — the player
-/// picks which stat to increase before play resumes.
+/// On level-up the player receives a stat point to spend freely in the
+/// Character Stats panel (CharacterWindow) — the game never pauses.
 /// Attach this to your Player GameObject.
 /// </summary>
 public class ExperienceManager : MonoBehaviour
@@ -25,33 +25,81 @@ public class ExperienceManager : MonoBehaviour
     // ─── Stats ────────────────────────────────────────────────────────────────
 
     [Header("Stats")]
-    [Tooltip("STR — increases melee attack damage.")]
+    [Tooltip("Unspent stat points earned from levelling up.")]
+    public int statPoints = 0;
+
+    [Tooltip("STR — increases melee attack damage and max HP.")]
     public int strength = 1;
 
-    [Tooltip("AGI — reduces attack cooldown and boosts move/sprint speed. " +
-             "Tune the per-point bonuses below.")]
+    [Tooltip("AGI — reduces attack cooldown and boosts move/sprint speed.")]
     public int agility = 1;
 
-    [Tooltip("INT — reserved for future mana and spell-damage systems.")]
+    [Tooltip("INT — each point adds spell damage.")]
     public int intelligence = 1;
+
+    // ─── STR Tuning ───────────────────────────────────────────────────────────
+
+    [Header("STR Tuning")]
+    [Tooltip("Base minimum damage at STR 1.")]
+    public float baseMinDamage = 1f;
+
+    [Tooltip("Base maximum damage at STR 1.")]
+    public float baseMaxDamage = 2f;
+
+    [Tooltip("Flat min damage added per STR point above 1.")]
+    public float minDamagePerStr = 0.5f;
+
+    [Tooltip("Flat max damage added per STR point above 1.")]
+    public float maxDamagePerStr = 1f;
+
+    [Tooltip("Max HP gained per STR point spent.")]
+    public int hpPerStr = 5;
+
+    // ─── AGI Tuning ───────────────────────────────────────────────────────────
+
+    // ─── Crit Stats ───────────────────────────────────────────────────────────
+
+    [Header("Crit Stats")]
+    [Tooltip("Base critical hit chance. (0.10 = 10%)")]
+    public float baseCritRate = 0.10f;
+
+    [Tooltip("Crit rate added per point spent. (0.02 = +2% per point)")]
+    public float critRatePerPoint = 0.02f;
+
+    [Tooltip("Base critical hit damage bonus. (0.50 = +50% damage)")]
+    public float baseCritDamage = 0.50f;
+
+    [Tooltip("Crit damage added per point spent. (0.10 = +10% per point)")]
+    public float critDamagePerPoint = 0.10f;
+
+    [Tooltip("Stat points spent on crit rate.")]
+    public int critRatePoints = 0;
+
+    [Tooltip("Stat points spent on crit damage.")]
+    public int critDamagePoints = 0;
 
     // ─── AGI Tuning ───────────────────────────────────────────────────────────
 
     [Header("AGI Tuning")]
-    [Tooltip("Flat speed added to base moveSpeed per AGI point.")]
-    public float agiMoveSpeedBonus = 0.1f;
+    [Tooltip("Move speed multiplier bonus per AGI point. (0.02 = +2% per point)")]
+    public float agiMoveSpeedPct = 0.02f;
 
-    [Tooltip("Flat speed added to base sprintSpeed per AGI point.")]
-    public float agiSprintSpeedBonus = 0.15f;
+    [Tooltip("Sprint speed multiplier bonus per AGI point. (0.02 = +2% per point)")]
+    public float agiSprintSpeedPct = 0.02f;
 
-    [Tooltip("Seconds subtracted from base attackCooldown per AGI point. " +
-             "Clamped so cooldown never drops below agiMinAttackCooldown.")]
-    public float agiCooldownReduction = 0.02f;
+    [Tooltip("Attack cooldown reduction per AGI point. (0.015 = -1.5% per point)")]
+    public float agiCooldownReductionPct = 0.015f;
 
     [Tooltip("Hard floor for attack cooldown regardless of AGI.")]
-    public float agiMinAttackCooldown = 0.2f;
+    public float agiMinAttackCooldown = 0.3f;
 
-    // ─── UI References ────────────────────────────────────────────────────────
+    // ─── INT Tuning ───────────────────────────────────────────────────────────
+
+    [Header("INT Tuning")]
+    [Tooltip("Spell damage multiplier bonus per INT point. (0.05 = +5% per point)")]
+    public float intSpellDamagePct = 0.05f;
+
+    // ─── HUD UI References ────────────────────────────────────────────────────
 
     [Header("HUD UI")]
     [Tooltip("Drag your Level label (TextMeshProUGUI) here.")]
@@ -72,80 +120,139 @@ public class ExperienceManager : MonoBehaviour
     [Tooltip("Drag your XP Slider here.")]
     public Slider xpBar;
 
-    // ─── Stat-Choice Panel ────────────────────────────────────────────────────
+    // ─── Audio ────────────────────────────────────────────────────────────────
 
-    [Header("Level-Up Panel")]
-    [Tooltip("Root panel GameObject that appears when the player levels up. " +
-             "Wire the three buttons below to ChooseSTR / ChooseAGI / ChooseINT.")]
-    public GameObject levelUpPanel;
+    [Header("Audio")]
+    [Tooltip("Sound played when the player levels up.")]
+    public AudioClip levelUpClip;
 
-    [Tooltip("Button that increases STR. Hook its OnClick → ExperienceManager.ChooseSTR()")]
-    public Button btnChooseSTR;
+    private AudioSource _audioSource;
 
-    [Tooltip("Button that increases AGI. Hook its OnClick → ExperienceManager.ChooseAGI()")]
-    public Button btnChooseAGI;
+    // ─── Events ──────────────────────────────────────────────────────────────
 
-    [Tooltip("Button that increases INT. Hook its OnClick → ExperienceManager.ChooseINT()")]
-    public Button btnChooseINT;
+    /// <summary>Fired when the player levels up. Argument is the new level.</summary>
+    public event System.Action<int> OnLevelUp;
+
+    /// <summary>Fired whenever XP changes. Argument is fill ratio (0–1) for the XP bar.</summary>
+    public event System.Action<float> OnXPChanged;
 
     // ─── Private State ────────────────────────────────────────────────────────
 
-    private bool _waitingForStatChoice = false;
+    private HealthSystem _playerHealth;
+    private PlayerInventory _inventory;
 
     // ─── Unity Lifecycle ──────────────────────────────────────────────────────
 
-    void Awake()
-    {
-        if (Instance != null && Instance != this)
-        {
-            Destroy(gameObject);
-            return;
-        }
-        Instance = this;
-    }
-
     void Start()
     {
-        // Wire buttons in code so the designer doesn't have to drag them manually
-        if (btnChooseSTR != null) btnChooseSTR.onClick.AddListener(ChooseSTR);
-        if (btnChooseAGI != null) btnChooseAGI.onClick.AddListener(ChooseAGI);
-        if (btnChooseINT != null) btnChooseINT.onClick.AddListener(ChooseINT);
+        _audioSource = GetComponent<AudioSource>();
+        if (_audioSource == null)
+            _audioSource = gameObject.AddComponent<AudioSource>();
 
-        HideLevelUpPanel();
+        _playerHealth = GetComponent<HealthSystem>();
+        if (_playerHealth == null)
+            Debug.LogWarning("[ExperienceManager] No HealthSystem found on this GameObject.");
+
+        // Cache own PlayerInventory — each player has their own, no singleton needed.
+        _inventory = GetComponent<PlayerInventory>();
+        if (_inventory != null)
+            _inventory.OnInventoryChanged += OnEquipmentChanged;
+
         UpdateUI();
+    }
+
+    void OnDestroy()
+    {
+        if (_inventory != null)
+            _inventory.OnInventoryChanged -= OnEquipmentChanged;
+
+        // Clear singleton if this was the local instance
+        if (Instance == this) Instance = null;
+    }
+
+    /// <summary>
+    /// Called by PlayerController after spawning the local player.
+    /// Sets this component as the global Instance so UI and scene pickups
+    /// can always reach the local player's XP/stats.
+    /// </summary>
+    public void SetAsLocalInstance()
+    {
+        Instance = this;
+        Debug.Log("[ExperienceManager] Set as local instance.");
+    }
+
+    /// <summary>Called whenever the player equips, unequips, or removes an item.</summary>
+    private void OnEquipmentChanged()
+    {
+        if (_playerHealth == null) return;
+
+        int strHP  = EquipBonusSTR * hpPerStr;
+        int flatHP = _inventory != null ? _inventory.TotalBonusHP : 0;
+        _playerHealth.ApplyEquipmentHP(strHP + flatHP);
     }
 
     // ─── Public XP API ───────────────────────────────────────────────────────
 
     /// <summary>
-    /// Award XP to the player. Triggers the level-up panel if a threshold is crossed.
+    /// Award XP to the player. Grants a stat point for each level threshold crossed.
     /// </summary>
     public void GainXP(int amount)
     {
-        if (_waitingForStatChoice) return;  // Don't accumulate XP mid-choice
-
         currentXP += amount;
         Debug.Log($"[XP] +{amount} XP  →  {currentXP}/{xpToNextLevel}");
 
-        if (currentXP >= xpToNextLevel)
+        if (DamagePopupManager.Instance != null)
+            DamagePopupManager.Instance.ShowXP(transform.position, amount);
+
+        // Handle multiple level-ups from a single XP grant
+        while (currentXP >= xpToNextLevel)
             TriggerLevelUp();
 
         UpdateUI();
     }
 
+    // ─── Effective Stats (base + equipment bonuses) ───────────────────────────
+
+    private int EquipBonusSTR => _inventory != null ? _inventory.TotalBonusSTR : 0;
+    private int EquipBonusAGI => _inventory != null ? _inventory.TotalBonusAGI : 0;
+    private int EquipBonusINT => _inventory != null ? _inventory.TotalBonusINT : 0;
+
+    public int EffectiveSTR => strength    + EquipBonusSTR;
+    public int EffectiveAGI => agility     + EquipBonusAGI;
+    public int EffectiveINT => intelligence + EquipBonusINT;
+
     // ─── Computed Stat Properties ─────────────────────────────────────────────
 
-    /// <summary>Move speed after applying AGI bonus. Read by PlayerController.</summary>
+    /// <summary>Move speed after AGI bonus (includes equipment). +agiMoveSpeedPct% per point.</summary>
     public float ComputedMoveSpeed(float baseMoveSpeed)
-        => baseMoveSpeed + agility * agiMoveSpeedBonus;
+        => baseMoveSpeed * (1f + EffectiveAGI * agiMoveSpeedPct);
 
-    /// <summary>Sprint speed after applying AGI bonus. Read by PlayerController.</summary>
+    /// <summary>Sprint speed after AGI bonus (includes equipment). +agiSprintSpeedPct% per point.</summary>
     public float ComputedSprintSpeed(float baseSprintSpeed)
-        => baseSprintSpeed + agility * agiSprintSpeedBonus;
+        => baseSprintSpeed * (1f + EffectiveAGI * agiSprintSpeedPct);
 
-    /// <summary>Attack cooldown after applying AGI reduction. Read by PlayerAttack.</summary>
+    /// <summary>Attack cooldown after AGI reduction (includes equipment). Floored at agiMinAttackCooldown.</summary>
     public float ComputedAttackCooldown(float baseAttackCooldown)
-        => Mathf.Max(agiMinAttackCooldown, baseAttackCooldown - agility * agiCooldownReduction);
+        => Mathf.Max(agiMinAttackCooldown, baseAttackCooldown * (1f - EffectiveAGI * agiCooldownReductionPct));
+
+    /// <summary>Spell damage multiplier from INT (includes equipment). +intSpellDamagePct% per point.</summary>
+    public float SpellDamageMultiplier => 1f + EffectiveINT * intSpellDamagePct;
+
+    /// <summary>Min damage using effective STR. Base at STR 1, +minDamagePerStr per point above.</summary>
+    public int ComputedMinDamage => Mathf.Max(1, Mathf.RoundToInt(baseMinDamage + (EffectiveSTR - 1) * minDamagePerStr));
+
+    /// <summary>Max damage using effective STR. Base at STR 1, +maxDamagePerStr per point above.</summary>
+    public int ComputedMaxDamage => Mathf.Max(ComputedMinDamage, Mathf.RoundToInt(baseMaxDamage + (EffectiveSTR - 1) * maxDamagePerStr));
+
+    /// <summary>Current crit rate (0–1). Base + stat points + equipment.</summary>
+    public float ComputedCritRate
+        => baseCritRate + critRatePoints * critRatePerPoint
+           + (_inventory != null ? _inventory.TotalBonusCritRate : 0f);
+
+    /// <summary>Current crit damage bonus (0–1+). Base + stat points + equipment.</summary>
+    public float ComputedCritDamage
+        => baseCritDamage + critDamagePoints * critDamagePerPoint
+           + (_inventory != null ? _inventory.TotalBonusCritDamage : 0f);
 
     // ─── Level-Up Flow ────────────────────────────────────────────────────────
 
@@ -154,70 +261,84 @@ public class ExperienceManager : MonoBehaviour
         currentXP -= xpToNextLevel;
         currentLevel++;
         xpToNextLevel = Mathf.RoundToInt(xpToNextLevel * xpScalingFactor);
+        statPoints++;
+        OnLevelUp?.Invoke(currentLevel);
 
-        Debug.Log($"[LEVEL UP] Now Level {currentLevel}! Choose a stat. " +
+        Debug.Log($"[LEVEL UP] Now Level {currentLevel}! +1 stat point ({statPoints} unspent). " +
                   $"Next level needs {xpToNextLevel} XP.");
 
-        _waitingForStatChoice = true;
-        Time.timeScale = 0f;        // Pause game while choosing
-        ShowLevelUpPanel();
+        if (_audioSource != null && levelUpClip != null)
+            _audioSource.PlayOneShot(levelUpClip);
+
+        if (SkillTreeManager.Instance != null)
+            SkillTreeManager.Instance.AddSkillPoint();
+        else
+            Debug.LogWarning("[ExperienceManager] SkillTreeManager not found — skill point not awarded.");
     }
 
-    // ─── Stat Choice Callbacks ────────────────────────────────────────────────
+    // ─── Stat Spend API (called by CharacterWindow buttons) ──────────────────
 
-    /// <summary>Called by the STR button (or wired in Start).</summary>
-    public void ChooseSTR()
+    /// <summary>Spend one stat point on Strength. Returns true if successful.</summary>
+    public bool SpendOnSTR()
     {
+        if (statPoints <= 0) return false;
+        statPoints--;
         strength++;
-        Debug.Log($"[STAT CHOICE] +1 STR → STR is now {strength}");
-        FinishStatChoice();
-    }
-
-    /// <summary>Called by the AGI button (or wired in Start).</summary>
-    public void ChooseAGI()
-    {
-        agility++;
-        Debug.Log($"[STAT CHOICE] +1 AGI → AGI is now {agility}");
-        FinishStatChoice();
-    }
-
-    /// <summary>Called by the INT button (or wired in Start).</summary>
-    public void ChooseINT()
-    {
-        intelligence++;
-        Debug.Log($"[STAT CHOICE] +1 INT → INT is now {intelligence}");
-        // TODO: Hook INT into mana pool and spell-damage systems when implemented.
-        FinishStatChoice();
-    }
-
-    private void FinishStatChoice()
-    {
-        _waitingForStatChoice = false;
-        Time.timeScale = 1f;        // Resume game
-        HideLevelUpPanel();
-
-        // If a massive XP grant caused multiple level-ups, handle the next one
-        if (currentXP >= xpToNextLevel)
-            TriggerLevelUp();
-
+        if (_playerHealth != null)
+            _playerHealth.IncreaseMaxHealth(hpPerStr);
+        Debug.Log($"[STAT] +1 STR → {strength} (dmg {ComputedMinDamage}-{ComputedMaxDamage}, +{hpPerStr} HP)  |  {statPoints} points remaining");
         UpdateUI();
+        return true;
     }
 
-    // ─── Panel Helpers ────────────────────────────────────────────────────────
-
-    private void ShowLevelUpPanel()
+    /// <summary>Spend one stat point on Agility. Returns true if successful.</summary>
+    public bool SpendOnAGI()
     {
-        if (levelUpPanel != null)
-            levelUpPanel.SetActive(true);
+        if (statPoints <= 0) return false;
+        statPoints--;
+        agility++;
+        Debug.Log($"[STAT] +1 AGI → {agility}  |  {statPoints} points remaining");
+        UpdateUI();
+        return true;
     }
 
-    private void HideLevelUpPanel()
+    /// <summary>Spend one stat point on Crit Rate. Returns true if successful.</summary>
+    public bool SpendOnCritRate()
     {
-        if (levelUpPanel != null)
-            levelUpPanel.SetActive(false);
+        if (statPoints <= 0) return false;
+        statPoints--;
+        critRatePoints++;
+        Debug.Log($"[STAT] +Crit Rate → {ComputedCritRate * 100f:F0}%  |  {statPoints} points remaining");
+        UpdateUI();
+        return true;
+    }
+
+    /// <summary>Spend one stat point on Crit Damage. Returns true if successful.</summary>
+    public bool SpendOnCritDamage()
+    {
+        if (statPoints <= 0) return false;
+        statPoints--;
+        critDamagePoints++;
+        Debug.Log($"[STAT] +Crit Damage → {ComputedCritDamage * 100f:F0}%  |  {statPoints} points remaining");
+        UpdateUI();
+        return true;
+    }
+
+    /// <summary>Spend one stat point on Intelligence. Returns true if successful.</summary>
+    public bool SpendOnINT()
+    {
+        if (statPoints <= 0) return false;
+        statPoints--;
+        intelligence++;
+        Debug.Log($"[STAT] +1 INT → {intelligence}  (×{SpellDamageMultiplier:F2} spell dmg)  |  {statPoints} points remaining");
+        UpdateUI();
+        return true;
     }
 
     // ─── UI Update ────────────────────────────────────────────────────────────
+
+    /// <summary>Called by PlayerUILinker after wiring UI references. Forces a full HUD refresh.</summary>
+    public void RefreshXPBar() => UpdateUI();
 
     private void UpdateUI()
     {
@@ -227,8 +348,13 @@ public class ExperienceManager : MonoBehaviour
         if (xpText != null)
             xpText.text = $"{currentXP} / {xpToNextLevel} XP";
 
+        float ratio = xpToNextLevel > 0 ? (float)currentXP / xpToNextLevel : 0f;
+
         if (xpBar != null)
-            xpBar.value = (float)currentXP / xpToNextLevel;
+            xpBar.value = ratio;
+
+        // Notify any external listeners (e.g. PlayerUILinker) even if xpBar is null here.
+        OnXPChanged?.Invoke(ratio);
 
         if (strengthText != null)
             strengthText.text = $"STR: {strength}";

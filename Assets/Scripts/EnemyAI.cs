@@ -9,6 +9,7 @@ public class EnemyAI : MonoBehaviour
     public Transform player;
     private NavMeshAgent agent;
     private Animator animator;
+    private HealthSystem _playerHealth;
 
     // ─── Detection & Attack ───────────────────────────────────────────────────
     [Header("Range Settings")]
@@ -42,7 +43,7 @@ public class EnemyAI : MonoBehaviour
     {
         // Grab components
         agent = GetComponent<NavMeshAgent>();
-        animator = GetComponent<Animator>();
+        animator = GetComponentInChildren<Animator>();
 
         // Auto-find player if not assigned
         if (player == null)
@@ -53,6 +54,10 @@ public class EnemyAI : MonoBehaviour
             else
                 Debug.LogWarning("[EnemyAI] No player found! Tag your player as 'Player'.");
         }
+
+        // Cache player HealthSystem to avoid GetComponent every attack tick
+        if (player != null)
+            _playerHealth = player.GetComponent<HealthSystem>();
 
         // Apply speed to NavMeshAgent
         if (agent != null)
@@ -130,14 +135,12 @@ public class EnemyAI : MonoBehaviour
                 animator.SetTrigger(AnimAttack);
 
             // Deal damage to player
-            HealthSystem health = player.GetComponent<HealthSystem>();
-            if (health != null)
-                health.TakeDamage(attackDamage);
+            if (_playerHealth != null)
+                _playerHealth.TakeDamage(attackDamage);
 
-            Debug.Log("[EnemyAI] Attack!");
         }
 
-        // Play attack animation, fallback to idle
+        // Stand still while in attack range
         SetAnimation(AnimIdle);
     }
 
@@ -164,6 +167,7 @@ public class EnemyAI : MonoBehaviour
     public void SetTarget(Transform target)
     {
         player = target;
+        _playerHealth = target != null ? target.GetComponent<HealthSystem>() : null;
     }
 
     // ─── Gizmos ───────────────────────────────────────────────────────────────
