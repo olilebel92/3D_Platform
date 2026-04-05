@@ -1,4 +1,5 @@
-﻿using UnityEngine;
+﻿using System.Collections.Generic;
+using UnityEngine;
 using UnityEngine.InputSystem;
 
 /// <summary>
@@ -26,6 +27,9 @@ public class PlayerAttack : MonoBehaviour
              "in ExperienceManager.")]
     public float attackCooldown = 0.8f;
 
+    [Tooltip("How long the hitbox stays active after the attack starts (should match the swing portion of the animation).")]
+    public float attackActiveDuration = 0.5f;
+
     [Tooltip("Fallback damage if ExperienceManager is not in the scene.")]
     public int attackDamage = 1;
 
@@ -37,6 +41,13 @@ public class PlayerAttack : MonoBehaviour
 
     [Tooltip("Only GameObjects with this tag will be damaged.")]
     public string enemyTag = "Enemy";
+
+    [Header("Audio")]
+    [Tooltip("Sound played when the player swings / attacks.")]
+    public AudioClip attackSwingClip;
+
+    [Tooltip("AudioSource used to play attack sounds. Auto-found if blank.")]
+    public AudioSource audioSource;
 
     [Header("References")]
     [Tooltip("Leave blank — auto-found on this GameObject at Start.")]
@@ -50,8 +61,15 @@ public class PlayerAttack : MonoBehaviour
 
     // No local PlayerInputActions — we borrow PlayerController's shared instance.
     private PlayerInputActions _inputActions;
+    private ExperienceManager _xp;
     private float _cooldownTimer = 0f;
+    private float _activeWindowTimer = 0f;
     private bool _isAttacking = false;
+    private bool _attackWindowActive = false;
+    private readonly HashSet<int> _hitThisSwing = new HashSet<int>();
+
+    // Index of the UppgerBody layer in the Animator controller.
+    private int _upperBodyLayerIndex = -1;
 
     // ─── Unity Lifecycle ──────────────────────────────────────────────────────
 
@@ -65,7 +83,11 @@ public class PlayerAttack : MonoBehaviour
         {
             _inputActions = pc.InputActions;
         }
-        else
+
+        // Cache own ExperienceManager — each player has their own instance.
+        _xp = GetComponent<ExperienceManager>();
+
+        if (_inputActions == null)
         {
             // Fallback: create our own instance only if PlayerController is absent.
             Debug.LogWarning("[PlayerAttack] PlayerController not found on this GameObject. " +
@@ -79,12 +101,29 @@ public class PlayerAttack : MonoBehaviour
             _inputActions.Player.Fire.performed += OnFire;
 
         // ── Animator ──────────────────────────────────────────────────────────
+        if (audioSource == null)
+            audioSource = GetComponent<AudioSource>();
+        if (audioSource == null)
+            audioSource = gameObject.AddComponent<AudioSource>();
+
         if (animator == null)
             animator = GetComponentInChildren<Animator>();
 
         if (animator == null)
+        {
             Debug.LogWarning("[PlayerAttack] No Animator found on " + gameObject.name +
                              " or its children.");
+        }
+        else
+        {
+            // Cache the UppgerBody layer index and start with weight 0
+            // so the Base Layer drives the arms during idle/walk/sprint.
+            _upperBodyLayerIndex = animator.GetLayerIndex("UpperBody");
+            if (_upperBodyLayerIndex >= 0)
+                animator.SetLayerWeight(_upperBodyLayerIndex, 0f);
+            else
+                Debug.LogWarning("[PlayerAttack] 'UpperBody' layer not found in Animator.");
+        }
     }
 
     void OnDestroy()
@@ -97,11 +136,37 @@ public class PlayerAttack : MonoBehaviour
     void Update()
     {
         // ── Cooldown Tick ─────────────────────────────────────────────────────
+        // Use unscaledDeltaTime so the cooldown still drains when the game is
+        // paused (Time.timeScale = 0) during the level-up stat-choice panel.
+        // Without this, attacking right as a level-up triggers leaves
+        // _isAttacking permanently true and blocks all future attacks.
         if (_isAttacking)
         {
-            _cooldownTimer -= Time.deltaTime;
+            _cooldownTimer -= Time.unscaledDeltaTime;
             if (_cooldownTimer <= 0f)
+            {
                 _isAttacking = false;
+
+                // Drop the upper body layer weight back to 0 so the
+                // Base Layer resumes driving the arms during locomotion.
+                if (_upperBodyLayerIndex >= 0)
+                    animator.SetLayerWeight(_upperBodyLayerIndex, 0f);
+            }
+        }
+
+        // ── Active Damage Window ──────────────────────────────────────────────
+        if (_attackWindowActive)
+        {
+            _activeWindowTimer -= Time.unscaledDeltaTime;
+            if (_activeWindowTimer <= 0f)
+            {
+                _attackWindowActive = false;
+                _hitThisSwing.Clear();
+            }
+            else
+            {
+                DamageEnemiesInRange();
+            }
         }
     }
 
@@ -111,20 +176,31 @@ public class PlayerAttack : MonoBehaviour
     {
         if (_isAttacking) return;
         if (animator == null) return;
+        if (Time.timeScale == 0f) return; // block attacks while any popup/menu is open
 
         // ── Trigger animation ─────────────────────────────────────────────────
+        // Activate the upper body layer so the attack clip overrides the arms.
+        if (_upperBodyLayerIndex >= 0)
+            animator.SetLayerWeight(_upperBodyLayerIndex, 1f);
+
         animator.SetTrigger(AnimAttack);
 
-        // ── Deal damage ───────────────────────────────────────────────────────
-        DamageEnemiesInRange();
+        // ── Attack sound ──────────────────────────────────────────────────────
+        if (audioSource != null && attackSwingClip != null)
+            audioSource.PlayOneShot(attackSwingClip);
+
+        // ── Open damage window ────────────────────────────────────────────────
+        _hitThisSwing.Clear();
+        _attackWindowActive = true;
+        _activeWindowTimer = attackActiveDuration;
 
         _isAttacking = true;
 
         // ── AGI Cooldown Reduction ────────────────────────────────────────────
         // ExperienceManager subtracts (agility × agiCooldownReduction) from the
         // base cooldown set in this Inspector, floored at agiMinAttackCooldown.
-        _cooldownTimer = ExperienceManager.Instance != null
-            ? ExperienceManager.Instance.ComputedAttackCooldown(attackCooldown)
+        _cooldownTimer = _xp != null
+            ? _xp.ComputedAttackCooldown(attackCooldown)
             : attackCooldown;
 
         Debug.Log($"[PlayerAttack] Attack triggered. Effective cooldown: {_cooldownTimer:F2}s");
@@ -137,22 +213,41 @@ public class PlayerAttack : MonoBehaviour
         Vector3 hitCenter = transform.position + transform.forward * attackOffset;
         Collider[] hits = Physics.OverlapSphere(hitCenter, attackRadius);
 
-        // ── STR Damage ────────────────────────────────────────────────────────
-        // Uses STR from ExperienceManager; falls back to Inspector value if missing.
-        int damage = ExperienceManager.Instance != null
-            ? ExperienceManager.Instance.strength
-            : attackDamage;
+        // ── Damage Range ──────────────────────────────────────────────────────
+        // Roll a value between computed min and max; falls back to Inspector value.
+        int baseDamage;
+        if (_xp != null)
+        {
+            int minDmg = _xp.ComputedMinDamage;
+            int maxDmg = _xp.ComputedMaxDamage;
+            baseDamage = Random.Range(minDmg, maxDmg + 1);
+        }
+        else
+        {
+            baseDamage = attackDamage;
+        }
+
+        // ── Crit Roll ─────────────────────────────────────────────────────────
+        bool isCrit = _xp != null && Random.value < _xp.ComputedCritRate;
+
+        int damage = isCrit && _xp != null
+            ? Mathf.RoundToInt(baseDamage * (1f + _xp.ComputedCritDamage))
+            : baseDamage;
 
         foreach (Collider hit in hits)
         {
             if (!hit.CompareTag(enemyTag)) continue;
 
+            int id = hit.gameObject.GetInstanceID();
+            if (_hitThisSwing.Contains(id)) continue;
+
             HealthSystem health = hit.GetComponent<HealthSystem>();
             if (health != null)
             {
-                health.TakeDamage(damage);
+                health.TakeDamage(damage, isCrit);
+                _hitThisSwing.Add(id);
                 Debug.Log($"[PlayerAttack] Hit {hit.gameObject.name} for {damage} damage " +
-                          $"(STR={damage}).");
+                          $"(STR={baseDamage}{(isCrit ? " CRIT!" : "")}).");
             }
         }
     }

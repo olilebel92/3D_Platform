@@ -20,6 +20,14 @@ public class HealthSystem : MonoBehaviour
     [Tooltip("Root panel of the HP bar — shown/hidden like the stamina bar.")]
     public GameObject hpBarPanel;
 
+    // ─── Audio ────────────────────────────────────────────────────────────────
+    [Header("Audio")]
+    [Tooltip("Sound played when this character takes damage.")]
+    public AudioClip hitSound;
+
+    [Tooltip("AudioSource used to play hit sounds. Auto-found if blank.")]
+    public AudioSource audioSource;
+
     // ─── Death Settings ───────────────────────────────────────────────────────
     [Header("Death Settings")]
     [Tooltip("If true, destroys the GameObject on death. Use for enemies.")]
@@ -28,15 +36,51 @@ public class HealthSystem : MonoBehaviour
     [Tooltip("Seconds before the object is destroyed after death.")]
     public float deathDelay = 0.5f;
 
+    // ─── Private State ────────────────────────────────────────────────────────
+
+    /// <summary>HP from the Inspector + all STR level-up spends. Never includes equipment.</summary>
+    private int _permanentMaxHealth;
+
+    private float _regenTimer = 0f;
+    private PlayerInventory _inventory;
+
     // ─── Unity Lifecycle ──────────────────────────────────────────────────────
     void Start()
     {
+        if (audioSource == null)
+            audioSource = GetComponent<AudioSource>();
+        if (audioSource == null)
+            audioSource = gameObject.AddComponent<AudioSource>();
+
+        // Cache own PlayerInventory — each player has their own, no singleton needed.
+        _inventory = GetComponent<PlayerInventory>();
+
+        _permanentMaxHealth = maxHealth;
         currentHealth = maxHealth;
         UpdateHealthUI();
     }
 
+    // ─── Unity Lifecycle (regen tick) ─────────────────────────────────────────
+
+    void Update()
+    {
+        if (!CompareTag("Player")) return;
+        if (currentHealth >= maxHealth) return;
+        if (_inventory == null) return;
+
+        float regen = _inventory.TotalBonusRegen;
+        if (regen <= 0f) return;
+
+        _regenTimer += Time.deltaTime;
+        if (_regenTimer >= 1f)
+        {
+            _regenTimer -= 1f;
+            Heal(Mathf.RoundToInt(regen));
+        }
+    }
+
     // ─── Public API ───────────────────────────────────────────────────────────
-    public void TakeDamage(int amount)
+    public void TakeDamage(int amount, bool isCrit = false)
     {
         currentHealth -= amount;
         currentHealth = Mathf.Clamp(currentHealth, 0, maxHealth);
@@ -44,11 +88,15 @@ public class HealthSystem : MonoBehaviour
 
         Debug.Log(gameObject.name + " took " + amount + " damage! HP: " + currentHealth + "/" + maxHealth);
 
+        // ── Hit Sound ─────────────────────────────────────────────────────────
+        if (audioSource != null && hitSound != null)
+            audioSource.PlayOneShot(hitSound);
+
         // ── Damage Popup ──────────────────────────────────────────────────────
         if (DamagePopupManager.Instance != null)
         {
             bool isPlayer = CompareTag("Player");
-            DamagePopupManager.Instance.ShowDamage(transform.position, amount, isPlayer);
+            DamagePopupManager.Instance.ShowDamage(transform.position, amount, isPlayer, isCrit);
         }
 
         if (currentHealth <= 0)
@@ -57,11 +105,42 @@ public class HealthSystem : MonoBehaviour
 
     public void Heal(int amount)
     {
+        int before = currentHealth;
         currentHealth += amount;
         currentHealth = Mathf.Clamp(currentHealth, 0, maxHealth);
+        int gained = currentHealth - before;
         UpdateHealthUI();
 
-        Debug.Log(gameObject.name + " healed " + amount + " HP! HP: " + currentHealth + "/" + maxHealth);
+        Debug.Log(gameObject.name + " healed " + gained + " HP! HP: " + currentHealth + "/" + maxHealth);
+
+        if (gained > 0 && DamagePopupManager.Instance != null)
+            DamagePopupManager.Instance.ShowHeal(transform.position, gained);
+    }
+
+    /// <summary>Permanently increases max HP (called when spending a STR stat point). Does NOT heal current HP.</summary>
+    public void IncreaseMaxHealth(int amount)
+    {
+        _permanentMaxHealth += amount;
+        maxHealth           += amount;
+        UpdateHealthUI();
+
+        Debug.Log(gameObject.name + " max HP increased by " + amount + ". HP: " + currentHealth + "/" + maxHealth);
+    }
+
+    /// <summary>
+    /// Recalculates max HP from equipment STR bonus. Called whenever inventory changes.
+    /// Does NOT permanently change HP — unequipping restores the previous max.
+    /// </summary>
+    public void ApplyEquipmentHP(int equipmentBonus)
+    {
+        int newMax = _permanentMaxHealth + equipmentBonus;
+        maxHealth  = newMax;
+
+        // Only clamp down if current HP now exceeds the new max (e.g. unequipping a high-HP item)
+        currentHealth = Mathf.Clamp(currentHealth, 1, maxHealth);
+        UpdateHealthUI();
+
+        Debug.Log($"[HealthSystem] Equipment HP bonus applied: +{equipmentBonus} → maxHP {maxHealth}");
     }
 
     // ─── Internal ─────────────────────────────────────────────────────────────
@@ -76,7 +155,23 @@ public class HealthSystem : MonoBehaviour
 
             Destroy(gameObject, deathDelay);
         }
+        else if (CompareTag("Player"))
+        {
+            if (WaveManager.Instance != null)
+                WaveManager.Instance.OnPlayerDeath();
+
+            if (DeathScreenManager.Instance != null)
+                DeathScreenManager.Instance.ShowDeathScreen();
+            else
+                Debug.LogWarning("[HealthSystem] Player died but no DeathScreenManager found in scene.");
+        }
     }
+
+    /// <summary>
+    /// Called by PlayerUILinker after it wires the UI references at runtime.
+    /// Forces an immediate bar refresh so the first frame shows the correct value.
+    /// </summary>
+    public void RefreshUI() => UpdateHealthUI();
 
     void UpdateHealthUI()
     {

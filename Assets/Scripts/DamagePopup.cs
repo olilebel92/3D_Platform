@@ -26,6 +26,7 @@ public class DamagePopup : MonoBehaviour
     // ─── Private State ────────────────────────────────────────────────────────
 
     private TextMeshPro _label;
+    private Camera _mainCam;
     private float _timer;
     private Vector3 _drift;
     private Color _color;
@@ -35,7 +36,11 @@ public class DamagePopup : MonoBehaviour
     /// <summary>
     /// Called by DamagePopupManager immediately after instantiation.
     /// </summary>
-    public void Initialize(int amount, Color color)
+    /// <param name="amount">Value to display.</param>
+    /// <param name="color">Text color.</param>
+    /// <param name="prefix">Optional prefix prepended to the number, e.g. "+".</param>
+    /// <param name="suffix">Optional suffix appended after the number, e.g. " EXP".</param>
+    public void Initialize(int amount, Color color, string prefix = "", string suffix = "")
     {
         _label = GetComponent<TextMeshPro>();
         if (_label == null)
@@ -45,7 +50,9 @@ public class DamagePopup : MonoBehaviour
             return;
         }
 
-        _label.text = amount.ToString();
+        _mainCam = Camera.main;
+
+        _label.text = prefix + amount.ToString() + suffix;
         _color = color;
         _label.color = _color;
 
@@ -64,8 +71,8 @@ public class DamagePopup : MonoBehaviour
         transform.position += _drift * Time.deltaTime;
 
         // Billboard — always face the camera
-        if (Camera.main != null)
-            transform.forward = Camera.main.transform.forward;
+        if (_mainCam != null)
+            transform.forward = _mainCam.transform.forward;
 
         // Fade out after hold phase
         float fadeProgress = Mathf.InverseLerp(holdDuration, holdDuration + fadeDuration, _timer);

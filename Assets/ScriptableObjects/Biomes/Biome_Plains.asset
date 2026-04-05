@@ -1,0 +1,29 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: ebb9304e04a24804d91e3ac7db4d4b75, type: 3}
+  m_Name: Biome_Plains
+  m_EditorClassIdentifier: Assembly-CSharp::BiomeDefinition
+  biomeName: Plains
+  mapColor: {r: 0.7058824, g: 0.8235294, b: 0.3529412, a: 1}
+  terrainLayers:
+  - {fileID: 8574412962073106934, guid: dfad4328647892e49a1e9b9e119b09ae, type: 2}
+  slopeLayerThreshold: 0.22
+  heightMin: 0.02
+  heightMax: 0.22
+  noiseFrequency: 0.003
+  noiseAmplitude: 300
+  noiseOctaves: 3
+  noisePersistence: 0.38
+  noiseLacunarity: 2
+  moisture: 0.45
+  temperature: 0.55
+  blendRadius: 42

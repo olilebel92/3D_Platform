@@ -7,10 +7,12 @@ public class ItemSpawner : MonoBehaviour
     public float spawnInterval = 4f;    // Seconds between each spawn
     public int maxItems = 10;           // Cap so the scene doesn't get flooded
 
-    [Header("Spawn Area (flat area, no terrain raycast needed)")]
-    public float areaWidth = 20f;       // X range: -areaWidth to +areaWidth
-    public float areaLength = 20f;      // Z range: -areaLength to +areaLength
-    public float spawnHeight = 50f;     // Raycast shoots down from this height
+    [Header("Spawn Area")]
+    public float areaWidth  = 20f;      // X range around spawner: -areaWidth  to +areaWidth
+    public float areaLength = 20f;      // Z range around spawner: -areaLength to +areaLength
+
+    [Tooltip("Fixed world-space Y the raycast starts from. Must be above the highest point of your terrain.")]
+    public float raycastOriginY = 10000f;
 
     private float timer = 0f;
     private int currentItemCount = 0;
@@ -33,10 +35,12 @@ public class ItemSpawner : MonoBehaviour
         float randomX = Random.Range(-areaWidth, areaWidth);
         float randomZ = Random.Range(-areaLength, areaLength);
 
-        Vector3 rayOrigin = new Vector3(randomX, spawnHeight, randomZ);
+        Vector3 rayOrigin = new Vector3(
+            transform.position.x + randomX,
+            raycastOriginY,
+            transform.position.z + randomZ);
 
-        // Raycast downward to land exactly on the terrain surface
-        if (Physics.Raycast(rayOrigin, Vector3.down, out RaycastHit hit, spawnHeight + 10f))
+        if (Physics.Raycast(rayOrigin, Vector3.down, out RaycastHit hit, raycastOriginY * 2f))
         {
             // Spawn slightly above the hit point so it sits on top
             Vector3 spawnPos = hit.point + Vector3.up * 0.5f;
@@ -48,6 +52,11 @@ public class ItemSpawner : MonoBehaviour
                 pickup.spawner = this;
 
             currentItemCount++;
+        }
+        else
+        {
+            Debug.LogWarning("[ItemSpawner] Raycast missed terrain at " + rayOrigin +
+                             " — increase Raycast Origin Y in the Inspector if your terrain is tall.");
         }
     }
 

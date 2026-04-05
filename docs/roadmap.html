@@ -1,0 +1,578 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>HackNSlash — Development Roadmap</title>
+  <style>
+    :root {
+      --bg:#0b0b14; --card:#1a1a2e; --border:#2a2a45;
+      --gold:#c9a84c; --gold-dim:#8a6f2e;
+      --text:#dde1f0; --muted:#7a7a9a;
+      --green:#3dba6e; --orange:#e8920a; --grey:#3a3a5a;
+      --blue:#4488ff; --modal-bg:rgba(5,5,15,0.92);
+    }
+    *{box-sizing:border-box;margin:0;padding:0;}
+    body{background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,sans-serif;min-height:100vh;}
+
+    header{background:linear-gradient(180deg,#0d0d1e 0%,var(--bg) 100%);border-bottom:1px solid var(--border);padding:40px 60px 30px;position:relative;overflow:hidden;}
+    header::before{content:'';position:absolute;inset:0;background:radial-gradient(ellipse at 50% -20%,rgba(201,168,76,.08) 0%,transparent 70%);pointer-events:none;}
+    .header-inner{position:relative;max-width:1200px;margin:0 auto;}
+    header h1{font-size:2.6rem;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--gold);text-shadow:0 0 40px rgba(201,168,76,.3);}
+    header p{margin-top:8px;color:var(--muted);font-size:.95rem;letter-spacing:.03em;}
+    .header-badges{display:flex;gap:10px;flex-wrap:wrap;margin-top:14px;}
+    .hbadge{display:inline-block;background:rgba(201,168,76,.1);border:1px solid var(--gold-dim);color:var(--gold);font-size:.78rem;padding:5px 14px;border-radius:20px;letter-spacing:.06em;text-transform:uppercase;}
+    .hbadge.blue{background:rgba(68,136,255,.1);border-color:#2255aa;color:var(--blue);}
+    .hbadge.green{background:rgba(61,186,110,.1);border-color:rgba(61,186,110,.4);color:var(--green);}
+
+    .tabs-bar{max-width:1200px;margin:0 auto;padding:28px 60px 0;display:flex;gap:4px;}
+    .tab-btn{background:none;border:1px solid var(--border);color:var(--muted);font-size:.8rem;font-weight:600;letter-spacing:.1em;text-transform:uppercase;padding:9px 24px;border-radius:8px 8px 0 0;cursor:pointer;transition:color .15s,border-color .15s,background .15s;}
+    .tab-btn.active{color:var(--gold);border-color:var(--gold-dim);background:var(--card);border-bottom-color:var(--card);position:relative;z-index:1;}
+    .tab-btn:hover:not(.active){color:var(--text);border-color:#3a3a60;}
+    .tabs-divider{max-width:1200px;margin:0 auto;padding:0 60px;border-bottom:1px solid var(--border);margin-top:-1px;}
+
+    .timeline-section{max-width:1200px;margin:32px auto 0;padding:0 60px;}
+    .timeline-label{font-size:.7rem;text-transform:uppercase;letter-spacing:.12em;color:var(--muted);margin-bottom:12px;}
+    .timeline-bar{height:6px;border-radius:3px;background:var(--border);}
+    .timeline-fill{height:100%;border-radius:3px;background:linear-gradient(90deg,var(--green),var(--gold));}
+    .timeline-quarters{display:flex;justify-content:space-between;margin-top:10px;}
+    .timeline-q{font-size:.62rem;color:var(--muted);letter-spacing:.04em;}
+    .timeline-q.current{color:var(--gold);font-weight:700;}
+
+    .grid-wrapper{max-width:1200px;margin:20px auto 0;padding:0 60px;}
+    .phase-banner{max-width:1200px;margin:32px auto 0;padding:0 60px;}
+    .phase-tag{display:inline-block;font-size:.68rem;text-transform:uppercase;letter-spacing:.12em;padding:4px 14px;border-radius:4px;margin-bottom:6px;}
+    .phase-tag.p1{background:rgba(61,186,110,.12);color:var(--green);border:1px solid rgba(61,186,110,.25);}
+    .phase-tag.p2{background:rgba(232,146,10,.12);color:var(--orange);border:1px solid rgba(232,146,10,.25);}
+    .phase-tag.p3{background:rgba(201,168,76,.12);color:var(--gold);border:1px solid var(--gold-dim);}
+    .phase-tag.p4{background:rgba(68,136,255,.12);color:var(--blue);border:1px solid #2255aa;}
+
+    .quarter-group{margin-bottom:48px;}
+    .quarter-title{font-size:.72rem;text-transform:uppercase;letter-spacing:.14em;color:var(--muted);border-bottom:1px solid var(--border);padding-bottom:10px;margin-bottom:20px;}
+    .quarter-title span{color:var(--gold);}
+    .card-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:18px;}
+
+    .card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:22px;cursor:pointer;transition:transform .15s,border-color .15s,box-shadow .15s;position:relative;overflow:hidden;}
+    .card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;border-radius:12px 12px 0 0;}
+    .card.completed::before{background:var(--green);}
+    .card.active::before{background:var(--orange);}
+    .card.planned::before{background:var(--grey);}
+    .card.target::before{background:linear-gradient(90deg,var(--gold),#f0d080);}
+    .card.future::before{background:var(--blue);}
+    .card:hover{transform:translateY(-3px);border-color:var(--gold-dim);box-shadow:0 8px 30px rgba(0,0,0,.4);}
+    .card-top{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:14px;}
+    .version-num{font-size:1.5rem;font-weight:800;color:var(--gold);letter-spacing:.04em;line-height:1;}
+    .status-badge{font-size:.65rem;font-weight:700;text-transform:uppercase;letter-spacing:.1em;padding:4px 10px;border-radius:20px;white-space:nowrap;}
+    .badge-completed{background:rgba(61,186,110,.15);color:var(--green);border:1px solid rgba(61,186,110,.3);}
+    .badge-active{background:rgba(232,146,10,.15);color:var(--orange);border:1px solid rgba(232,146,10,.3);}
+    .badge-planned{background:rgba(58,58,90,.5);color:var(--muted);border:1px solid var(--border);}
+    .badge-target{background:rgba(201,168,76,.15);color:var(--gold);border:1px solid var(--gold-dim);}
+    .badge-future{background:rgba(68,136,255,.15);color:var(--blue);border:1px solid #2255aa;}
+    .card-title{font-size:1rem;font-weight:700;color:var(--text);margin-bottom:6px;}
+    .card-date{font-size:.72rem;color:var(--muted);margin-bottom:14px;letter-spacing:.04em;}
+    .card-bullets{list-style:none;display:flex;flex-direction:column;gap:5px;}
+    .card-bullets li{font-size:.78rem;color:#a0a0c0;padding-left:12px;position:relative;line-height:1.4;}
+    .card-bullets li::before{content:'›';position:absolute;left:0;color:var(--gold-dim);}
+    .card-loop{margin-top:12px;font-size:.7rem;padding:5px 10px;border-radius:6px;background:rgba(201,168,76,.07);border:1px solid rgba(201,168,76,.15);color:#a08040;letter-spacing:.04em;}
+    .card-more{margin-top:10px;font-size:.7rem;color:var(--gold-dim);letter-spacing:.06em;text-align:right;}
+
+    .changelog-wrapper{max-width:900px;margin:40px auto;padding:0 60px;}
+    .cl-entry{margin-bottom:40px;}
+    .cl-header{display:flex;align-items:center;gap:16px;padding-bottom:14px;border-bottom:1px solid var(--border);margin-bottom:20px;flex-wrap:wrap;}
+    .cl-version{font-size:1.6rem;font-weight:800;color:var(--gold);}
+    .cl-title{font-size:1rem;font-weight:700;color:var(--text);}
+    .cl-date{font-size:.75rem;color:var(--muted);margin-left:auto;}
+    .cl-section-title{font-size:.68rem;text-transform:uppercase;letter-spacing:.12em;color:var(--muted);margin:16px 0 8px;}
+    .cl-list{list-style:none;display:flex;flex-direction:column;gap:6px;}
+    .cl-list li{font-size:.85rem;color:var(--text);padding:7px 12px 7px 24px;background:rgba(255,255,255,.03);border:1px solid var(--border);border-radius:7px;position:relative;line-height:1.5;}
+    .cl-list li::before{content:'→';position:absolute;left:8px;color:var(--gold-dim);font-size:.8rem;}
+    .cl-note{margin-top:16px;padding:12px 16px;background:rgba(201,168,76,.06);border:1px solid rgba(201,168,76,.2);border-radius:8px;font-size:.8rem;color:#b09060;line-height:1.6;}
+    .cl-note strong{color:var(--gold);}
+
+    .reco-wrapper{max-width:960px;margin:40px auto;padding:0 60px;display:flex;flex-direction:column;gap:28px;}
+    .reco-card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:26px;}
+    .reco-card-title{font-size:.7rem;text-transform:uppercase;letter-spacing:.14em;color:var(--muted);margin-bottom:16px;}
+    .reco-card h3{font-size:1.1rem;font-weight:700;color:var(--text);margin-bottom:12px;}
+    .rec-badge{display:inline-block;font-size:.6rem;font-weight:700;text-transform:uppercase;letter-spacing:.1em;padding:2px 8px;border-radius:10px;background:rgba(201,168,76,.2);color:var(--gold);border:1px solid var(--gold-dim);margin-left:8px;vertical-align:middle;}
+    .reco-list{list-style:none;display:flex;flex-direction:column;gap:10px;}
+    .reco-list li{display:flex;gap:14px;padding:12px 16px;background:rgba(255,255,255,.02);border:1px solid var(--border);border-radius:9px;align-items:flex-start;font-size:.85rem;line-height:1.6;}
+    .reco-list .ri-num{font-size:1.1rem;font-weight:800;color:var(--gold);flex-shrink:0;min-width:28px;}
+    .reco-list .ri-body strong{color:var(--text);display:block;margin-bottom:2px;font-size:.88rem;}
+    .reco-list .ri-body span{color:var(--muted);font-size:.8rem;}
+    .phase-table{width:100%;border-collapse:collapse;}
+    .phase-table th{font-size:.68rem;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);text-align:left;padding:8px 12px;border-bottom:1px solid var(--border);}
+    .phase-table td{font-size:.83rem;padding:10px 12px;border-bottom:1px solid rgba(42,42,69,.5);vertical-align:top;line-height:1.5;}
+    .phase-table tr:last-child td{border-bottom:none;}
+    .phase-table .v{font-weight:700;color:var(--gold);white-space:nowrap;}
+    .phase-table .w{color:var(--muted);font-size:.75rem;white-space:nowrap;}
+    .phase-table .focus{color:var(--text);}
+    .phase-table .why{color:#7a7a9a;font-size:.78rem;}
+    .phase-table .loop-marker{color:var(--green);font-weight:600;}
+    .risk-row{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+    .risk-item{padding:14px;border-radius:9px;border:1px solid var(--border);}
+    .risk-item.high{border-color:rgba(217,79,79,.3);background:rgba(217,79,79,.05);}
+    .risk-item.medium{border-color:rgba(232,146,10,.3);background:rgba(232,146,10,.05);}
+    .risk-item .risk-label{font-size:.65rem;font-weight:700;text-transform:uppercase;letter-spacing:.1em;margin-bottom:6px;}
+    .risk-item.high .risk-label{color:#d94f4f;}
+    .risk-item.medium .risk-label{color:var(--orange);}
+    .risk-item p{font-size:.8rem;color:#a0a0c0;line-height:1.5;}
+    .loop-box{background:rgba(255,255,255,.03);border:1px solid var(--border);border-radius:10px;padding:18px 20px;font-size:.85rem;line-height:2.2;color:var(--text);}
+    .loop-step{color:var(--gold);font-weight:700;}
+    .pillars-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:14px;}
+    .pillar{padding:10px 14px;background:rgba(61,186,110,.06);border:1px solid rgba(61,186,110,.2);border-radius:8px;font-size:.78rem;color:#80c080;line-height:1.5;}
+    .pillar strong{display:block;margin-bottom:3px;color:var(--green);}
+
+    .modal-overlay{position:fixed;inset:0;background:var(--modal-bg);z-index:100;display:flex;align-items:center;justify-content:center;padding:20px;opacity:0;pointer-events:none;transition:opacity .2s;backdrop-filter:blur(4px);}
+    .modal-overlay.open{opacity:1;pointer-events:all;}
+    .modal{background:var(--card);border:1px solid var(--border);border-radius:16px;max-width:620px;width:100%;max-height:88vh;overflow-y:auto;transform:translateY(16px);transition:transform .2s;}
+    .modal-overlay.open .modal{transform:translateY(0);}
+    .modal-header{padding:28px 28px 20px;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--card);border-radius:16px 16px 0 0;z-index:1;}
+    .modal-top{display:flex;justify-content:space-between;align-items:flex-start;}
+    .modal-version{font-size:2rem;font-weight:800;color:var(--gold);}
+    .modal-close{background:none;border:1px solid var(--border);color:var(--muted);width:32px;height:32px;border-radius:8px;cursor:pointer;font-size:1rem;display:flex;align-items:center;justify-content:center;transition:color .15s,border-color .15s;}
+    .modal-close:hover{color:var(--text);border-color:var(--gold-dim);}
+    .modal-title{font-size:1.2rem;font-weight:700;margin:6px 0 4px;}
+    .modal-meta{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-top:10px;}
+    .modal-date{font-size:.78rem;color:var(--muted);}
+    .modal-body{padding:24px 28px 28px;}
+    .modal-section-title{font-size:.68rem;text-transform:uppercase;letter-spacing:.12em;color:var(--muted);margin-bottom:10px;margin-top:22px;}
+    .modal-section-title:first-child{margin-top:0;}
+    .modal-list{list-style:none;display:flex;flex-direction:column;gap:8px;}
+    .modal-list li{font-size:.88rem;color:var(--text);padding:8px 12px 8px 24px;background:rgba(255,255,255,.03);border:1px solid var(--border);border-radius:8px;position:relative;line-height:1.5;}
+    .modal-list li::before{content:'→';position:absolute;left:8px;color:var(--gold-dim);font-size:.8rem;}
+    .modal-note{margin-top:18px;padding:12px 16px;background:rgba(201,168,76,.06);border:1px solid rgba(201,168,76,.2);border-radius:8px;font-size:.8rem;color:#b09060;line-height:1.6;}
+
+    ::-webkit-scrollbar{width:6px;}
+    ::-webkit-scrollbar-track{background:var(--bg);}
+    ::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px;}
+    @media(max-width:700px){
+      header,.tabs-bar,.tabs-divider,.timeline-section,.phase-banner,.grid-wrapper,.changelog-wrapper,.reco-wrapper{padding-left:20px;padding-right:20px;}
+      header h1{font-size:1.8rem;}
+      .risk-row,.pillars-grid{grid-template-columns:1fr;}
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="header-inner">
+    <h1>HackNSlash</h1>
+    <p>Development Roadmap &nbsp;·&nbsp; Updated April 2026 &nbsp;·&nbsp; Timeline refreshes every 3 months</p>
+    <div class="header-badges">
+      <div class="hbadge">V1.0 Target — Q2 2027</div>
+      <div class="hbadge green">Co-op First — 2 to 4 Players</div>
+      <div class="hbadge blue">Save System — V1.1</div>
+      <div class="hbadge blue">Dungeon Expansion — V1.3</div>
+    </div>
+  </div>
+</header>
+
+<div class="tabs-bar">
+  <button class="tab-btn active" onclick="switchTab('roadmap',this)">Roadmap</button>
+  <button class="tab-btn" onclick="switchTab('changelog',this)">Changelog</button>
+  <button class="tab-btn" onclick="switchTab('recommendations',this)">Recommendations</button>
+</div>
+<div class="tabs-divider"></div>
+
+<!-- ROADMAP TAB -->
+<div id="view-roadmap">
+  <div class="timeline-section">
+    <div class="timeline-label">Progress — V0.1 · April 2026 to V2.0 · Mid 2028</div>
+    <div class="timeline-bar"><div class="timeline-fill" style="width:21%"></div></div>
+    <div class="timeline-quarters">
+      <span class="timeline-q current">Q2 '26</span>
+      <span class="timeline-q">Q3 '26</span>
+      <span class="timeline-q">Q4 '26</span>
+      <span class="timeline-q">Q1 '27</span>
+      <span class="timeline-q">Q2 '27</span>
+      <span class="timeline-q">Q3 '27</span>
+      <span class="timeline-q">Q4 '27</span>
+      <span class="timeline-q">Q1 '28</span>
+      <span class="timeline-q">Q2 '28</span>
+    </div>
+  </div>
+  <div class="grid-wrapper" id="gridWrapper"></div>
+</div>
+
+<!-- CHANGELOG TAB -->
+<div id="view-changelog" style="display:none">
+  <div class="changelog-wrapper">
+
+    <div class="cl-entry">
+      <div class="cl-header">
+        <div class="cl-version">V0.3</div>
+        <div><div class="cl-title">Co-op Player Prefab</div><span class="status-badge badge-completed">Completed</span></div>
+        <div class="cl-date">April 5, 2026</div>
+      </div>
+      <div class="cl-section-title">Player Spawning</div>
+      <ul class="cl-list">
+        <li>Player converted from scene object to spawnable NetworkObject prefab</li>
+        <li>PlayerSpawner — one player per connected client with correct NGO ownership</li>
+        <li>Terrain.SampleHeight() for accurate spawn Y regardless of terrain elevation</li>
+        <li>OwnerNetworkTransform — client-authoritative movement, no server lag</li>
+        <li>ApplySpawnPositionClientRpc — owner client sets its own position, fixes prefab Y=0 desync</li>
+        <li>CharacterController frozen on spawn, re-enabled only after position is confirmed</li>
+        <li>Spectators skipped from spawn; non-spectators use contiguous spawn points</li>
+        <li>Tested and working for 1–4 players simultaneously</li>
+      </ul>
+      <div class="cl-section-title">Per-Player UI & Singletons</div>
+      <ul class="cl-list">
+        <li>SetAsLocalInstance() — ExperienceManager and PlayerInventory isolated per player</li>
+        <li>PlayerUILinker — dynamically wires HP bar, XP bar, stamina and labels after NGO spawn</li>
+        <li>SpectatorSetup fix — HUD only hidden when class = Spectator, not for all non-host clients</li>
+        <li>Camera retry loop — handles null Camera.main at spawn time without crashing</li>
+      </ul>
+      <div class="cl-section-title">Multiplayer Compatibility</div>
+      <ul class="cl-list">
+        <li>PauseManager — opening panels no longer freezes Time.timeScale in multiplayer</li>
+        <li>Death screen — no timeScale freeze in MP, respawn RPC heals and teleports instead of scene reload</li>
+        <li>CoinPickup — awards XP to the player who touches the coin, not a global singleton</li>
+        <li>PlayerAttack and HealthSystem — use per-player cached component references</li>
+      </ul>
+      <div class="cl-section-title">Lobby Polish</div>
+      <ul class="cl-list">
+        <li>Spectator added as a selectable class in the lobby</li>
+        <li>Session mode label — shows Single Player Session or Multiplayer Mode live</li>
+        <li>Player numbering is 1-based — Player 1, 2, 3 instead of 0, 1, 2</li>
+      </ul>
+      <div class="cl-note"><strong>Next:</strong> Enemy health and damage synced across all clients — V0.4</div>
+    </div>
+
+    <div class="cl-entry">
+      <div class="cl-header">
+        <div class="cl-version">V0.2</div>
+        <div><div class="cl-title">Networking Foundation</div><span class="status-badge badge-completed">Completed</span></div>
+        <div class="cl-date">April 4, 2026</div>
+      </div>
+      <div class="cl-section-title">Networking</div>
+      <ul class="cl-list">
+        <li>Unity Netcode for GameObjects (NGO) integrated</li>
+        <li>NetworkManager + UnityTransport set up in MainMenu scene</li>
+        <li>Host / Spectate flow from Main Menu — no port forwarding needed on LAN</li>
+        <li>NGO scene management moves all clients between scenes automatically</li>
+      </ul>
+      <div class="cl-section-title">Spectator Mode</div>
+      <ul class="cl-list">
+        <li>Free-roam spectator camera — WASD, Q/E up/down, Right Mouse to look, Shift for fast speed</li>
+        <li>Mouse and gamepad both supported in spectator</li>
+        <li>All player HUD hidden for spectators</li>
+      </ul>
+      <div class="cl-section-title">Lobby Scene</div>
+      <ul class="cl-list">
+        <li>LobbyScene added to build</li>
+        <li>LobbyPlayer NetworkObject spawned per client — survives scene transitions</li>
+        <li>Synced player name editable in lobby</li>
+        <li>Class selection: Random, Warrior, Mage, Rogue</li>
+        <li>Ready system — Start Game only enables when all players ready</li>
+        <li>Force Start override for host</li>
+        <li>Player list shows P# in yellow, Host in red, class and ready status per row</li>
+        <li>Disconnect button returns cleanly to Main Menu</li>
+      </ul>
+      <div class="cl-note"><strong>Next:</strong> Convert player to spawnable prefab — required for co-op (V0.3)</div>
+    </div>
+
+    <div class="cl-entry">
+      <div class="cl-header">
+        <div class="cl-version">V0.1</div>
+        <div><div class="cl-title">First Build</div><span class="status-badge badge-completed">Completed</span></div>
+        <div class="cl-date">April 3, 2026</div>
+      </div>
+      <div class="cl-section-title">Core Systems</div>
+      <ul class="cl-list">
+        <li>Player movement, sprinting, stamina system</li>
+        <li>Melee attack with STR scaling and AGI cooldown reduction</li>
+        <li>Fireball shooter, isometric and third-person camera</li>
+        <li>Enemy AI state machine — Idle, Chase, Attack via NavMesh</li>
+        <li>Enemy spawner, wave manager, XP and leveling with STR/AGI/INT stats</li>
+        <li>Coin pickups, item spawner, inventory and equip system</li>
+        <li>Spell bar 10 slots, character window, damage popups, pause menu, death screen</li>
+        <li>Scene transitions with fade to black</li>
+      </ul>
+      <div class="cl-note"><strong>Note:</strong> All assets are placeholders. First ever build compiled and uploaded.</div>
+    </div>
+
+  </div>
+</div>
+
+<!-- RECOMMENDATIONS TAB -->
+<div id="view-recommendations" style="display:none">
+  <div class="reco-wrapper">
+
+    <div class="reco-card">
+      <div class="reco-card-title">Confirmed — Gameplay Loop</div>
+      <h3>Session-based · Persistent Character <span class="rec-badge">Locked In — April 2026</span></h3>
+      <p style="color:var(--muted);font-size:.83rem;margin:10px 0 18px;line-height:1.6;">The gameplay loop is confirmed. Every feature decision should serve this loop. If a feature doesn't make the dungeon run or the hub better, it goes on the post-V1.0 list.</p>
+      <div class="loop-box">
+        <span class="loop-step">Hub / Town</span> — persistent social space, upgrade stations, dungeon entrance<br>
+        &nbsp;&nbsp;&nbsp;Party forms in Lobby (2–4 players) — enter dungeon together<br>
+        <span class="loop-step">Dungeon Floors</span> — rooms of enemies, traps, mini-bosses, locked doors<br>
+        &nbsp;&nbsp;&nbsp;Clear the room — door opens — next floor<br>
+        <span class="loop-step">Boss Room</span> — boss fight at end of the dungeon<br>
+        &nbsp;&nbsp;&nbsp;Defeat boss — loot drops — return to Hub<br>
+        <span class="loop-step">Upgrade</span> — spend XP on skill tree · craft/equip loot · prepare next run<br>
+        <span class="loop-step">Harder Dungeon Tier</span> — higher floor cap, stronger enemies, better rewards
+      </div>
+      <div class="pillars-grid">
+        <div class="pillar"><strong>Co-op first</strong>Designed for 2–4 players. Solo is supported, not the focus.</div>
+        <div class="pillar"><strong>Persistent character</strong>XP, gear, skill points carry over permanently between sessions.</div>
+        <div class="pillar"><strong>Open skill tree</strong>Class sets starting position and base stats. No locked nodes — build anything.</div>
+        <div class="pillar"><strong>Dungeon tiers</strong>Escalating difficulty — not open world. Each session has a clear start and end.</div>
+      </div>
+    </div>
+
+    <div class="reco-card">
+      <div class="reco-card-title">Priority Recommendations</div>
+      <ul class="reco-list">
+        <li><div class="ri-num">1</div><div class="ri-body"><strong>Prove the loop before polishing anything</strong><span>V0.6 should be a rough dungeon run that works end-to-end. Ugly is fine. The goal is: enter, fight rooms, boss, return to hub, XP gained. Everything else is polish on top of that.</span></div></li>
+        <li><div class="ri-num">2</div><div class="ri-body"><strong>Dungeon room system replaces WaveManager at V0.9</strong><span>The current WaveManager sends waves at the player. The target design uses rooms — you enter, clear enemies, the door opens. This is a deliberate architectural shift that needs a dedicated milestone.</span></div></li>
+        <li><div class="ri-num">3</div><div class="ri-body"><strong>Hub before content</strong><span>A minimal hub — a flat area with a dungeon entrance — should exist from V0.7. Players need somewhere to return to for the loop to feel right, even as a placeholder.</span></div></li>
+        <li><div class="ri-num">4</div><div class="ri-body"><strong>Terrain design only after dungeon is built</strong><span>Don't invest in world design until V1.4. You don't know what the hub needs to contain or how the dungeon entrance fits until the dungeon system is working.</span></div></li>
+        <li><div class="ri-num">5</div><div class="ri-body"><strong>Save system after V1.0 — data must be stable first</strong><span>Building the save system before class differentiation, the skill tree, and gear are locked means rewriting it. Wait until V1.1 when the data structure won't change anymore.</span></div></li>
+        <li><div class="ri-num">6</div><div class="ri-body"><strong>Skill tree: one shared open tree, class = starting position</strong><span>No locked nodes. Class sets base stats and start point on the tree. Adding new classes later is just defining new start positions — no new trees to build.</span></div></li>
+        <li><div class="ri-num">7</div><div class="ri-body"><strong>Ask one question for every feature: does it serve the loop?</strong><span>Does this make the dungeon run better, or the hub more engaging? If the answer is no, it goes on the post-V1.0 list. This is the fastest path to a shippable game.</span></div></li>
+      </ul>
+    </div>
+
+    <div class="reco-card">
+      <div class="reco-card-title">Suggested Timeline</div>
+      <table class="phase-table">
+        <tr><th>Version</th><th>When</th><th>Focus</th><th>Serves the loop</th></tr>
+        <tr><td class="v">V0.1–V0.3</td><td class="w">Done</td><td class="focus">Core game + networking + player prefab</td><td class="why">Foundation</td></tr>
+        <tr><td class="v">V0.4</td><td class="w">Q2 2026</td><td class="focus">Enemy networking</td><td class="why">Co-op architecture</td></tr>
+        <tr><td class="v">V0.5</td><td class="w">Q3 2026</td><td class="focus">Combat sync</td><td class="why">Fair co-op hits</td></tr>
+        <tr><td class="v">V0.6</td><td class="w">Q3 2026</td><td class="focus">First dungeon run prototype</td><td class="why loop-marker">Loop proof-of-concept</td></tr>
+        <tr><td class="v">V0.7</td><td class="w">Q4 2026</td><td class="focus">Per-player XP + hub placeholder</td><td class="why loop-marker">Return to hub works</td></tr>
+        <tr><td class="v">V0.8</td><td class="w">Q4 2026</td><td class="focus">Class stats + open skill tree</td><td class="why loop-marker">Upgrade phase works</td></tr>
+        <tr><td class="v">V0.9</td><td class="w">Q1 2027</td><td class="focus">Room system + boss + dungeon tiers</td><td class="why loop-marker">Full loop, all phases</td></tr>
+        <tr><td class="v">V1.0</td><td class="w">Q2 2027</td><td class="focus">Polish — First Playable Release</td><td class="why loop-marker">Shareable, complete loop</td></tr>
+        <tr><td class="v">V1.1–V1.2</td><td class="w">Q3 2027</td><td class="focus">Save system + character select</td><td class="why">Persistence between sessions</td></tr>
+        <tr><td class="v">V1.3</td><td class="w">Q4 2027</td><td class="focus">Dungeon expansion — procedural + tiers</td><td class="why">Replayability</td></tr>
+        <tr><td class="v">V1.4</td><td class="w">Q4 2027</td><td class="focus">Hub world design + terrain</td><td class="why">Social space between runs</td></tr>
+        <tr><td class="v">V1.5</td><td class="w">Q1 2028</td><td class="focus">Skill tree expansion + new classes</td><td class="why">Build variety</td></tr>
+        <tr><td class="v">V2.0</td><td class="w">Q2 2028</td><td class="focus">Full content wave</td><td class="why">Long-term replayability</td></tr>
+      </table>
+    </div>
+
+    <div class="reco-card">
+      <div class="reco-card-title">Risks to Watch</div>
+      <div class="risk-row">
+        <div class="risk-item high"><div class="risk-label">High — WaveManager to Room System</div><p>The current wave system is the opposite of the room-based target design. This architectural shift at V0.9 is the largest single refactor before release. Plan a full dedicated session — don't combine it with other work.</p></div>
+        <div class="risk-item high"><div class="risk-label">High — Building content before the loop</div><p>Adding spells, enemies, and gear before V0.9 feels like progress but isn't. The loop has to work end-to-end first. Content fills a working game — it doesn't make an incomplete one fun.</p></div>
+        <div class="risk-item medium"><div class="risk-label">Medium — Hub scope creep</div><p>The hub can become a full game unto itself — NPCs, shops, quests, housing. Keep V0.7 as a flat area with a dungeon entrance. The rest comes at V1.4 when the dungeon system is stable.</p></div>
+        <div class="risk-item medium"><div class="risk-label">Medium — Networked combat complexity</div><p>Server-authoritative damage and hit detection are easy to get wrong. V0.4 and V0.5 need dedicated testing sessions. Latency issues are much harder to fix after the systems are built on top.</p></div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- Modal -->
+<div class="modal-overlay" id="modalOverlay" onclick="closeModal(event)">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-top">
+        <div><div class="modal-version" id="mVersion"></div><div class="modal-title" id="mTitle"></div></div>
+        <button class="modal-close" onclick="closeModalDirect()">x</button>
+      </div>
+      <div class="modal-meta"><span class="status-badge" id="mBadge"></span><span class="modal-date" id="mDate"></span></div>
+    </div>
+    <div class="modal-body" id="mBody"></div>
+  </div>
+</div>
+
+<script>
+// ─────────────────────────────────────────────────────────────────────────────
+//  VERSIONS DATA
+//  status: "completed" | "active" | "planned" | "target" | "future"
+//  phase:  "p1" | "p2" | "p3" | "p4"
+// ─────────────────────────────────────────────────────────────────────────────
+const VERSIONS = [
+  {version:"V0.1",title:"First Build",status:"completed",quarter:"Q2 2026",date:"April 3, 2026",phase:"p1",loop:null,
+   bullets:["Core player systems","Enemy AI & spawning","XP & leveling"],
+   details:["Player movement, sprinting, stamina, jumping","Melee attack STR scaling, fireball shooter","Isometric and third-person camera","Enemy AI via NavMesh, wave manager","XP/leveling STR/AGI/INT, inventory, spell bar","Character window, damage popups, pause, death screen"],
+   note:"All assets are placeholders. First ever build compiled."},
+
+  {version:"V0.2",title:"Networking Foundation",status:"completed",quarter:"Q2 2026",date:"April 4, 2026",phase:"p1",loop:null,
+   bullets:["Host/Join from Main Menu","Lobby with class selection","Ready system + LobbyPlayer persists"],
+   details:["Unity NGO + NetworkManager + UnityTransport set up","Free-roam spectator camera (WASD + gamepad)","LobbyScene: name, class selection, ready system","Force Start for host, Disconnect button","LobbyPlayer NetworkObject survives scene transitions"],
+   note:"All players still use the same character. Co-op spawning comes in V0.3."},
+
+  {version:"V0.3",title:"Co-op Player Prefab",status:"completed",quarter:"Q2 2026",date:"April 5, 2026",phase:"p1",loop:null,
+   bullets:["Player is a spawnable NetworkObject","1–4 players each own their character","UI, pause, and death all multiplayer-aware"],
+   details:["Player converted to NetworkObject prefab — PlayerSpawner spawns one per client","Terrain.SampleHeight() finds correct spawn Y on any terrain","OwnerNetworkTransform — client-authoritative movement","ApplySpawnPositionClientRpc — fixes prefab Y=0 desync at spawn","CharacterController frozen until spawn position confirmed","Per-player ExperienceManager and PlayerInventory via SetAsLocalInstance()","PlayerUILinker wires HP/XP/stamina UI at runtime","SpectatorSetup fixed — HUD only hidden when class = Spectator","PauseManager skips Time.timeScale freeze in multiplayer","Death screen: no time freeze, respawn RPC instead of scene reload","Spectator added as lobby class, session mode label, 1-based player numbering"],
+   note:"Single most important architectural step for co-op — everything else depends on this being solid."},
+
+  {version:"V0.4",title:"Enemy Networking",status:"active",quarter:"Q2 2026",date:"Est. May – June 2026",phase:"p1",loop:null,
+   bullets:["Enemies visible on all clients","Server-authoritative AI","Multi-player targeting — nearest player"],
+   details:["EnemySpawner uses NetworkObject.Spawn() — enemies appear for all clients","NetworkTransform syncs enemy positions and rotations","EnemyAI runs server-side only — clients receive synced state","AI retargeting: finds nearest player, not just first tagged","Enemy death synced — destruction triggered server-side","Foundation for dungeon room enemies at V0.9"],
+   note:null},
+
+  {version:"V0.5",title:"Combat Sync",status:"planned",quarter:"Q3 2026",date:"Est. July 2026",phase:"p2",loop:null,
+   bullets:["HP synced across all clients","Server-authoritative damage","Networked projectiles"],
+   details:["HealthSystem HP becomes NetworkVariable — synced to all clients","TakeDamage() routed through ServerRpc — server validates all hits","PlayerAttack ServerRpc — client requests, server applies damage","FireballShooter spawns projectiles as NetworkObjects","Critical foundation for fair co-op dungeon combat"],
+   note:null},
+
+  {version:"V0.6",title:"First Dungeon Run Prototype",status:"planned",quarter:"Q3 2026",date:"Est. Aug – Sep 2026",phase:"p2",loop:"Proves the core loop end-to-end",
+   bullets:["Linear sequence of enemy encounters","First dungeon entrance from a hub area","Enter, fight, boss, return — even if rough"],
+   details:["Simple linear dungeon: 3–4 combat encounters followed by a boss","Dungeon entrance: a zone that loads the dungeon with the party","Placeholder hub area — a flat open space players return to after the run","WaveManager adapted to trigger room clears in sequence","Boss placeholder: a stronger enemy with more HP","XP and loot awarded on run completion, returned to hub"],
+   note:"First time the target loop exists — even in rough form. Ugly is fine. Proving the concept is the goal."},
+
+  {version:"V0.7",title:"Progression Co-op + Hub",status:"planned",quarter:"Q4 2026",date:"Est. Oct – Nov 2026",phase:"p3",loop:"Return to hub fully works",
+   bullets:["Per-player XP & stats","Hub placeholder area","ExperienceManager refactor"],
+   details:["ExperienceManager becomes per-player component — no longer a singleton","Each player has own XP, level, STR/AGI/INT","Hub placeholder: a dedicated scene players return to after each run","Hub has a visible dungeon entrance and a spot to review stats/gear","LobbyPlayer carries class choice into game — stats scale by class","Shared kill XP distributed equally between players in range"],
+   note:"The hub doesn't need to be beautiful — it needs to exist. Players must have somewhere to return to for the loop to feel complete."},
+
+  {version:"V0.8",title:"Class Stats + Open Skill Tree",status:"planned",quarter:"Q4 2026",date:"Est. December 2026",phase:"p3",loop:"Upgrade phase works — spend points after each run",
+   bullets:["Class sets base stats + skill tree start position","One shared open tree — no locked nodes","Build anything from any class"],
+   details:["Warrior: +STR base, starts near melee/toughness nodes","Mage: +INT base, starts near spell/power nodes","Rogue: +AGI base, starts near speed/crit nodes","Random: average stats, starts at tree centre","All nodes accessible to all classes — costs more points the further from start","First skill tree pass: 30–40 nodes, 3 regions","Skill points awarded on level-up — spent in hub between runs"],
+   note:"No nodes are locked. Class identity comes from where you start, not where you're forbidden to go. A Warrior who invests in spell nodes becomes a battlemage — naturally."},
+
+  {version:"V0.9",title:"Dungeon Loop & Boss",status:"planned",quarter:"Q1 2027",date:"Est. Jan – Mar 2027",phase:"p3",loop:"Full loop — all phases working",
+   bullets:["Room-based dungeon replaces wave system","Locked doors open on room clear","Dungeon boss + multiple tiers"],
+   details:["Room system: enter room, clear all enemies, door unlocks, next room","WaveManager replaced by RoomManager — rooms have spawn lists, not timed waves","Multiple dungeon floors (3–5 rooms per floor, 2–3 floors per run)","Mini-boss mid-dungeon, boss room at the end","Two dungeon tiers: normal and hard — harder enemies, better rewards","Hub upgrade station: spend loot to upgrade gear between runs","Complete loop: Hub, Dungeon, Boss, Loot, Hub, Upgrade, Repeat"],
+   note:"Largest milestone before V1.0. The WaveManager architectural shift is significant — plan a full dedicated session for it."},
+
+  {version:"V1.0",title:"First Playable Release",status:"target",quarter:"Q2 2027",date:"Target: Q2 2027",phase:"p3",loop:"Complete loop — shareable with friends",
+   bullets:["Full loop polished and complete","Hub, dungeon, boss, upgrade — all working","Shareable with friends — 2–4 players"],
+   details:["Hub, Lobby, Dungeon, Boss, Return, Upgrade, Repeat — all polished","2–4 player co-op fully functional end-to-end","All three classes feel distinct from their skill tree starting positions","2 dungeon tiers with meaningful difficulty difference","Session length: 20–40 minutes per run","Shareable build for friends and external playtesters","UI, audio, and performance polished to a releasable standard"],
+   note:"The 1-year target. A complete, fun, shareable co-op experience. Not a final product — but a real game."},
+
+  {version:"V1.1",title:"Save System",status:"future",quarter:"Q3 2027",date:"Est. Jul – Aug 2027",phase:"p4",loop:null,
+   bullets:["Persistent character between sessions","Local save per player","Data is stable — right time to build this"],
+   details:["Local save file per player: name, class, XP, level, stats, gear, skill tree","Save on hub return after each run","Character persists between lobby sessions — pick up where you left off","Foundation for multiple character slots at V1.2"],
+   note:"Built after V1.0 so the data structure is stable. Class, skill tree, and gear are all locked in."},
+
+  {version:"V1.2",title:"Character Select",status:"future",quarter:"Q3 2027",date:"Est. September 2027",phase:"p4",loop:null,
+   bullets:["Multiple character slots","Character preview screen","Create / load / delete characters"],
+   details:["Create, load, and delete character slots","Character preview: name, class, level, equipped gear","Character select screen between Lobby and Game","Each slot persists independently — multiple builds and characters"],
+   note:null},
+
+  {version:"V1.3",title:"Dungeon Expansion",status:"future",quarter:"Q4 2027",date:"Est. Oct – Nov 2027",phase:"p4",loop:"More replayable runs",
+   bullets:["Procedural room generation","More dungeon tiers","New room types and traps"],
+   details:["Procedural dungeon generation — rooms assembled from a pool each run","Dungeon tier 3 and 4 — harder enemies, unique modifiers, better loot","New room types: trap rooms, puzzle rooms, elite rooms","Room modifiers: cursed (extra enemies), blessed (bonus loot)","A second dungeon biome with a distinct visual theme","Elite enemies that can appear in any room"],
+   note:"The dungeon system was built at V0.9. This expands it with variety — the difference between a dungeon you run once and one you run fifty times."},
+
+  {version:"V1.4",title:"Hub World Design",status:"future",quarter:"Q4 2027",date:"Est. December 2027",phase:"p4",loop:"Hub becomes a living social space",
+   bullets:["Proper hub — terrain, atmosphere, NPCs","Upgrade stations, blacksmith, vendor","Full visual design pass"],
+   details:["Replace placeholder hub with intentional visual design","Blacksmith NPC: craft and upgrade gear using dungeon materials","Vendor NPC: buy consumables, sell loot","Skill trainer NPC: reset skill points for a cost","Terrain pass: hub and dungeon entrance feel connected and atmospheric"],
+   note:"Built after V1.3 so you know what the hub needs to contain — upgrade stations for dungeon loot, entrances for multiple dungeon types."},
+
+  {version:"V1.5",title:"Skill Tree Expansion + New Classes",status:"future",quarter:"Q1 2028",date:"Est. Jan – Mar 2028",phase:"p4",loop:null,
+   bullets:["More skill tree nodes","One or two new classes","Deeper build variety"],
+   details:["Expand skill tree to 80–100 nodes","One or two new classes with distinct start positions on the tree","Class-specific cosmetic unlocks at the hub","Respec system — reset and rebuild your tree between runs"],
+   note:null},
+
+  {version:"V2.0",title:"Full Content Wave",status:"future",quarter:"Q2 2028",date:"Est. Q2 2028",phase:"p4",loop:"Long-term replayability",
+   bullets:["New dungeon biome","New boss fights","Endgame content"],
+   details:["Dungeon biome 3 with unique enemy types and visual identity","2 new boss fights with distinct mechanics","Dungeon modifier system — community daily challenge","Endgame dungeon tier for players at level cap","Balance pass across all classes and gear"],
+   note:null},
+];
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  Render
+// ─────────────────────────────────────────────────────────────────────────────
+const PHASE_LABELS = {
+  p1:"Phase 1 — Foundation",
+  p2:"Phase 2 — Playable Co-op",
+  p3:"Phase 3 — Full Loop",
+  p4:"Phase 4 — Persistence & Depth"
+};
+
+const BADGE_CLASS = {
+  completed:"badge-completed",
+  active:"badge-active",
+  planned:"badge-planned",
+  target:"badge-target",
+  future:"badge-future"
+};
+
+const BADGE_LABEL = {
+  completed:"Completed",
+  active:"In Progress",
+  planned:"Planned",
+  target:"V1.0 Target",
+  future:"Post-V1.0"
+};
+
+function renderGrid() {
+  const wrapper = document.getElementById("gridWrapper");
+  let lastPhase = null;
+  let html = "";
+
+  VERSIONS.forEach((v, i) => {
+    if (v.phase !== lastPhase) {
+      if (lastPhase !== null) html += `</div></div>`;
+      html += `
+        <div class="phase-banner"><span class="phase-tag ${v.phase}">${PHASE_LABELS[v.phase]}</span></div>
+        <div class="grid-wrapper" style="margin-top:0"><div class="card-grid">`;
+      lastPhase = v.phase;
+    }
+
+    const bullets = v.bullets.map(b => `<li>${b}</li>`).join("");
+    const loop = v.loop ? `<div class="card-loop">${v.loop}</div>` : "";
+
+    html += `
+      <div class="card ${v.status}" onclick="openModal(${i})">
+        <div class="card-top">
+          <div class="version-num">${v.version}</div>
+          <span class="status-badge ${BADGE_CLASS[v.status]}">${BADGE_LABEL[v.status]}</span>
+        </div>
+        <div class="card-title">${v.title}</div>
+        <div class="card-date">${v.date}</div>
+        <ul class="card-bullets">${bullets}</ul>
+        ${loop}
+        <div class="card-more">Click for details</div>
+      </div>`;
+  });
+
+  html += `</div></div>`;
+  wrapper.innerHTML = html;
+}
+
+function openModal(i) {
+  const v = VERSIONS[i];
+  document.getElementById("mVersion").textContent = v.version;
+  document.getElementById("mTitle").textContent = v.title;
+  document.getElementById("mDate").textContent = v.date;
+
+  const badge = document.getElementById("mBadge");
+  badge.className = `status-badge ${BADGE_CLASS[v.status]}`;
+  badge.textContent = BADGE_LABEL[v.status];
+
+  const details = v.details.map(d => `<li>${d}</li>`).join("");
+  const note = v.note ? `<div class="modal-note">${v.note}</div>` : "";
+  const loop = v.loop ? `<div class="modal-note" style="margin-top:10px">${v.loop}</div>` : "";
+
+  document.getElementById("mBody").innerHTML = `
+    <div class="modal-section-title">What's in this version</div>
+    <ul class="modal-list">${details}</ul>
+    ${loop}${note}`;
+
+  document.getElementById("modalOverlay").classList.add("open");
+}
+
+function closeModal(e) {
+  if (e.target === document.getElementById("modalOverlay"))
+    document.getElementById("modalOverlay").classList.remove("open");
+}
+
+function closeModalDirect() {
+  document.getElementById("modalOverlay").classList.remove("open");
+}
+
+function switchTab(name, btn) {
+  ["roadmap","changelog","recommendations"].forEach(t => {
+    document.getElementById("view-" + t).style.display = t === name ? "" : "none";
+  });
+  document.querySelectorAll(".tab-btn").forEach(b => b.classList.remove("active"));
+  btn.classList.add("active");
+}
+
+document.addEventListener("keydown", e => {
+  if (e.key === "Escape") document.getElementById("modalOverlay").classList.remove("open");
+});
+
+renderGrid();
+</script>
+</body>
+</html>
