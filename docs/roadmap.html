@@ -46,6 +46,7 @@
     .phase-tag.p2{background:rgba(232,146,10,.12);color:var(--orange);border:1px solid rgba(232,146,10,.25);}
     .phase-tag.p3{background:rgba(201,168,76,.12);color:var(--gold);border:1px solid var(--gold-dim);}
     .phase-tag.p4{background:rgba(68,136,255,.12);color:var(--blue);border:1px solid #2255aa;}
+    .phase-tag.p5{background:rgba(120,80,180,.12);color:#b07aff;border:1px solid #6633aa;}
 
     .quarter-group{margin-bottom:48px;}
     .quarter-title{font-size:.72rem;text-transform:uppercase;letter-spacing:.14em;color:var(--muted);border-bottom:1px solid var(--border);padding-bottom:10px;margin-bottom:20px;}
@@ -68,6 +69,7 @@
     .badge-planned{background:rgba(58,58,90,.5);color:var(--muted);border:1px solid var(--border);}
     .badge-target{background:rgba(201,168,76,.15);color:var(--gold);border:1px solid var(--gold-dim);}
     .badge-future{background:rgba(68,136,255,.15);color:var(--blue);border:1px solid #2255aa;}
+    .badge-maybe{background:rgba(120,80,180,.15);color:#b07aff;border:1px solid #6633aa;}
     .card-title{font-size:1rem;font-weight:700;color:var(--text);margin-bottom:6px;}
     .card-date{font-size:.72rem;color:var(--muted);margin-bottom:14px;letter-spacing:.04em;}
     .card-bullets{list-style:none;display:flex;flex-direction:column;gap:5px;}
@@ -466,6 +468,56 @@ const VERSIONS = [
    bullets:["New dungeon biome","New boss fights","Endgame content"],
    details:["Dungeon biome 3 with unique enemy types and visual identity","2 new boss fights with distinct mechanics","Dungeon modifier system — community daily challenge","Endgame dungeon tier for players at level cap","Balance pass across all classes and gear"],
    note:null},
+
+  {version:"?",title:"Player Trading",status:"maybe",quarter:"TBD",date:"Post-V1.0 — if it fits",phase:"p5",loop:null,
+   bullets:["Trade items between players in the hub","Offer / accept flow","Server-validated — no duplication exploits"],
+   details:["Trade window: each player offers items from their inventory","Both players must accept before items are exchanged","Server validates the transaction — prevents item duplication","Only available in the hub between runs","Requires: networked inventory, item ownership checks, and NetworkObject loot drops to be solid first"],
+   note:"A natural fit for a co-op loot game. Held back until the inventory and networking layers are fully stable. Could be cut if scope gets tight — the core loop works without it."},
+
+  {version:"?",title:"Item Crafting",status:"maybe",quarter:"TBD",date:"Post-V1.0 — if it fits",phase:"p5",loop:null,
+   bullets:["Combine materials to forge new items","Recipe-based or discovery system","Dedicated crafting bench in the hub"],
+   details:["Players collect crafting materials dropped by enemies or found in dungeons","Recipes unlock as you progress through the game","Crafting bench placed in the hub area — craft between runs","Output items are random-rolled within a tier range, like generated loot","Requires a material inventory layer on top of the existing item system"],
+   note:"Adds a satisfying parallel progression path alongside pure loot drops. Scope risk is high — material tracking, recipe data, and UI work add up fast. Evaluate after the core loot loop is solid."},
+
+  {version:"?",title:"Item Forging / Upgrading",status:"maybe",quarter:"TBD",date:"Post-V1.0 — if it fits",phase:"p5",loop:null,
+   bullets:["Upgrade an existing item's power level","Spend materials to push gear further","Risk/reward: upgrades can fail at high tiers"],
+   details:["Forging takes an existing item and boosts its stats (e.g. +damage, +HP)","Each upgrade tier requires more rare materials","High-tier upgrades have a chance to fail — item may be downgraded or destroyed","Gives players a reason to keep a favourite item rather than constantly replacing it","Depends on crafting material system"],
+   note:"Classic ARPG system (think Diablo's socketing or Torchlight's enchanting). Kept separate from crafting so either can ship without the other. The risk/reward of upgrading is inherently fun but needs careful balance."},
+
+  {version:"?",title:"Gem Socketing",status:"maybe",quarter:"TBD",date:"Post-V1.0 — if it fits",phase:"p5",loop:null,
+   bullets:["Socket gems into items for bonus stats","Gems drop from enemies and chests","Mix gem types for set bonuses"],
+   details:["Items can roll with 0–3 sockets on generation","Gems grant flat stat bonuses (STR, AGI, INT, resistance, etc.)","Removing a gem costs a reagent — prevents free respec","Set bonuses activate when matching gems fill all sockets","Relatively self-contained — can be added without reworking the core item system"],
+   note:"Low implementation risk compared to full crafting — gems are essentially extra stat rolls. Could ship in a smaller patch once the item system is stable. Inspired by Diablo II and Torchlight gem mechanics."},
+
+  {version:"?",title:"Enchanting",status:"maybe",quarter:"TBD",date:"Post-V1.0 — if it fits",phase:"p5",loop:null,
+   bullets:["Add magical affixes to existing items","Randomised results with material cost","Overwrite or add to existing enchants"],
+   details:["Enchanting bench in the hub lets players spend materials to roll a new affix onto an item","Result is randomised within a pool locked to item type and tier","Players can re-enchant to re-roll, destroying the old enchant","Pairs naturally with Item Forging — gives a second axis of item customisation","Needs a distinct affix pool separate from the base item generation"],
+   note:"Gives players agency over their gear beyond what drops. The randomised outcome keeps the dopamine loop alive. Risk: if too cheap, it trivialises loot drops; if too expensive, players ignore it. Needs tuning."},
+
+  {version:"?",title:"Consumables & Potions",status:"maybe",quarter:"TBD",date:"Post-V1.0 — if it fits",phase:"p5",loop:null,
+   bullets:["Health potions, mana flasks, buffs","Limited inventory slots for consumables","Craftable or purchasable in the hub"],
+   details:["Players can carry a limited number of consumable items into a run","Types: health potion, stamina flask, damage buff, speed boost, resist potion","Consumed on hotkey press (e.g. F or D-pad down)","Drop from enemies or purchased from a hub vendor with gold","Craftable versions with stronger effects require materials"],
+   note:"Adds resource management to a run without changing the core combat loop. The key design constraint: potions should matter but not trivialise difficulty — limited charges and no in-run restocking recommended."},
+
+  {version:"?",title:"Rune System",status:"maybe",quarter:"TBD",date:"Post-V1.0 — if it fits",phase:"p5",loop:null,
+   bullets:["Runes modify spell and ability behaviour","Socket runes into the skill tree or spells","Rare runes with unique effects"],
+   details:["Runes drop as rare items with a specific effect tag (e.g. 'Chaining', 'Piercing', 'Homing')","Slot runes into a spell to add or override behaviour — Fireball + Chaining = bounces to nearby targets","Rune slots on spells or passive skill tree nodes","Rare runes combine two effects with a tradeoff (e.g. +damage, −speed)","Completely changes the feel of a build without adding new spells"],
+   note:"High creativity payoff — runes let players express builds without needing a massive spell library. Implementation is non-trivial: each rune effect needs to hook into spell behaviour. Worth it post-V1.0 if the spell system is solid."},
+
+  {version:"?",title:"Cosmetic Transmog",status:"maybe",quarter:"TBD",date:"Post-V1.0 — if it fits",phase:"p5",loop:null,
+   bullets:["Apply any item's look to another item","Stats from equipped item, appearance from chosen skin","Unlock skins permanently per account"],
+   details:["Transmog station in the hub: pick an equipped item, choose its visual from any item you have collected","The item keeps its current stats — only the mesh/icon changes","Collected skins are saved permanently (not lost on death)","Encourages players to keep running dungeons for cosmetic variety","Requires item visual metadata separate from stat data"],
+   note:"Pure quality-of-life for players who care about aesthetics. No gameplay impact makes it safe to ship late. Requires item 3D models to be set up per item type — scope depends heavily on art pipeline."},
+
+  {version:"?",title:"Pets",status:"maybe",quarter:"TBD",date:"Post-V1.0 — if it fits",phase:"p5",loop:null,
+   bullets:["Cosmetic or utility companion follows the player","Auto-loot nearby items","Pet skins unlocked via gameplay"],
+   details:["Pet follows the player through dungeons","Utility effect: auto-vacuum nearby coins and small pickups (no combat advantage)","Cosmetic-only variants: no utility, purely visual","Pets unlocked through achievements, rare drops, or hub vendor","Multiplayer: each player sees their own pet — no shared pet"],
+   note:"Low gameplay risk — utility pets just replicate what the player does manually. Cosmetic pets are pure content. Implementation needs a follow AI and networked position sync, but no combat integration required."},
+
+  {version:"?",title:"Dungeon Modifiers & Curses",status:"maybe",quarter:"TBD",date:"Post-V1.0 — if it fits",phase:"p5",loop:null,
+   bullets:["Random modifiers on each dungeon run","Harder modifiers = better loot","Community challenge: daily cursed dungeon"],
+   details:["On entering a dungeon, 1–3 modifiers are rolled: e.g. 'Enemies enrage at 30% HP', 'No healing', 'Double boss HP'","Higher-tier modifier combinations yield bonus loot quality at completion","Daily Challenge: a server-chosen fixed seed and modifier set — global leaderboard for fastest clear","Curses are optional — players can choose a harder modifier for better rewards","Needs a modifier data system and UI to display active modifiers during the run"],
+   note:"Massively extends replayability without needing new art or levels. The daily challenge is a social hook that keeps players returning. Modifier data is light; the main work is implementing each modifier's gameplay effect."},
 ];
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -475,7 +527,8 @@ const PHASE_LABELS = {
   p1:"Phase 1 — Foundation",
   p2:"Phase 2 — Playable Co-op",
   p3:"Phase 3 — Full Loop",
-  p4:"Phase 4 — Persistence & Depth"
+  p4:"Phase 4 — Persistence & Depth",
+  p5:"Maybe Features — No Commitment"
 };
 
 const BADGE_CLASS = {
@@ -483,7 +536,8 @@ const BADGE_CLASS = {
   active:"badge-active",
   planned:"badge-planned",
   target:"badge-target",
-  future:"badge-future"
+  future:"badge-future",
+  maybe:"badge-maybe"
 };
 
 const BADGE_LABEL = {
@@ -491,7 +545,8 @@ const BADGE_LABEL = {
   active:"In Progress",
   planned:"Planned",
   target:"V1.0 Target",
-  future:"Post-V1.0"
+  future:"Post-V1.0",
+  maybe:"Maybe"
 };
 
 function renderGrid() {
