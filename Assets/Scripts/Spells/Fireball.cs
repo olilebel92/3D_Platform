@@ -1,4 +1,5 @@
 using UnityEngine;
+using Unity.Netcode;
 
 /// <summary>
 /// Attach this to your Fireball prefab.
@@ -8,8 +9,13 @@ using UnityEngine;
 ///   raw = (baseDamage + TotalSpellDamageBonus + TotalFireDamageBonus) * SpellDamageMultiplier (INT)
 ///   targets inside blastRadius   → raw
 ///   targets inside falloffRadius → lerp raw → raw * minDamageFraction
+///
+/// Multiplayer: must be a NetworkObject registered in NetworkManager.
+///   SpellCaster spawns this server-side and passes precomputedDamage so the
+///   server never needs to read per-player singletons (ExperienceManager, SkillTree).
+///   OnTriggerEnter and Explode run only on the server; movement runs everywhere.
 /// </summary>
-public class Fireball : MonoBehaviour
+public class Fireball : NetworkBehaviour
 {
     // ─── Damage ───────────────────────────────────────────────────────────────
 
@@ -42,21 +48,49 @@ public class Fireball : MonoBehaviour
     [Tooltip("Uniform scale applied on spawn.")]
     public float projectileScale = 1f;
 
+    // ─── Runtime (set by SpellCaster before Spawn) ────────────────────────────
+
+    /// <summary>
+    /// Pre-computed raw damage passed in by SpellCaster.SpawnProjectileServerRpc.
+    /// When > 0 it bypasses ComputeRawDamage() (which reads per-player singletons
+    /// that are not valid on the server).
+    /// </summary>
+    [HideInInspector] public float precomputedDamage = 0f;
+
     // ─── Unity Lifecycle ──────────────────────────────────────────────────────
 
     void Start()
     {
         transform.localScale = Vector3.one * projectileScale;
-        Destroy(gameObject, lifetime);
+
+        // Solo / offline: manage own lifetime here.
+        // Networked lifetime is handled in OnNetworkSpawn on the server.
+        if (!IsSpawned)
+            Destroy(gameObject, lifetime);
     }
+
+    // ─── NGO Lifecycle ────────────────────────────────────────────────────────
+
+    public override void OnNetworkSpawn()
+    {
+        // Server sets the self-destruct timer so all clients despawn together.
+        if (IsServer)
+            Invoke(nameof(SelfDestruct), lifetime);
+    }
+
+    // ─── Movement ─────────────────────────────────────────────────────────────
 
     void Update()
     {
+        // Runs on all clients — smooth visual movement everywhere.
         transform.Translate(Vector3.forward * speed * Time.deltaTime);
     }
 
+    // ─── Collision ────────────────────────────────────────────────────────────
+
     void OnTriggerEnter(Collider other)
     {
+        if (!IsAuthoritative()) return;
         if (other.CompareTag("Player")) return;
 
         Debug.Log("[Fireball] Hit: " + other.name);
@@ -67,7 +101,7 @@ public class Fireball : MonoBehaviour
 
     void Explode(Vector3 origin)
     {
-        float raw = ComputeRawDamage();
+        float raw = precomputedDamage > 0f ? precomputedDamage : ComputeRawDamage();
 
         Collider[] hits = Physics.OverlapSphere(origin, falloffRadius);
         foreach (Collider hit in hits)
@@ -78,16 +112,41 @@ public class Fireball : MonoBehaviour
             if (health == null) continue;
 
             float dist   = Vector3.Distance(origin, hit.transform.position);
-            float damage = ComputeFalloffDamage(raw, dist);
+            int   damage = Mathf.RoundToInt(ComputeFalloffDamage(raw, dist));
 
-            health.TakeDamage(Mathf.RoundToInt(damage));
-            Debug.Log($"[Fireball] Hit '{hit.name}' for {damage:F1} damage.");
+            // Route through TakeDamageServerRpc so EnemyAI syncs NetworkHealth
+            // to all clients. When called from the server, NGO executes it directly.
+            EnemyAI enemyAI = hit.GetComponent<EnemyAI>();
+            if (enemyAI != null)
+                enemyAI.TakeDamageServerRpc(damage, false);
+            else
+                health.TakeDamage(damage);
+
+            Debug.Log($"[Fireball] Hit '{hit.name}' for {damage} damage.");
         }
 
-        Destroy(gameObject);
+        DespawnOrDestroy();
     }
 
-    // ─── Damage Helpers ───────────────────────────────────────────────────────
+    void SelfDestruct() => DespawnOrDestroy();
+
+    void DespawnOrDestroy()
+    {
+        if (IsSpawned)
+            NetworkObject.Despawn(true);
+        else
+            Destroy(gameObject);
+    }
+
+    // ─── Helpers ──────────────────────────────────────────────────────────────
+
+    /// <summary>True when this instance should run authoritative logic (collision, damage).</summary>
+    bool IsAuthoritative()
+    {
+        if (NetworkManager.Singleton == null || !NetworkManager.Singleton.IsListening)
+            return true;   // solo / offline
+        return IsServer;   // multiplayer — server only
+    }
 
     float ComputeRawDamage()
     {
@@ -97,7 +156,6 @@ public class Fireball : MonoBehaviour
         float fireBonus = SkillTreeManager.Instance != null
             ? SkillTreeManager.Instance.TotalFireDamageBonus : 0f;
 
-        // SpellDamageMultiplier = 1 + (EffectiveINT * intSpellDamagePct)
         float intMultiplier = ExperienceManager.Instance != null
             ? ExperienceManager.Instance.SpellDamageMultiplier : 1f;
 

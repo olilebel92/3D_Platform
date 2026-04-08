@@ -1,5 +1,6 @@
 using UnityEngine;
 using UnityEngine.InputSystem;
+using UnityEngine.InputSystem.Controls;
 
 /// <summary>
 /// Third-person orbit camera. The player rotates the view with the mouse (or right
@@ -20,11 +21,15 @@ public class CameraControllerThirdPerson : MonoBehaviour
     // ─── Orbit Settings ───────────────────────────────────────────────────────
 
     [Header("Orbit Settings")]
-    [Tooltip("Horizontal mouse/stick sensitivity (degrees per input unit).")]
+    [Tooltip("Horizontal gamepad stick sensitivity (degrees per second).")]
     public float sensitivityX = 200f;
 
-    [Tooltip("Vertical mouse/stick sensitivity (degrees per input unit).")]
+    [Tooltip("Vertical gamepad stick sensitivity (degrees per second).")]
     public float sensitivityY = 150f;
+
+    [Tooltip("Mouse sensitivity (0.1–1.0). Internally scaled by 0.01 so 0.25 = 0.0025 actual.")]
+    [Range(0.1f, 1f)]
+    public float mouseSensitivity = 0.25f;
 
     [Tooltip("Minimum vertical angle (looking down toward the feet).")]
     public float minPitch = -20f;
@@ -128,8 +133,13 @@ public class CameraControllerThirdPerson : MonoBehaviour
         // ── Read look input ──────────────────────────────────────────────────
         Vector2 look = _lookAction.ReadValue<Vector2>();
 
-        _yaw   += look.x * sensitivityX * Time.deltaTime;
-        _pitch -= look.y * sensitivityY * Time.deltaTime;
+        // Mouse delta is already per-frame (pixels) — no Time.deltaTime needed.
+        // Gamepad stick is -1..1 continuous — needs Time.deltaTime.
+        bool usingMouse = _lookAction.activeControl?.device is Mouse;
+        float scale = usingMouse ? mouseSensitivity * 0.01f : Time.deltaTime;
+
+        _yaw   += look.x * sensitivityX * scale;
+        _pitch -= look.y * sensitivityY * scale;
         _pitch  = Mathf.Clamp(_pitch, minPitch, maxPitch);
 
         // ── Smooth follow the pivot ──────────────────────────────────────────

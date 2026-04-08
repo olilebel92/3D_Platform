@@ -208,6 +208,9 @@ public class CharacterWindow : MonoBehaviour
 
     private void ToggleWindow()
     {
+        // Block opening while a popup or tutorial is showing
+        if (!_isOpen && PopupManager.IsShowing) return;
+
         _isOpen = !_isOpen;
 
         if (_isOpen && SkillTreeManager.Instance != null)

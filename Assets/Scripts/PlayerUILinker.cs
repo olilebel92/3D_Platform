@@ -99,8 +99,10 @@ public class PlayerUILinker : MonoBehaviour
             xp.xpText    = xpText;
 
             // Event-driven: whenever XP changes the bar updates automatically.
+            // Guard against the slider being destroyed during scene cleanup
+            // (Unity destroyed objects pass != null but throw on access).
             if (xpBar != null)
-                xp.OnXPChanged += ratio => xpBar.value = ratio;
+                xp.OnXPChanged += ratio => { if (xpBar != null) xpBar.value = ratio; };
 
             xp.RefreshXPBar();
         }
@@ -127,7 +129,7 @@ public class PlayerUILinker : MonoBehaviour
         // ── Wire CharacterWindow ──────────────────────────────────────────────
         // CharacterWindow.Start() runs before the player spawns, so its
         // FindGameObjectWithTag("Player") returns null. Wire it here instead.
-        CharacterWindow charWindow = FindFirstObjectByType<CharacterWindow>();
+        CharacterWindow charWindow = FindFirstObjectByType<CharacterWindow>(FindObjectsInactive.Include);
         if (charWindow != null)
         {
             charWindow.playerHealthSystem  = health;
@@ -148,12 +150,8 @@ public class PlayerUILinker : MonoBehaviour
         }
 
         // ── Wire any other scene systems that need the player ─────────────────
-        // EnemySpawner and WaveManager auto-find by tag on Start(), but if the
-        // player spawned after them, pass the reference manually now.
-        foreach (var spawner in FindObjectsByType<EnemySpawner>(FindObjectsSortMode.None))
-            if (spawner.playerTransform == null)
-                spawner.playerTransform = localPlayer.transform;
-
+        // EnemySpawner no longer needs a player reference — EnemyAI finds
+        // the nearest player automatically via RefreshNearestTarget().
         WaveManager wave = FindFirstObjectByType<WaveManager>();
         if (wave != null && wave.playerTransform == null)
             wave.playerTransform = localPlayer.transform;

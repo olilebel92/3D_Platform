@@ -49,6 +49,18 @@ public class PlayerInventory : MonoBehaviour
     {
         Instance = this;
         Debug.Log("[PlayerInventory] Set as local instance.");
+
+        // Notify InventoryUI (bag grid subscription).
+        InventoryUI inventoryUI = UnityEngine.Object.FindFirstObjectByType<InventoryUI>();
+        if (inventoryUI != null) inventoryUI.SubscribeToInventoryIfNeeded();
+
+        // Notify every EquipSlotUI — FindObjectsByType with FindObjectsInactive.Include
+        // reaches slots inside the inventory panel even while it is hidden.
+        foreach (EquipSlotUI slot in UnityEngine.Object.FindObjectsByType<EquipSlotUI>(
+            FindObjectsInactive.Include, FindObjectsSortMode.None))
+        {
+            slot.BindToInventory(this);
+        }
     }
 
     void Start()

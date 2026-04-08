@@ -300,6 +300,17 @@ public class LobbyManager : MonoBehaviour
     void LoadGame()
     {
         Debug.Log("[LobbyManager] Loading: " + gameSceneName);
+
+        // Solo host (no other players) — shut down NGO and load directly so the
+        // game scene runs in singleplayer mode (PlayerSpawner's SpawnSolo path).
+        if (NetworkManager.Singleton.ConnectedClientsIds.Count == 1)
+        {
+            Debug.Log("[LobbyManager] Only one player — switching to singleplayer mode.");
+            NetworkManager.Singleton.Shutdown();
+            SceneManager.LoadScene(gameSceneName);
+            return;
+        }
+
         NetworkManager.Singleton.SceneManager.LoadScene(gameSceneName, LoadSceneMode.Single);
     }
 

@@ -80,6 +80,9 @@ public class MainMenuManager : MonoBehaviour
     {
         // Reset timeScale in case we came back from a paused state
         Time.timeScale = 1f;
+
+        // Shut down any active NGO session when returning to the main menu
+        ShutdownNetwork();
     }
 
     void Start()
@@ -108,6 +111,8 @@ public class MainMenuManager : MonoBehaviour
     {
         Debug.Log("[MainMenu] Solo play — loading: " + gameSceneName);
 
+        ShutdownNetwork();
+
         if (SceneTransitionManager.Instance != null)
             SceneTransitionManager.Instance.LoadScene(gameSceneName);
         else
@@ -122,6 +127,10 @@ public class MainMenuManager : MonoBehaviour
     void OnHost()
     {
         if (!ValidateNetworkManager()) return;
+
+        var transport = NetworkManager.Singleton.GetComponent<UnityTransport>();
+        if (transport != null)
+            transport.SetConnectionData("0.0.0.0", port, "0.0.0.0");
 
         Debug.Log("[MainMenu] Starting as Host — loading lobby...");
         NetworkManager.Singleton.StartHost();
@@ -267,5 +276,14 @@ public class MainMenuManager : MonoBehaviour
         if (NetworkManager.Singleton != null) return true;
         Debug.LogError("[MainMenu] NetworkManager not found in scene! Add a NetworkManager GameObject.");
         return false;
+    }
+
+    static void ShutdownNetwork()
+    {
+        if (NetworkManager.Singleton != null && NetworkManager.Singleton.IsListening)
+        {
+            Debug.Log("[MainMenu] Shutting down NGO session.");
+            NetworkManager.Singleton.Shutdown();
+        }
     }
 }

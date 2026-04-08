@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
@@ -57,12 +57,21 @@ public class PopupManager : MonoBehaviour
     /// <summary>Fired when the entire sequence finishes (all entries shown).</summary>
     public event Action OnSequenceComplete;
 
+    // ─── State ────────────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// True while a popup is visible. Panels check this before allowing themselves to open.
+    /// </summary>
+    public static bool IsShowing { get; private set; }
+
     // ─── Private State ────────────────────────────────────────────────────────
 
     private Queue<DialogueEntry> _queue = new Queue<DialogueEntry>();
     private Coroutine _activeCoroutine;
     private CanvasGroup _canvasGroup;
     private bool _inputReady = false;
+    private bool _skipRequested = false;
+    private bool _pauseRequested = false;   // tracks whether we've called RequestPause so we can always pair it with ReleasePause
 
     // ─── Unity Lifecycle ──────────────────────────────────────────────────────
 
@@ -102,8 +111,14 @@ public class PopupManager : MonoBehaviour
         foreach (var e in entries)
             _queue.Enqueue(e);
 
-        Time.timeScale = 0f;
-        Debug.Log("[PopupManager] Game paused.");
+        // Close all open panels so camera lock and pause state are clean
+        CloseAllPanels();
+
+        // RequestPause is deferred to RunSequence() (after one frame yield) so that
+        // NetworkManager.IsListening is stable before PauseManager checks it.
+        // Calling it here risks setting Time.timeScale=0 in MP if the popup fires
+        // before the NGO session is fully established (e.g. start-of-game tutorial).
+        IsShowing = true;
 
         _activeCoroutine = StartCoroutine(RunSequence());
     }
@@ -115,7 +130,7 @@ public class PopupManager : MonoBehaviour
         {
             new DialogueEntry
             {
-                message = message,
+                message        = message,
                 customDuration = duration
             }
         });
@@ -124,11 +139,22 @@ public class PopupManager : MonoBehaviour
     /// <summary>Force-close the popup immediately.</summary>
     public void Hide()
     {
-        StopActive();
+        StopActive();   // releases the pause if RunSequence had already requested it
         _queue.Clear();
-        Time.timeScale = 1f;
-        Debug.Log("[PopupManager] Game resumed.");
+        IsShowing = false;
         StartCoroutine(FadePanel(false));
+    }
+
+    // ─── Panel Management ─────────────────────────────────────────────────────
+    // Closes all game panels before showing a popup to prevent camera/pause conflicts.
+
+    private void CloseAllPanels()
+    {
+        CharacterWindow cw = FindFirstObjectByType<CharacterWindow>();
+        if (cw != null) cw.CloseWindow();
+
+        InventoryUI inv = FindFirstObjectByType<InventoryUI>();
+        if (inv != null) inv.CloseInventory();
     }
 
     // ─── Sequence Coroutine ───────────────────────────────────────────────────
@@ -139,6 +165,15 @@ public class PopupManager : MonoBehaviour
         if (_queue.Count > 0 && messageText != null)
             messageText.text = _queue.Peek().message;
 
+        // Wait one frame before requesting a pause so NetworkManager.IsListening
+        // has time to become true. Without this delay, a popup that fires during
+        // early scene setup (e.g. the start-of-game tutorial at t=1.5s) would call
+        // RequestPause before NGO is connected, making IsMultiplayer return false
+        // and briefly setting Time.timeScale=0 in a multiplayer session.
+        yield return null;
+        _pauseRequested = true;
+        PauseManager.RequestPause();
+
         yield return StartCoroutine(FadePanel(true));
 
         while (_queue.Count > 0)
@@ -148,19 +183,19 @@ public class PopupManager : MonoBehaviour
         }
 
         yield return StartCoroutine(FadePanel(false));
-        Time.timeScale = 1f;
-        Debug.Log("[PopupManager] Game resumed.");
+
+        _pauseRequested = false;
+        PauseManager.ReleasePause();
+        IsShowing = false;
         OnSequenceComplete?.Invoke();
         Debug.Log("[PopupManager] Sequence complete.");
     }
 
     private IEnumerator ShowEntry(DialogueEntry entry)
     {
-        // Display text
         if (messageText != null)
             messageText.text = entry.message;
 
-        // Reset progress bar
         SetProgressBar(1f);
 
         // Short grace period before accepting input (unscaled — runs while game is paused)
@@ -169,10 +204,9 @@ public class PopupManager : MonoBehaviour
         _inputReady = true;
 
         float duration = entry.customDuration > 0f ? entry.customDuration : defaultDuration;
-        float elapsed = 0f;
-        bool skipped = false;
+        float elapsed  = 0f;
+        bool  skipped  = false;
 
-        // Count down — player can skip at any point after inputDelay
         while (elapsed < duration)
         {
             elapsed += Time.unscaledDeltaTime;
@@ -189,34 +223,19 @@ public class PopupManager : MonoBehaviour
 
         SetProgressBar(0f);
 
-        if (!skipped)
-            Debug.Log($"[PopupManager] Entry auto-advanced: \"{entry.message}\"");
-        else
-            Debug.Log($"[PopupManager] Entry skipped: \"{entry.message}\"");
+        Debug.Log(skipped
+            ? $"[PopupManager] Entry skipped: \"{entry.message}\""
+            : $"[PopupManager] Entry auto-advanced: \"{entry.message}\"");
     }
 
     // ─── Input ────────────────────────────────────────────────────────────────
 
-    /// <summary>Called by the Continue button click event.</summary>
-    private void OnContinuePressed()
-    {
-        // Handled via WasSkipPressed polling — button click sets a flag instead
-        // so it works within the coroutine's while loop.
-        _skipRequested = true;
-    }
-
-    private bool _skipRequested = false;
+    private void OnContinuePressed() => _skipRequested = true;
 
     private bool WasSkipPressed()
     {
-        // Consume button click flag
-        if (_skipRequested)
-        {
-            _skipRequested = false;
-            return true;
-        }
+        if (_skipRequested) { _skipRequested = false; return true; }
 
-        // Keyboard: Enter, Space, or E
         if (Keyboard.current != null)
         {
             if (Keyboard.current.enterKey.wasPressedThisFrame ||
@@ -225,12 +244,8 @@ public class PopupManager : MonoBehaviour
                 return true;
         }
 
-        // Gamepad: South button (A / Cross)
-        if (Gamepad.current != null)
-        {
-            if (Gamepad.current.buttonSouth.wasPressedThisFrame)
-                return true;
-        }
+        if (Gamepad.current != null && Gamepad.current.buttonSouth.wasPressedThisFrame)
+            return true;
 
         return false;
     }
@@ -261,8 +276,8 @@ public class PopupManager : MonoBehaviour
         }
 
         popupPanel.SetActive(true);
-        float start = fadeIn ? 0f : 1f;
-        float end = fadeIn ? 1f : 0f;
+        float start   = fadeIn ? 0f : 1f;
+        float end     = fadeIn ? 1f : 0f;
         float elapsed = 0f;
 
         while (elapsed < fadeDuration)
@@ -273,12 +288,10 @@ public class PopupManager : MonoBehaviour
         }
 
         _canvasGroup.alpha = end;
-
-        if (!fadeIn)
-            popupPanel.SetActive(false);
+        if (!fadeIn) popupPanel.SetActive(false);
     }
 
-    // ─── Progress Bar Helper ──────────────────────────────────────────────────
+    // ─── Progress Bar ─────────────────────────────────────────────────────────
 
     private void SetProgressBar(float fillAmount)
     {
@@ -296,7 +309,15 @@ public class PopupManager : MonoBehaviour
             _activeCoroutine = null;
         }
 
+        // If RunSequence had already called RequestPause before being stopped,
+        // release it now so the pause count never leaks.
+        if (_pauseRequested)
+        {
+            _pauseRequested = false;
+            PauseManager.ReleasePause();
+        }
+
         _skipRequested = false;
-        _inputReady = false;
+        _inputReady    = false;
     }
 }

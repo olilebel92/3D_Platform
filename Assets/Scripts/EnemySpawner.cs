@@ -1,13 +1,12 @@
-﻿using UnityEngine;
+using UnityEngine;
+using Unity.Netcode;
 
 public class EnemySpawner : MonoBehaviour
 {
     // ─── References ───────────────────────────────────────────────────────────
     [Header("References")]
-    [Tooltip("Drag your Enemy prefab here.")]
+    [Tooltip("Drag your Enemy prefab here. Must have a NetworkObject component.")]
     public GameObject enemyPrefab;
-    [Tooltip("Leave blank to auto-find by tag.")]
-    public Transform playerTransform;
 
     // ─── Spawn Points ─────────────────────────────────────────────────────────
     [Header("Spawn Points")]
@@ -21,32 +20,19 @@ public class EnemySpawner : MonoBehaviour
     [Tooltip("Maximum enemies alive at once.")]
     public int maxEnemies = 5;
 
-    private float spawnTimer = 0f;
-    private int currentEnemyCount = 0;
+    private float _spawnTimer = 0f;
+    private int _currentEnemyCount = 0;
 
     // ─── Unity Lifecycle ──────────────────────────────────────────────────────
-    void Start()
-    {
-        // Auto-find player if not assigned
-        if (playerTransform == null)
-        {
-            GameObject playerObj = GameObject.FindGameObjectWithTag("Player");
-            if (playerObj != null)
-                playerTransform = playerObj.transform;
-            else
-                Debug.LogWarning("[EnemySpawner] No player found! Tag your player as 'Player'.");
-        }
-    }
-
     void Update()
     {
-        spawnTimer += Time.deltaTime;
+        if (!IsServer()) return;
 
-        if (spawnTimer >= spawnInterval)
+        _spawnTimer += Time.deltaTime;
+        if (_spawnTimer >= spawnInterval)
         {
-            spawnTimer = 0f;
-
-            if (currentEnemyCount < maxEnemies)
+            _spawnTimer = 0f;
+            if (_currentEnemyCount < maxEnemies)
                 SpawnEnemy();
         }
     }
@@ -60,48 +46,44 @@ public class EnemySpawner : MonoBehaviour
             return;
         }
 
-        // Pick a random spawn point, or use this object's position as fallback
         Vector3 spawnPos = transform.position;
         if (spawnPoints != null && spawnPoints.Length > 0)
         {
             Transform randomPoint = spawnPoints[Random.Range(0, spawnPoints.Length)];
-            if (randomPoint != null)
-                spawnPos = randomPoint.position;
+            if (randomPoint != null) spawnPos = randomPoint.position;
         }
 
-        // Spawn the enemy
         GameObject enemy = Instantiate(enemyPrefab, spawnPos, Quaternion.identity);
-        currentEnemyCount++;
 
-        // Assign player target automatically
-        EnemyAI ai = enemy.GetComponent<EnemyAI>();
-        if (ai != null && playerTransform != null)
-            ai.SetTarget(playerTransform);
-
-        // Track when this enemy is destroyed
-        EnemyTracker tracker = enemy.AddComponent<EnemyTracker>();
+        EnemyTracker tracker = enemy.GetComponent<EnemyTracker>();
+        if (tracker == null) tracker = enemy.AddComponent<EnemyTracker>();
         tracker.spawner = this;
 
-        Debug.Log("[EnemySpawner] Spawned enemy. Total: " + currentEnemyCount);
+        NetworkObject netObj = enemy.GetComponent<NetworkObject>();
+        if (netObj != null && IsNetworkActive())
+            netObj.Spawn(destroyWithScene: true);
+
+        _currentEnemyCount++;
+        Debug.Log("[EnemySpawner] Spawned enemy. Total: " + _currentEnemyCount);
     }
 
-    // ─── Called by EnemyTracker when an enemy dies/despawns ──────────────────
-    public void EnemyDestroyed()
-    {
-        currentEnemyCount--;
-    }
+    // ─── Called by EnemyTracker on death ──────────────────────────────────────
+    public void EnemyDestroyed() => _currentEnemyCount--;
+
+    // ─── Network Helpers ──────────────────────────────────────────────────────
+    private static bool IsNetworkActive() =>
+        NetworkManager.Singleton != null && NetworkManager.Singleton.IsListening;
+
+    private bool IsServer() => !IsNetworkActive() || NetworkManager.Singleton.IsServer;
 
     // ─── Gizmos ───────────────────────────────────────────────────────────────
     void OnDrawGizmosSelected()
     {
-        // Blue spheres at each spawn point
         Gizmos.color = Color.blue;
         if (spawnPoints != null)
             foreach (Transform point in spawnPoints)
-                if (point != null)
-                    Gizmos.DrawWireSphere(point.position, 0.5f);
+                if (point != null) Gizmos.DrawWireSphere(point.position, 0.5f);
 
-        // White sphere at spawner position fallback
         Gizmos.color = Color.white;
         Gizmos.DrawWireSphere(transform.position, 0.5f);
     }

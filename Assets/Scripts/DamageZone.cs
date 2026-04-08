@@ -1,4 +1,5 @@
 using UnityEngine;
+using Unity.Netcode;
 
 public class DamageZone : MonoBehaviour
 {
@@ -6,11 +7,22 @@ public class DamageZone : MonoBehaviour
 
     void OnTriggerEnter(Collider other)
     {
-        if (other.CompareTag("Player"))
+        if (!other.CompareTag("Player")) return;
+
+        // In MP, physics is simulated on every machine so this trigger can fire
+        // on machines that don't own the entering player. Only the owning client
+        // should apply damage — HealthSystem has no NetworkVariable so server-side
+        // changes don't propagate to the player's UI.
+        bool networkActive = NetworkManager.Singleton != null
+                          && NetworkManager.Singleton.IsListening;
+        if (networkActive)
         {
-            HealthSystem health = other.GetComponent<HealthSystem>();
-            if (health != null)
-                health.TakeDamage(damageAmount);
+            NetworkObject playerNet = other.GetComponent<NetworkObject>();
+            if (playerNet != null && !playerNet.IsOwner) return;
         }
+
+        HealthSystem health = other.GetComponent<HealthSystem>();
+        if (health != null)
+            health.TakeDamage(damageAmount);
     }
 }

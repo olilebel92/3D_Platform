@@ -1,12 +1,18 @@
 using UnityEngine;
 using UnityEngine.InputSystem;
+using Unity.Netcode;
 
 /// <summary>
-/// Single component on the Player that handles casting any spell from the spell bar.
-/// All per-spell behaviour (cast time, channeling, projectile count) is defined on SpellData.
-/// No new player scripts are needed when adding new spells.
+/// Handles casting any spell from the spell bar.
+/// All per-spell behaviour (cast time, channeling, projectile count) lives on SpellData.
+///
+/// Multiplayer: the owning client computes damage from local stats, then sends a
+/// ServerRpc with the prefab's GlobalObjectIdHash — a stable uint baked into every
+/// registered NetworkObject prefab by NGO. The server resolves the prefab from
+/// NetworkManager's registry and spawns it, so no ordered array or enum mapping
+/// is needed. Adding a new spell requires only registering its prefab in NetworkManager.
 /// </summary>
-public class SpellCaster : MonoBehaviour
+public class SpellCaster : NetworkBehaviour
 {
     // ─── Inspector ────────────────────────────────────────────────────────────
 
@@ -44,15 +50,29 @@ public class SpellCaster : MonoBehaviour
         }
     }
 
-    void OnDestroy()
+    public override void OnDestroy()
     {
+        base.OnDestroy();
         if (_ownsInputActions && _inputActions != null)
             _inputActions.Player.Disable();
     }
 
+    // ─── NGO Lifecycle ────────────────────────────────────────────────────────
+
+    public override void OnNetworkSpawn()
+    {
+        if (!IsOwner)
+        {
+            enabled = false;
+            return;
+        }
+    }
+
+    // ─── Update ───────────────────────────────────────────────────────────────
+
     void Update()
     {
-        // ── Hotkeys 1–0 select a slot and immediately begin casting ───────────
+        // Hotkeys 1–0: select slot and begin cast
         if (Keyboard.current != null)
         {
             for (int i = 0; i < 10; i++)
@@ -67,15 +87,14 @@ public class SpellCaster : MonoBehaviour
             }
         }
 
-        // ── Gamepad R1 → cast currently selected spell ────────────────────────
+        // Gamepad R1: cast currently selected spell
         if (Gamepad.current != null && Gamepad.current.rightShoulder.wasPressedThisFrame)
             BeginCast(SpellBarManager.Instance?.GetSelectedSpell());
 
-        // ── Tick active cast state ────────────────────────────────────────────
         TickCastState();
     }
 
-    // ─── State Machine ────────────────────────────────────────────────────────
+    // ─── Cast State Machine ───────────────────────────────────────────────────
 
     void TickCastState()
     {
@@ -88,7 +107,7 @@ public class SpellCaster : MonoBehaviour
                     FireSpell();
                     _state = _active != null && _active.isChannelable
                         ? CastState.Channeling : CastState.Idle;
-                    _timer = _active != null ? _active.channelTickRate : 0f;
+                    _timer = _active?.channelTickRate ?? 0f;
                 }
                 break;
 
@@ -103,7 +122,7 @@ public class SpellCaster : MonoBehaviour
                 if (_timer <= 0f)
                 {
                     FireSpell();
-                    _timer = _active != null ? _active.channelTickRate : 0.5f;
+                    _timer = _active?.channelTickRate ?? 0.5f;
                 }
                 break;
         }
@@ -138,29 +157,117 @@ public class SpellCaster : MonoBehaviour
         if (_active == null || _active.prefab == null) return;
 
         Transform origin = firePoint != null ? firePoint : transform;
-        int count        = Mathf.Max(1, _active.projectileCount);
+        int       count  = Mathf.Max(1, _active.projectileCount);
 
-        if (count == 1)
+        bool networkActive = NetworkManager.Singleton != null
+                          && NetworkManager.Singleton.IsListening;
+
+        if (networkActive)
         {
-            Instantiate(_active.prefab, origin.position, origin.rotation);
+            // Validate that the prefab has a NetworkObject component (i.e. is registered in NGO).
+            if (!_active.prefab.TryGetComponent<NetworkObject>(out NetworkObject _))
+            {
+                Debug.LogWarning($"[SpellCaster] '{_active.spellName}' prefab has no NetworkObject " +
+                                 "component — register it in NetworkManager's prefab list.");
+                return;
+            }
+
+            // Pass the prefab's asset name as the identifier. The server resolves it
+            // by name from NetworkManager's own registered prefab list — the same list
+            // on both client and server, so they always agree. Prefab names must be
+            // unique within the NetworkManager registry (standard Unity convention).
+            string prefabName = _active.prefab.name;
+            float  rawDamage  = ComputeRawDamage(_active);
+
+            foreach (Quaternion rot in GetShotRotations(origin, count))
+                SpawnProjectileServerRpc(origin.position, rot, rawDamage, prefabName);
         }
         else
         {
-            float halfSpread = _active.spreadAngle * 0.5f;
-            float step       = _active.spreadAngle / (count - 1);
-
-            for (int i = 0; i < count; i++)
-            {
-                float yaw      = -halfSpread + step * i;
-                Quaternion rot = origin.rotation * Quaternion.Euler(0f, yaw, 0f);
+            foreach (Quaternion rot in GetShotRotations(origin, count))
                 Instantiate(_active.prefab, origin.position, rot);
-            }
         }
 
-        Debug.Log($"[SpellCaster] Fired: {_active.spellName} x{count}");
+        Debug.Log($"[SpellCaster] Fired {_active.spellName} x{count}");
+    }
+
+    // ─── Network RPC ──────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Runs on the server. Resolves the prefab from NetworkManager's registry by name,
+    /// injects the client-computed damage, and spawns the projectile for all clients.
+    /// </summary>
+    [Rpc(SendTo.Server)]
+    private void SpawnProjectileServerRpc(Vector3 pos, Quaternion rot, float rawDamage, string prefabName)
+    {
+        NetworkObject prefab = FindRegisteredPrefab(prefabName);
+        if (prefab == null)
+        {
+            Debug.LogWarning($"[SpellCaster] No registered NetworkObject prefab named '{prefabName}' — " +
+                             "check NetworkManager's prefab list.");
+            return;
+        }
+
+        NetworkObject instance = Instantiate(prefab, pos, rot);
+
+        // Inject damage before Spawn() so it's available when OnNetworkSpawn fires.
+        if (instance.TryGetComponent<Fireball>(out Fireball fb))
+            fb.precomputedDamage = rawDamage;
+
+        instance.Spawn(true);
     }
 
     // ─── Helpers ──────────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Searches NetworkManager's registered prefab list for the entry whose
+    /// prefab asset name matches. Prefab names must be unique in the registry
+    /// (standard Unity convention — prefab asset filenames are unique per project).
+    /// </summary>
+    static NetworkObject FindRegisteredPrefab(string prefabName)
+    {
+        foreach (var entry in NetworkManager.Singleton.NetworkConfig.Prefabs.Prefabs)
+        {
+            if (entry.Prefab != null && entry.Prefab.name == prefabName
+                && entry.Prefab.TryGetComponent<NetworkObject>(out NetworkObject no))
+                return no;
+        }
+        return null;
+    }
+
+    /// <summary>Returns one rotation per projectile, spread evenly around the origin.</summary>
+    Quaternion[] GetShotRotations(Transform origin, int count)
+    {
+        if (count == 1) return new[] { origin.rotation };
+
+        var   rots       = new Quaternion[count];
+        float halfSpread = _active.spreadAngle * 0.5f;
+        float step       = _active.spreadAngle / (count - 1);
+        for (int i = 0; i < count; i++)
+        {
+            float yaw = -halfSpread + step * i;
+            rots[i]   = origin.rotation * Quaternion.Euler(0f, yaw, 0f);
+        }
+        return rots;
+    }
+
+    /// <summary>
+    /// Computes raw spell damage from the local player's stats.
+    /// Called client-side on the owner before the ServerRpc is sent,
+    /// so the server never needs to read per-player singletons.
+    /// </summary>
+    float ComputeRawDamage(SpellData spell)
+    {
+        float baseDmg = 0f;
+        if (spell.prefab.TryGetComponent<Fireball>(out Fireball fb))
+            baseDmg = fb.baseDamage;
+
+        float spellBonus = SkillTreeManager.Instance?.TotalSpellDamageBonus ?? 0f;
+        float fireBonus  = SkillTreeManager.Instance?.TotalFireDamageBonus  ?? 0f;
+        float intMult    = ExperienceManager.Instance?.SpellDamageMultiplier ?? 1f;
+
+        return (baseDmg + spellBonus + fireBonus) * intMult;
+    }
 
     bool IsCastHeld()
     {
@@ -171,8 +278,6 @@ public class SpellCaster : MonoBehaviour
                 if (Keyboard.current[key].isPressed) return true;
             }
 
-        if (Gamepad.current != null && Gamepad.current.rightShoulder.isPressed) return true;
-
-        return false;
+        return Gamepad.current != null && Gamepad.current.rightShoulder.isPressed;
     }
 }

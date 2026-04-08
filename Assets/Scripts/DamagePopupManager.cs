@@ -32,6 +32,22 @@ public class DamagePopupManager : MonoBehaviour
     [Tooltip("Color for XP gained.")]
     public Color xpColor = new Color(1f, 0.85f, 0f);       // yellow
 
+    [Header("Text Size")]
+    [Tooltip("Font size for damage dealt by the player.")]
+    public float dealFontSize = 6f;
+
+    [Tooltip("Font size for damage received by the player.")]
+    public float receiveFontSize = 6f;
+
+    [Tooltip("Font size for critical hits.")]
+    public float critFontSize = 9f;
+
+    [Tooltip("Font size for HP healed.")]
+    public float healFontSize = 6f;
+
+    [Tooltip("Font size for XP gained.")]
+    public float xpFontSize = 5f;
+
     [Header("Spawn Offset")]
     [Tooltip("Height above the damaged object's origin where the popup appears.")]
     public float heightOffset = 1.8f;
@@ -71,7 +87,8 @@ public class DamagePopupManager : MonoBehaviour
         if (popup != null)
         {
             Color color = isPlayerReceiving ? receiveColor : (isCrit ? critColor : dealColor);
-            popup.Initialize(amount, color);
+            float size  = isPlayerReceiving ? receiveFontSize : (isCrit ? critFontSize : dealFontSize);
+            popup.Initialize(amount, color, size);
         }
     }
 
@@ -95,7 +112,7 @@ public class DamagePopupManager : MonoBehaviour
 
         DamagePopup popup = obj.GetComponent<DamagePopup>();
         if (popup != null)
-            popup.Initialize(amount, healColor, "+");
+            popup.Initialize(amount, healColor, healFontSize);
     }
 
     /// <summary>
@@ -116,6 +133,6 @@ public class DamagePopupManager : MonoBehaviour
 
         DamagePopup popup = obj.GetComponent<DamagePopup>();
         if (popup != null)
-            popup.Initialize(amount, xpColor, "+", " EXP");
+            popup.Initialize(amount, xpColor, xpFontSize, suffix: " EXP");
     }
 }

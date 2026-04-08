@@ -1,4 +1,4 @@
-# Unity generated folders — no need for Claude to read these
+# === Unity Generated & Heavy Folders ===
 Library/
 Temp/
 obj/
@@ -6,16 +6,47 @@ Build/
 Builds/
 Logs/
 UserSettings/
+ProjectSettings/
+Packages/
 
-# Unity meta files (usually not needed for code tasks)
+# === Binary & Asset Files ===
+*.asset
+*.prefab
+*.unity
+*.mat
+*.png
+*.jpg
+*.jpeg
+*.tga
+*.mp3
+*.wav
+*.fbx
+*.anim
+*.controller
+*.mixer
+
+# === Meta files ===
 *.meta
 
-# Visual Studio / Rider
+# === Visual Studio / Rider / IDE files ===
 .vs/
 .idea/
 *.csproj
 *.sln
+*.user
+*.userprefs
 
-# OS
+# === Claude-specific (exclude memory/settings, but allow rules/) ===
+.claudeignore
+CLAUDE.md
+.claude/settings*
+.claude/projects/
+
+# === Docs / non-code web files ===
+docs/
+
+# === Other junk ===
+*.log
+*.tmp
 .DS_Store
 Thumbs.db

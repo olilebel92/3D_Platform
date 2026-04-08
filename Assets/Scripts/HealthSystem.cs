@@ -41,6 +41,7 @@ public class HealthSystem : MonoBehaviour
     /// <summary>HP from the Inspector + all STR level-up spends. Never includes equipment.</summary>
     private int _permanentMaxHealth;
 
+    private bool _isDead = false;
     private float _regenTimer = 0f;
     private PlayerInventory _inventory;
 
@@ -82,6 +83,8 @@ public class HealthSystem : MonoBehaviour
     // ─── Public API ───────────────────────────────────────────────────────────
     public void TakeDamage(int amount, bool isCrit = false)
     {
+        if (_isDead) return;
+
         currentHealth -= amount;
         currentHealth = Mathf.Clamp(currentHealth, 0, maxHealth);
         UpdateHealthUI();
@@ -109,6 +112,13 @@ public class HealthSystem : MonoBehaviour
         currentHealth += amount;
         currentHealth = Mathf.Clamp(currentHealth, 0, maxHealth);
         int gained = currentHealth - before;
+
+        // Revive dead state — happens when the respawn flow heals the player back
+        // above 0. Without this, _isDead stays true after respawn and all subsequent
+        // TakeDamage calls are silently ignored.
+        if (_isDead && currentHealth > 0)
+            _isDead = false;
+
         UpdateHealthUI();
 
         Debug.Log(gameObject.name + " healed " + gained + " HP! HP: " + currentHealth + "/" + maxHealth);
@@ -146,10 +156,27 @@ public class HealthSystem : MonoBehaviour
     // ─── Internal ─────────────────────────────────────────────────────────────
     void Die()
     {
+        if (_isDead) return;
+        _isDead = true;
+
         Debug.Log(gameObject.name + " died!");
 
         if (destroyOnDeath)
         {
+            // Guard: NetworkObjects must only be destroyed by the server.
+            // If this runs on a non-server client it means damage was applied
+            // locally by mistake — log a warning and bail out.
+            var netObj = GetComponent<Unity.Netcode.NetworkObject>();
+            bool networkActive = Unity.Netcode.NetworkManager.Singleton != null
+                              && Unity.Netcode.NetworkManager.Singleton.IsListening;
+            if (networkActive && netObj != null && netObj.IsSpawned
+                && !Unity.Netcode.NetworkManager.Singleton.IsServer)
+            {
+                Debug.LogWarning($"[HealthSystem] Die() blocked — {gameObject.name} is a " +
+                                 "NetworkObject and can only be destroyed by the server.");
+                return;
+            }
+
             EnemyAI ai = GetComponent<EnemyAI>();
             if (ai != null) ai.enabled = false;
 

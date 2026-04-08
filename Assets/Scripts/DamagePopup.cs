@@ -40,7 +40,7 @@ public class DamagePopup : MonoBehaviour
     /// <param name="color">Text color.</param>
     /// <param name="prefix">Optional prefix prepended to the number, e.g. "+".</param>
     /// <param name="suffix">Optional suffix appended after the number, e.g. " EXP".</param>
-    public void Initialize(int amount, Color color, string prefix = "", string suffix = "")
+    public void Initialize(int amount, Color color, float fontSize = 6f, string prefix = "", string suffix = "")
     {
         _label = GetComponent<TextMeshPro>();
         if (_label == null)
@@ -52,9 +52,10 @@ public class DamagePopup : MonoBehaviour
 
         _mainCam = Camera.main;
 
-        _label.text = prefix + amount.ToString() + suffix;
-        _color = color;
-        _label.color = _color;
+        _label.fontSize = fontSize;
+        _label.text     = prefix + amount.ToString() + suffix;
+        _color          = color;
+        _label.color    = _color;
 
         float dx = Random.Range(-horizontalDrift, horizontalDrift);
         _drift = new Vector3(dx, riseSpeed, 0f);

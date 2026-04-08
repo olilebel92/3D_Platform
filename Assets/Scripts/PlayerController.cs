@@ -101,6 +101,14 @@ public class PlayerController : NetworkBehaviour
             var lockOnSys = GetComponent<LockOnSystem>();
             if (lockOnSys != null) lockOnSys.enabled = false;
 
+            // ── Disable CharacterController on remote players ─────────────────
+            // OwnerNetworkTransform syncs position by writing transform.position
+            // directly. An enabled CharacterController intercepts and blocks those
+            // writes, causing remote players to appear stuck at their spawn point
+            // or underground. Disabling it here lets NGO drive the position freely.
+            var remoteCc = GetComponent<CharacterController>();
+            if (remoteCc != null) remoteCc.enabled = false;
+
             return;
         }
 

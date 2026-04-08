@@ -39,6 +39,7 @@ public class InventoryUI : MonoBehaviour
     private bool _pendingRefresh = false;
     private readonly List<GameObject> _spawnedSlots = new();
     private CharacterWindow _characterWindow;
+    private PlayerInventory _subscribedInventory = null;
 
     // ─── Unity Lifecycle ──────────────────────────────────────────────────────
 
@@ -49,14 +50,35 @@ public class InventoryUI : MonoBehaviour
 
         _characterWindow = FindFirstObjectByType<CharacterWindow>();
 
-        if (PlayerInventory.Instance != null)
-            PlayerInventory.Instance.OnInventoryChanged += OnInventoryChanged;
+        // In solo mode the player instance is ready at Start; in MP it may arrive later
+        // via PlayerInventory.SetAsLocalInstance() → call SubscribeToInventoryIfNeeded()
+        // there and also whenever the inventory is opened as a safety net.
+        SubscribeToInventoryIfNeeded();
     }
 
     void OnDestroy()
     {
-        if (PlayerInventory.Instance != null)
-            PlayerInventory.Instance.OnInventoryChanged -= OnInventoryChanged;
+        if (_subscribedInventory != null)
+            _subscribedInventory.OnInventoryChanged -= OnInventoryChanged;
+    }
+
+    /// <summary>
+    /// Subscribes to the current PlayerInventory.Instance if we haven't already.
+    /// Safe to call multiple times — no-ops if already subscribed to the same instance.
+    /// Handles the MP case where the local player spawns after this Start() has run.
+    /// </summary>
+    public void SubscribeToInventoryIfNeeded()
+    {
+        if (PlayerInventory.Instance == null) return;
+        if (_subscribedInventory == PlayerInventory.Instance) return;  // already up to date
+
+        // Unsubscribe from any old instance (e.g. after a respawn that replaces the player)
+        if (_subscribedInventory != null)
+            _subscribedInventory.OnInventoryChanged -= OnInventoryChanged;
+
+        _subscribedInventory = PlayerInventory.Instance;
+        _subscribedInventory.OnInventoryChanged += OnInventoryChanged;
+        Debug.Log("[InventoryUI] Subscribed to local PlayerInventory.");
     }
 
     void Update()
@@ -79,6 +101,9 @@ public class InventoryUI : MonoBehaviour
 
     private void ToggleInventory()
     {
+        // Block opening while a popup or tutorial is showing
+        if (!_isOpen && PopupManager.IsShowing) return;
+
         _isOpen = !_isOpen;
 
         if (inventoryPanel != null)
@@ -86,6 +111,9 @@ public class InventoryUI : MonoBehaviour
 
         if (_isOpen)
         {
+            // In MP the player may have spawned after this script's Start() ran,
+            // so check here whether we still need to subscribe to their inventory.
+            SubscribeToInventoryIfNeeded();
             RefreshGrid();
             if (pauseGameWhileOpen) PauseManager.RequestPause();
         }

@@ -1,6 +1,7 @@
 using System.Collections;
 using UnityEngine;
 using TMPro;
+using Unity.Netcode;
 
 // ─── Wave Enemy Definition ────────────────────────────────────────────────────
 [System.Serializable]
@@ -23,7 +24,16 @@ public class WaveEnemyDefinition
 }
 
 // ─── Wave Manager ─────────────────────────────────────────────────────────────
-public class WaveManager : MonoBehaviour
+/// <summary>
+/// Server-authoritative wave spawner.
+/// Made NetworkBehaviour so it can push XP, heals, and UI updates to all clients
+/// via ClientRpc — HealthSystem / ExperienceManager have no NetworkVariables so
+/// server-side calls alone would not update non-host players.
+///
+/// IMPORTANT: Add a NetworkObject component to this GameObject in the Inspector.
+/// Scene-placed NetworkObjects are auto-spawned by NGO when the scene loads.
+/// </summary>
+public class WaveManager : NetworkBehaviour
 {
     // ─── Singleton ────────────────────────────────────────────────────────────
     public static WaveManager Instance { get; private set; }
@@ -97,11 +107,15 @@ public class WaveManager : MonoBehaviour
 
     void Start()
     {
+        // Only the server runs wave logic.
+        // In solo (no NetworkManager), ShouldRunWaves() returns true.
+        if (!ShouldRunWaves()) return;
+
         GameObject playerObj = GameObject.FindGameObjectWithTag("Player");
         if (playerObj != null)
             playerTransform = playerObj.transform;
         else
-            Debug.LogWarning("[WaveManager] No Player found! Tag your player as 'Player'.");
+            Debug.LogWarning("[WaveManager] No Player found at Start — ring spawn will use spawner position.");
 
         StartCoroutine(RunWaves());
     }
@@ -116,7 +130,9 @@ public class WaveManager : MonoBehaviour
 
             // Announce wave
             UpdateWaveLabel();
-            SetStatus(isBossWave ? "BOSS WAVE " + currentWave + " incoming!" : "Wave " + currentWave + " incoming!");
+            SetStatus(isBossWave
+                ? "BOSS WAVE " + currentWave + " incoming!"
+                : "Wave " + currentWave + " incoming!");
             yield return new WaitForSeconds(waveAnnounceDuration);
 
             if (gameOver) break;
@@ -135,15 +151,23 @@ public class WaveManager : MonoBehaviour
 
             SetStatus("Wave " + currentWave + " cleared!");
 
-            // ── Full heal ─────────────────────────────────────────────────────
-            if (playerTransform != null)
+            // ── Full heal — send to every player's owning client ──────────────
+            if (!IsNetworkActive())
             {
-                HealthSystem playerHealth = playerTransform.GetComponent<HealthSystem>();
-                if (playerHealth != null)
-                    playerHealth.Heal(playerHealth.maxHealth);
+                foreach (GameObject p in GameObject.FindGameObjectsWithTag("Player"))
+                {
+                    HealthSystem h = p.GetComponent<HealthSystem>();
+                    if (h != null) h.Heal(h.maxHealth);
+                }
+            }
+            else
+            {
+                // ClientRpc with no params → runs on ALL clients.
+                // Each client finds its own owned player and heals locally.
+                HealAllPlayersClientRpc();
             }
 
-            // ── Wave reward ───────────────────────────────────────────────────
+            // ── Wave item reward ──────────────────────────────────────────────
             GrantWaveReward(currentWave);
 
             // Countdown to next wave
@@ -182,51 +206,46 @@ public class WaveManager : MonoBehaviour
             {
                 Vector3 spawnPos = GetSpawnPosition();
                 GameObject enemy = Instantiate(def.prefab, spawnPos, Quaternion.identity);
-                aliveEnemyCount++;
-                totalSpawned++;
 
                 ApplyDifficultyScaling(enemy);
 
-                // Assign player target
-                EnemyAI ai = enemy.GetComponent<EnemyAI>();
-                if (ai != null && playerTransform != null)
-                    ai.SetTarget(playerTransform);
-
-                // Hook into death notification
+                // Hook into death notification before spawning
                 EnemyTracker tracker = enemy.GetComponent<EnemyTracker>();
-                if (tracker == null)
-                    tracker = enemy.AddComponent<EnemyTracker>();
+                if (tracker == null) tracker = enemy.AddComponent<EnemyTracker>();
                 tracker.waveManager = this;
+
+                // Only spawn via NGO when networking is active.
+                // In solo mode, plain Instantiate is enough — EnemyAI handles solo fallback.
+                NetworkObject netObj = enemy.GetComponent<NetworkObject>();
+                if (netObj != null && IsNetworkActive())
+                    netObj.Spawn(destroyWithScene: true);
+
+                aliveEnemyCount++;
+                totalSpawned++;
             }
         }
-
     }
 
     int GetEnemyCount(WaveEnemyDefinition def)
     {
-        // wavesActive = 0 on the unlock wave, so count starts at baseCount
         int wavesActive = currentWave - def.unlockAtWave;
         return def.baseCount + wavesActive * def.countIncreasePerWave;
     }
 
     void ApplyDifficultyScaling(GameObject enemy)
     {
-        // HP and damage scale exponentially — each wave multiplies the previous value
-        // Speed stays linear so enemies don't become impossibly fast
         float hpMult  = Mathf.Pow(1f + hpScalePerWave,     currentWave - 1);
         float dmgMult = Mathf.Pow(1f + damageScalePerWave,  currentWave - 1);
         float spdMult = 1f + (currentWave - 1) * speedScalePerWave;
 
-        // HP — set before HealthSystem.Start() runs so Start() uses the scaled maxHealth
         HealthSystem health = enemy.GetComponent<HealthSystem>();
         if (health != null)
         {
             int scaledMax = Mathf.Max(1, Mathf.RoundToInt(health.maxHealth * hpMult));
-            health.maxHealth    = scaledMax;
+            health.maxHealth     = scaledMax;
             health.currentHealth = scaledMax;
         }
 
-        // Damage & Speed — EnemyAI.Start() applies moveSpeed to NavMeshAgent, so set before that
         EnemyAI ai = enemy.GetComponent<EnemyAI>();
         if (ai != null)
         {
@@ -243,7 +262,6 @@ public class WaveManager : MonoBehaviour
             if (pt != null) return pt.position;
         }
 
-        // Ring spawn around the player
         Vector3 origin = playerTransform != null ? playerTransform.position : transform.position;
         float angle    = Random.Range(0f, 360f) * Mathf.Deg2Rad;
         float distance = Random.Range(spawnRingMin, spawnRingMax);
@@ -254,57 +272,216 @@ public class WaveManager : MonoBehaviour
     // ─── Wave Reward ──────────────────────────────────────────────────────────
     void GrantWaveReward(int wave)
     {
+        if (!IsNetworkActive())
+        {
+            // Solo: generate once and give it to every player directly.
+            if (ItemGenerator.Instance == null)
+            {
+                Debug.LogWarning("[WaveManager] ItemGenerator not found — no item reward given.");
+                return;
+            }
+            ItemData reward = ItemGenerator.Instance.GenerateItemForWave(wave);
+            foreach (GameObject p in GameObject.FindGameObjectsWithTag("Player"))
+            {
+                PlayerInventory inv = p.GetComponent<PlayerInventory>();
+                if (inv != null) inv.AddItem(reward);
+            }
+        }
+        else
+        {
+            // MP: ItemData is a ScriptableObject and cannot be sent over RPC directly.
+            // Broadcast the wave number; each client rolls and applies its own item.
+            // Same rarity table, independent stat rolls — avoids needing an item-ID registry.
+            GrantWaveItemClientRpc(wave);
+        }
+    }
+
+    /// <summary>
+    /// Sent to ALL clients on wave clear. Each client generates its own wave-reward
+    /// item locally and adds it to the locally-owned player's inventory.
+    /// </summary>
+    [ClientRpc]
+    private void GrantWaveItemClientRpc(int wave)
+    {
         if (ItemGenerator.Instance == null)
         {
-            Debug.LogWarning("[WaveManager] ItemGenerator not found — no item reward given.");
+            Debug.LogWarning("[WaveManager] ItemGenerator not found on this client — no item reward.");
             return;
         }
 
-        if (PlayerInventory.Instance == null)
+        // Find the player owned by this client
+        foreach (GameObject p in GameObject.FindGameObjectsWithTag("Player"))
         {
-            Debug.LogWarning("[WaveManager] PlayerInventory not found — no item reward given.");
-            return;
+            NetworkObject net = p.GetComponent<NetworkObject>();
+            if (net != null && net.IsOwner)
+            {
+                PlayerInventory inv = p.GetComponent<PlayerInventory>();
+                if (inv != null)
+                {
+                    ItemData reward = ItemGenerator.Instance.GenerateItemForWave(wave);
+                    inv.AddItem(reward);
+                    Debug.Log($"[WaveManager] Wave {wave} item reward granted: {reward.itemName}");
+                }
+                return;
+            }
         }
-
-        ItemData reward = ItemGenerator.Instance.GenerateItemForWave(wave);
-        PlayerInventory.Instance.AddItem(reward);
-
     }
 
     // ─── Public API ───────────────────────────────────────────────────────────
+
     /// <summary>Called by EnemyTracker when a wave-managed enemy dies.</summary>
     public void EnemyDestroyed()
     {
         aliveEnemyCount = Mathf.Max(0, aliveEnemyCount - 1);
 
-        if (ExperienceManager.Instance != null)
+        int xp = Mathf.Max(1, Mathf.RoundToInt(xpBase + currentWave * xpPerWave));
+
+        if (!IsNetworkActive())
         {
-            int xp = Mathf.Max(1, Mathf.RoundToInt(xpBase + currentWave * xpPerWave));
-            ExperienceManager.Instance.GainXP(xp);
+            // Solo — apply directly
+            foreach (GameObject p in GameObject.FindGameObjectsWithTag("Player"))
+            {
+                ExperienceManager xpManager = p.GetComponent<ExperienceManager>();
+                if (xpManager != null) xpManager.GainXP(xp);
+            }
+        }
+        else
+        {
+            // MP — send XP to each player's owning client.
+            // ExperienceManager has no NetworkVariable so server-side GainXP()
+            // would not update the client's XP bar or trigger level-up events.
+            foreach (GameObject p in GameObject.FindGameObjectsWithTag("Player"))
+            {
+                NetworkObject net = p.GetComponent<NetworkObject>();
+                if (net == null) continue;
+                ClientRpcParams ownerOnly = new ClientRpcParams
+                {
+                    Send = new ClientRpcSendParams { TargetClientIds = new[] { net.OwnerClientId } }
+                };
+                GrantXPClientRpc(xp, ownerOnly);
+            }
         }
     }
 
-    /// <summary>Call this when the player dies to end the run.</summary>
+    /// <summary>
+    /// Called by HealthSystem.Die() when a player dies.
+    /// In MP the call originates on the owning client — route to server so the
+    /// wave loop (which runs server-side) actually stops.
+    /// </summary>
     public void OnPlayerDeath()
     {
         if (gameOver) return;
-        gameOver = true;
-        SetStatus("You survived " + currentWave + " wave" + (currentWave != 1 ? "s" : "") + "!");
-;
+
+        if (IsNetworkActive() && !IsServer)
+        {
+            // Owning client notifies the server
+            NotifyPlayerDeathServerRpc();
+        }
+        else
+        {
+            // Solo, or already on the server
+            TriggerGameOver();
+        }
+    }
+
+    // ─── Server RPCs ──────────────────────────────────────────────────────────
+
+    [Rpc(SendTo.Server)]
+    private void NotifyPlayerDeathServerRpc()
+    {
+        if (gameOver) return;
+        TriggerGameOver();
+    }
+
+    // ─── Client RPCs ──────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Grants XP to the targeted client's locally-owned player.
+    /// Sent with ClientRpcParams so only the correct player's machine receives it.
+    /// </summary>
+    [ClientRpc]
+    private void GrantXPClientRpc(int xp, ClientRpcParams clientRpcParams = default)
+    {
+        foreach (GameObject p in GameObject.FindGameObjectsWithTag("Player"))
+        {
+            NetworkObject net = p.GetComponent<NetworkObject>();
+            if (net != null && net.IsOwner)
+            {
+                ExperienceManager xpManager = p.GetComponent<ExperienceManager>();
+                if (xpManager != null) xpManager.GainXP(xp);
+                return;
+            }
+        }
+    }
+
+    /// <summary>
+    /// Sent to ALL clients on wave clear. Each client heals its own locally-owned player.
+    /// </summary>
+    [ClientRpc]
+    private void HealAllPlayersClientRpc()
+    {
+        foreach (GameObject p in GameObject.FindGameObjectsWithTag("Player"))
+        {
+            NetworkObject net = p.GetComponent<NetworkObject>();
+            if (net != null && net.IsOwner)
+            {
+                HealthSystem h = p.GetComponent<HealthSystem>();
+                if (h != null) h.Heal(h.maxHealth);
+                return;
+            }
+        }
+    }
+
+    /// <summary>Syncs status text to all clients so Player 2 sees wave info.</summary>
+    [ClientRpc]
+    private void SyncStatusClientRpc(string msg)
+    {
+        if (statusText != null) statusText.text = msg;
+    }
+
+    /// <summary>Syncs wave label to all clients.</summary>
+    [ClientRpc]
+    private void SyncWaveLabelClientRpc(string label)
+    {
+        if (waveLabelText != null) waveLabelText.text = label;
     }
 
     // ─── UI Helpers ───────────────────────────────────────────────────────────
+
     void UpdateWaveLabel()
     {
-        if (waveLabelText != null)
-            waveLabelText.text = "Wave " + currentWave;
+        string label = "Wave " + currentWave;
+        if (waveLabelText != null) waveLabelText.text = label;
+        // Push to all clients so every player sees the wave number
+        if (IsNetworkActive() && IsServer) SyncWaveLabelClientRpc(label);
     }
 
     void SetStatus(string msg)
     {
-        if (statusText != null)
-            statusText.text = msg;
+        if (statusText != null) statusText.text = msg;
+        // Push to all clients so every player sees enemy count, countdown, etc.
+        if (IsNetworkActive() && IsServer) SyncStatusClientRpc(msg);
     }
+
+    // ─── Internal ─────────────────────────────────────────────────────────────
+
+    void TriggerGameOver()
+    {
+        gameOver = true;
+        SetStatus("You survived " + currentWave + " wave" + (currentWave != 1 ? "s" : "") + "!");
+    }
+
+    // ─── Network Helpers ──────────────────────────────────────────────────────
+
+    private static bool IsNetworkActive() =>
+        NetworkManager.Singleton != null && NetworkManager.Singleton.IsListening;
+
+    /// <summary>
+    /// Returns true when this machine should run wave logic (server or solo).
+    /// Named ShouldRunWaves to avoid collision with NetworkBehaviour.IsServer property.
+    /// </summary>
+    private bool ShouldRunWaves() =>
+        !IsNetworkActive() || NetworkManager.Singleton.IsServer;
 
     // ─── Gizmos ───────────────────────────────────────────────────────────────
     void OnDrawGizmosSelected()

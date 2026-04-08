@@ -1,6 +1,7 @@
 using UnityEngine;
 using UnityEngine.InputSystem;
 using UnityEngine.SceneManagement;
+using Unity.Netcode;
 
 /// <summary>
 /// Handles opening/closing the pause menu on ESC (keyboard) or Start (gamepad).
@@ -94,6 +95,16 @@ public class PauseMenuController : MonoBehaviour
 
         _isPaused = false;
         Time.timeScale = 1f;
+
+        // Shut down any active NGO session before loading the main menu.
+        // This must happen here (game scene) — not after — so NGO doesn't
+        // intercept the scene load or leave remote clients in a broken state.
+        if (NetworkManager.Singleton != null && NetworkManager.Singleton.IsListening)
+        {
+            Debug.Log("[PauseMenuController] Shutting down NGO session before returning to main menu.");
+            NetworkManager.Singleton.Shutdown();
+        }
+
         SceneManager.LoadScene(mainMenuSceneName);
     }
 

@@ -1,6 +1,7 @@
 ﻿using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.InputSystem;
+using Unity.Netcode;
 
 /// <summary>
 /// Listens for the Fire input action and triggers a melee attack animation.
@@ -18,7 +19,7 @@ using UnityEngine.InputSystem;
 ///   - Attack → Any State: Has Exit Time checked, Exit Time 1.0, duration 0, no conditions
 ///   - Player state must have a Motion assigned (e.g. an Idle clip)
 /// </summary>
-public class PlayerAttack : MonoBehaviour
+public class PlayerAttack : NetworkBehaviour
 {
     // ─── Inspector ────────────────────────────────────────────────────────────
 
@@ -126,11 +127,26 @@ public class PlayerAttack : MonoBehaviour
         }
     }
 
-    void OnDestroy()
+    public override void OnDestroy()
     {
+        base.OnDestroy();
         // Always unsubscribe to avoid memory leaks / stale callbacks.
         if (_inputActions != null)
             _inputActions.Player.Fire.performed -= OnFire;
+    }
+
+    // ─── NGO Lifecycle ────────────────────────────────────────────────────────
+
+    public override void OnNetworkSpawn()
+    {
+        // Non-owners have no business running hit detection or receiving input.
+        // Disabling the component stops Update() and prevents Start() from
+        // running on remote player instances.
+        if (!IsOwner)
+        {
+            enabled = false;
+            return;
+        }
     }
 
     void Update()
@@ -244,7 +260,25 @@ public class PlayerAttack : MonoBehaviour
             HealthSystem health = hit.GetComponent<HealthSystem>();
             if (health != null)
             {
-                health.TakeDamage(damage, isCrit);
+                bool networkActive = NetworkManager.Singleton != null
+                                  && NetworkManager.Singleton.IsListening;
+
+                if (networkActive)
+                {
+                    // MP: enemies are NetworkObjects — damage must be applied on the
+                    // server so that Die() → Destroy() runs with the correct authority.
+                    EnemyAI enemyAI = hit.GetComponent<EnemyAI>();
+                    if (enemyAI != null)
+                        enemyAI.TakeDamageServerRpc(damage, isCrit);
+                    else
+                        health.TakeDamage(damage, isCrit); // non-AI enemy fallback
+                }
+                else
+                {
+                    // Solo: apply directly — no NetworkObject involved.
+                    health.TakeDamage(damage, isCrit);
+                }
+
                 _hitThisSwing.Add(id);
                 Debug.Log($"[PlayerAttack] Hit {hit.gameObject.name} for {damage} damage " +
                           $"(STR={baseDamage}{(isCrit ? " CRIT!" : "")}).");

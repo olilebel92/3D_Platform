@@ -1,4 +1,3 @@
-using System.Collections;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.UI;
@@ -33,6 +32,9 @@ public class EquipSlotUI : MonoBehaviour, IDropHandler, IPointerEnterHandler, IP
 
     // ─── Unity Lifecycle ──────────────────────────────────────────────────────
 
+    // Tracks which inventory we are currently subscribed to so we can cleanly unsub.
+    private PlayerInventory _subscribedInventory;
+
     void Start()
     {
         if (unequipButton != null)
@@ -41,33 +43,34 @@ public class EquipSlotUI : MonoBehaviour, IDropHandler, IPointerEnterHandler, IP
             unequipButton.navigation = new Navigation { mode = Navigation.Mode.None };
         }
 
+        // If Instance is already set (solo, or fast NGO spawn) wire up immediately.
         if (PlayerInventory.Instance != null)
-        {
-            PlayerInventory.Instance.OnInventoryChanged += Refresh;
-            Refresh();
-        }
-        else
-        {
-            // PlayerInventory.SetAsLocalInstance() fires after scene Start() in multiplayer.
-            // Wait for it to become available before subscribing and refreshing.
-            StartCoroutine(WaitForInventory());
-        }
+            BindToInventory(PlayerInventory.Instance);
+        // Otherwise PlayerInventory.SetAsLocalInstance() will call BindToInventory()
+        // via FindObjectsByType — no polling coroutine needed.
     }
 
-    private IEnumerator WaitForInventory()
+    /// <summary>
+    /// Called by PlayerInventory.SetAsLocalInstance() so every equip slot wires up
+    /// even while the inventory panel is inactive (FindObjectsInactive.Include).
+    /// </summary>
+    public void BindToInventory(PlayerInventory inventory)
     {
-        while (PlayerInventory.Instance == null)
-            yield return null;
+        if (_subscribedInventory == inventory) return;
 
-        PlayerInventory.Instance.OnInventoryChanged += Refresh;
+        if (_subscribedInventory != null)
+            _subscribedInventory.OnInventoryChanged -= Refresh;
+
+        _subscribedInventory = inventory;
+        inventory.OnInventoryChanged += Refresh;
         Refresh();
-        Debug.Log($"[EquipSlotUI] {slotType} subscribed to PlayerInventory.");
+        Debug.Log($"[EquipSlotUI] {slotType} bound to {inventory.gameObject.name}.");
     }
 
     void OnDestroy()
     {
-        if (PlayerInventory.Instance != null)
-            PlayerInventory.Instance.OnInventoryChanged -= Refresh;
+        if (_subscribedInventory != null)
+            _subscribedInventory.OnInventoryChanged -= Refresh;
     }
 
     // ─── IDropHandler ─────────────────────────────────────────────────────────
@@ -99,10 +102,17 @@ public class EquipSlotUI : MonoBehaviour, IDropHandler, IPointerEnterHandler, IP
         ItemData equipped = PlayerInventory.Instance?.GetEquipped(slotType);
         bool hasItem = equipped != null;
 
+
         if (slotIconImage != null)
         {
-            slotIconImage.sprite = (hasItem && equipped.icon != null) ? equipped.icon : null;
-            slotIconImage.color  = hasItem ? equippedColor : emptyColor;
+            bool hasIcon = hasItem && equipped != null && equipped.icon != null;
+            slotIconImage.sprite = hasIcon ? equipped.icon : null;
+            // Equipped but no icon → transparent so no white-square artifact
+            // Equipped with icon   → full equippedColor (normally Color.white)
+            // Empty slot           → emptyColor (normally dim/translucent)
+            slotIconImage.color  = hasIcon  ? equippedColor
+                                 : hasItem  ? Color.clear
+                                 :            emptyColor;
         }
 
         if (slotLabel != null)
