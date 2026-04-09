@@ -48,6 +48,12 @@ crashlytics-build.properties
 ehthumbs.db
 Thumbs.db
 
+# Third-party asset packs — re-import from Asset Store
+Assets/MasterMagicFX/
+Assets/MasterMagicFX.meta
+Assets/ithappy/
+Assets/ithappy.meta
+
 # Large asset folders — only scripts are tracked
 Assets/Animations/
 Assets/Audio/
