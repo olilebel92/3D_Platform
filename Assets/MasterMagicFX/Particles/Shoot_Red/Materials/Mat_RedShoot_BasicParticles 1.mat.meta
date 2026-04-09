@@ -1,0 +1,16 @@
+fileFormatVersion: 2
+guid: 72cc2e416b64374468d0e38e9b47919e
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 2100000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 312910
+  packageName: MasterMagicFX
+  packageVersion: 0.1
+  assetPath: Assets/MasterMagicFX/Particles/Shoot_Red/Materials/Mat_RedShoot_BasicParticles
+    1.mat
+  uploadId: 740422

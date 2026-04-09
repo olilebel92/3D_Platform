@@ -1,0 +1,18 @@
+fileFormatVersion: 2
+guid: d70dc160a5000f04bbfd6bd058646d1f
+MonoImporter:
+  externalObjects: {}
+  serializedVersion: 2
+  defaultReferences: []
+  executionOrder: 0
+  icon: {instanceID: 0}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 312910
+  packageName: MasterMagicFX
+  packageVersion: 0.1
+  assetPath: Assets/MasterMagicFX/Scripts/Miscs/MLaser.cs
+  uploadId: 740422

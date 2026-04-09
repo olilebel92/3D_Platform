@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: cab76741dca15f54e9a9f3b22ff2381a
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 2100000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 312910
+  packageName: MasterMagicFX
+  packageVersion: 0.1
+  assetPath: Assets/MasterMagicFX/Particles/Buff_AttackUp/Materials/Mat_HealGlow.mat
+  uploadId: 740422

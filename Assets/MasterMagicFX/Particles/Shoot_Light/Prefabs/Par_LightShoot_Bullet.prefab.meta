@@ -1,0 +1,14 @@
+fileFormatVersion: 2
+guid: 48ba13529b6ad6342b1b16d5a52331c0
+PrefabImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 312910
+  packageName: MasterMagicFX
+  packageVersion: 0.1
+  assetPath: Assets/MasterMagicFX/Particles/Shoot_Light/Prefabs/Par_LightShoot_Bullet.prefab
+  uploadId: 740422

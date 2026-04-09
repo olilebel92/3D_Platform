@@ -1,0 +1,16 @@
+fileFormatVersion: 2
+guid: 6d7cc5aa961856d4f83d9152bbdb6d03
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 2100000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 312910
+  packageName: MasterMagicFX
+  packageVersion: 0.1
+  assetPath: Assets/MasterMagicFX/Particles/Explosion_PurpleCosmo/Materials/Mat_ExpGround
+    3.mat
+  uploadId: 740422

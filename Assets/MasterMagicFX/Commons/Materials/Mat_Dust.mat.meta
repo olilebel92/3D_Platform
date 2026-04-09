@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: c572069dd5eabf04fbf3d9c9b51b8d3c
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 2100000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 312910
+  packageName: MasterMagicFX
+  packageVersion: 0.1
+  assetPath: Assets/MasterMagicFX/Commons/Materials/Mat_Dust.mat
+  uploadId: 740422

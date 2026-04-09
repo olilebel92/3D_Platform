@@ -57,6 +57,9 @@ public class Fireball : NetworkBehaviour
     /// </summary>
     [HideInInspector] public float precomputedDamage = 0f;
 
+    /// <summary>Optional VFX prefab instantiated at the explosion center on impact.</summary>
+    [HideInInspector] public GameObject hitEffect = null;
+
     // ─── Unity Lifecycle ──────────────────────────────────────────────────────
 
     void Start()
@@ -103,6 +106,7 @@ public class Fireball : NetworkBehaviour
     {
         float raw = precomputedDamage > 0f ? precomputedDamage : ComputeRawDamage();
 
+        bool networked = NetworkManager.Singleton != null && NetworkManager.Singleton.IsListening;
         Collider[] hits = Physics.OverlapSphere(origin, falloffRadius);
         foreach (Collider hit in hits)
         {
@@ -115,9 +119,9 @@ public class Fireball : NetworkBehaviour
             int   damage = Mathf.RoundToInt(ComputeFalloffDamage(raw, dist));
 
             // Route through TakeDamageServerRpc so EnemyAI syncs NetworkHealth
-            // to all clients. When called from the server, NGO executes it directly.
+            // to all clients. In singleplayer NGO is inactive, so call TakeDamage directly.
             EnemyAI enemyAI = hit.GetComponent<EnemyAI>();
-            if (enemyAI != null)
+            if (enemyAI != null && networked)
                 enemyAI.TakeDamageServerRpc(damage, false);
             else
                 health.TakeDamage(damage);
@@ -125,7 +129,22 @@ public class Fireball : NetworkBehaviour
             Debug.Log($"[Fireball] Hit '{hit.name}' for {damage} damage.");
         }
 
+        SpawnHitEffect(origin);
         DespawnOrDestroy();
+    }
+
+    void SpawnHitEffect(Vector3 pos)
+    {
+        if (hitEffect == null) return;
+        GameObject fx = Instantiate(hitEffect, pos, Quaternion.identity);
+        // Auto-destroy: use the ParticleSystem duration if available, else 3 s.
+        // startLifetime can be a curve — use duration as a safe upper-bound instead.
+        ParticleSystem ps = fx.GetComponent<ParticleSystem>();
+        float duration = ps != null ? ps.main.duration + ps.main.startLifetime.constantMax : 3f;
+        if (ps != null && ps.main.startLifetime.mode != UnityEngine.ParticleSystemCurveMode.Constant
+                       && ps.main.startLifetime.mode != UnityEngine.ParticleSystemCurveMode.TwoConstants)
+            duration = ps.main.duration * 2f;
+        Destroy(fx, duration);
     }
 
     void SelfDestruct() => DespawnOrDestroy();

@@ -1,0 +1,14 @@
+fileFormatVersion: 2
+guid: d6fc1bf64a02b5a419ec69c2819fe003
+PrefabImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 312910
+  packageName: MasterMagicFX
+  packageVersion: 0.1
+  assetPath: Assets/MasterMagicFX/Particles/Field_Red/Prefabs/Par_RedField.prefab
+  uploadId: 740422

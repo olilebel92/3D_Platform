@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: 44d7750b763534a4fa86ff2ba2ad6a4d
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 11400000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 312910
+  packageName: MasterMagicFX
+  packageVersion: 0.1
+  assetPath: Assets/MasterMagicFX/Commons/Miscs/Main Camera Profile.asset
+  uploadId: 740422

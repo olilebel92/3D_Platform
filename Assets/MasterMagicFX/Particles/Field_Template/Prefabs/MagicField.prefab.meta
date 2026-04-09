@@ -1,0 +1,14 @@
+fileFormatVersion: 2
+guid: 11fb55a7833af8346b17191f3167dc07
+PrefabImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 312910
+  packageName: MasterMagicFX
+  packageVersion: 0.1
+  assetPath: Assets/MasterMagicFX/Particles/Field_Template/Prefabs/MagicField.prefab
+  uploadId: 740422

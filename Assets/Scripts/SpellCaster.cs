@@ -27,6 +27,53 @@ public class SpellCaster : NetworkBehaviour
     private float     _timer  = 0f;
     private SpellData _active = null;
 
+    // ─── Public Cast State API (for UI) ──────────────────────────────────────
+
+    /// <summary>Fired when a spell with cast time begins charging. Args: spell, total cast duration.</summary>
+    public event System.Action<SpellData, float> OnCastBegin;
+    /// <summary>Fired when the cast bar completes (spell fires / channeling begins).</summary>
+    public event System.Action                   OnCastComplete;
+    /// <summary>Fired when channeling begins (either after cast time or from instant-cast channelable).</summary>
+    public event System.Action<SpellData>        OnChannelBegin;
+    /// <summary>Fired each time a channel tick fires a projectile.</summary>
+    public event System.Action                   OnChannelTick;
+    /// <summary>Fired when the player releases the channel button.</summary>
+    public event System.Action                   OnChannelEnd;
+    /// <summary>Fired when the cast or channel is interrupted externally (e.g. player moved).</summary>
+    public event System.Action                   OnCastCancelled;
+
+    /// <summary>0→1 progress during cast time (Pending state).</summary>
+    public float CastProgress =>
+        _state == CastState.Pending && _active != null && _active.castTime > 0f
+            ? 1f - (_timer / _active.castTime)
+            : 0f;
+
+    /// <summary>0→1 progress toward the next channel tick.</summary>
+    public float ChannelTickProgress =>
+        _state == CastState.Channeling && _active != null && _active.channelTickRate > 0f
+            ? 1f - (_timer / _active.channelTickRate)
+            : 0f;
+
+    public bool IsCasting    => _state == CastState.Pending;
+    public bool IsChanneling => _state == CastState.Channeling;
+
+    /// <summary>True whenever input and movement should be locked (casting or channeling).</summary>
+    public bool IsLocked => _state != CastState.Idle;
+
+    /// <summary>
+    /// Interrupts any active cast or channel immediately (e.g. player moved).
+    /// Fires OnCastCancelled so the UI can react.
+    /// </summary>
+    public void CancelCast()
+    {
+        if (_state == CastState.Idle) return;
+        _state  = CastState.Idle;
+        _timer  = 0f;
+        _active = null;
+        OnCastCancelled?.Invoke();
+        Debug.Log("[SpellCaster] Cast cancelled.");
+    }
+
     // ─── Input ────────────────────────────────────────────────────────────────
 
     private PlayerInputActions _inputActions;
@@ -104,10 +151,19 @@ public class SpellCaster : NetworkBehaviour
                 _timer -= Time.deltaTime;
                 if (_timer <= 0f)
                 {
+                    OnCastComplete?.Invoke();
                     FireSpell();
-                    _state = _active != null && _active.isChannelable
-                        ? CastState.Channeling : CastState.Idle;
-                    _timer = _active?.channelTickRate ?? 0f;
+                    if (_active != null && _active.isChannelable)
+                    {
+                        _state = CastState.Channeling;
+                        _timer = _active.channelTickRate;
+                        OnChannelBegin?.Invoke(_active);
+                    }
+                    else
+                    {
+                        _state = CastState.Idle;
+                        _timer = 0f;
+                    }
                 }
                 break;
 
@@ -115,6 +171,7 @@ public class SpellCaster : NetworkBehaviour
                 if (!IsCastHeld())
                 {
                     _state = CastState.Idle;
+                    OnChannelEnd?.Invoke();
                     Debug.Log("[SpellCaster] Channel released.");
                     break;
                 }
@@ -122,6 +179,7 @@ public class SpellCaster : NetworkBehaviour
                 if (_timer <= 0f)
                 {
                     FireSpell();
+                    OnChannelTick?.Invoke();
                     _timer = _active?.channelTickRate ?? 0.5f;
                 }
                 break;
@@ -141,13 +199,23 @@ public class SpellCaster : NetworkBehaviour
         if (spell.castTime <= 0f)
         {
             FireSpell();
-            _state = spell.isChannelable ? CastState.Channeling : CastState.Idle;
-            _timer = spell.channelTickRate;
+            if (spell.isChannelable)
+            {
+                _state = CastState.Channeling;
+                _timer = spell.channelTickRate;
+                OnChannelBegin?.Invoke(spell);
+            }
+            else
+            {
+                _state = CastState.Idle;
+                _timer = 0f;
+            }
         }
         else
         {
             _state = CastState.Pending;
             _timer = spell.castTime;
+            OnCastBegin?.Invoke(spell, spell.castTime);
             Debug.Log($"[SpellCaster] Casting {spell.spellName}... ({spell.castTime}s)");
         }
     }
@@ -176,16 +244,21 @@ public class SpellCaster : NetworkBehaviour
             // by name from NetworkManager's own registered prefab list — the same list
             // on both client and server, so they always agree. Prefab names must be
             // unique within the NetworkManager registry (standard Unity convention).
-            string prefabName = _active.prefab.name;
-            float  rawDamage  = ComputeRawDamage(_active);
+            string prefabName    = _active.prefab.name;
+            float  rawDamage     = ComputeRawDamage(_active);
+            string hitEffectName = _active.hitEffect != null ? _active.hitEffect.name : "";
 
             foreach (Quaternion rot in GetShotRotations(origin, count))
-                SpawnProjectileServerRpc(origin.position, rot, rawDamage, prefabName);
+                SpawnProjectileServerRpc(origin.position, rot, rawDamage, prefabName, hitEffectName);
         }
         else
         {
             foreach (Quaternion rot in GetShotRotations(origin, count))
-                Instantiate(_active.prefab, origin.position, rot);
+            {
+                GameObject go = Instantiate(_active.prefab, origin.position, rot);
+                if (go.TryGetComponent<Fireball>(out Fireball fb))
+                    fb.hitEffect = _active.hitEffect;
+            }
         }
 
         Debug.Log($"[SpellCaster] Fired {_active.spellName} x{count}");
@@ -198,7 +271,7 @@ public class SpellCaster : NetworkBehaviour
     /// injects the client-computed damage, and spawns the projectile for all clients.
     /// </summary>
     [Rpc(SendTo.Server)]
-    private void SpawnProjectileServerRpc(Vector3 pos, Quaternion rot, float rawDamage, string prefabName)
+    private void SpawnProjectileServerRpc(Vector3 pos, Quaternion rot, float rawDamage, string prefabName, string hitEffectName)
     {
         NetworkObject prefab = FindRegisteredPrefab(prefabName);
         if (prefab == null)
@@ -210,9 +283,13 @@ public class SpellCaster : NetworkBehaviour
 
         NetworkObject instance = Instantiate(prefab, pos, rot);
 
-        // Inject damage before Spawn() so it's available when OnNetworkSpawn fires.
+        // Inject damage and hit effect before Spawn() so they're available when OnNetworkSpawn fires.
         if (instance.TryGetComponent<Fireball>(out Fireball fb))
+        {
             fb.precomputedDamage = rawDamage;
+            if (!string.IsNullOrEmpty(hitEffectName))
+                fb.hitEffect = FindRegisteredGameObject(hitEffectName);
+        }
 
         instance.Spawn(true);
     }
@@ -220,18 +297,25 @@ public class SpellCaster : NetworkBehaviour
     // ─── Helpers ──────────────────────────────────────────────────────────────
 
     /// <summary>
-    /// Searches NetworkManager's registered prefab list for the entry whose
-    /// prefab asset name matches. Prefab names must be unique in the registry
-    /// (standard Unity convention — prefab asset filenames are unique per project).
+    /// Searches NetworkManager's registered prefab list for an entry by name.
+    /// Returns the raw GameObject; caller casts to NetworkObject when needed.
+    /// Falls back to Resources.Load when not found in the registry (local VFX only).
     /// </summary>
-    static NetworkObject FindRegisteredPrefab(string prefabName)
+    static GameObject FindRegisteredGameObject(string prefabName)
     {
         foreach (var entry in NetworkManager.Singleton.NetworkConfig.Prefabs.Prefabs)
         {
-            if (entry.Prefab != null && entry.Prefab.name == prefabName
-                && entry.Prefab.TryGetComponent<NetworkObject>(out NetworkObject no))
-                return no;
+            if (entry.Prefab != null && entry.Prefab.name == prefabName)
+                return entry.Prefab;
         }
+        return Resources.Load<GameObject>(prefabName);
+    }
+
+    static NetworkObject FindRegisteredPrefab(string prefabName)
+    {
+        GameObject go = FindRegisteredGameObject(prefabName);
+        if (go != null && go.TryGetComponent<NetworkObject>(out NetworkObject no))
+            return no;
         return null;
     }
 

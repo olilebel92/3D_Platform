@@ -1,0 +1,14 @@
+fileFormatVersion: 2
+guid: 595fea3b1c9aa58419876fca563e55e0
+PrefabImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 312910
+  packageName: MasterMagicFX
+  packageVersion: 0.1
+  assetPath: Assets/MasterMagicFX/Particles/Slash_Template/Prefabs/Par_SwordBeam.prefab
+  uploadId: 740422

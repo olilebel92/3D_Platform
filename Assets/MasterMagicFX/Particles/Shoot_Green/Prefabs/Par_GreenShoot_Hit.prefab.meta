@@ -1,0 +1,14 @@
+fileFormatVersion: 2
+guid: 4ceff47cb119c31429987556350d564f
+PrefabImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 312910
+  packageName: MasterMagicFX
+  packageVersion: 0.1
+  assetPath: Assets/MasterMagicFX/Particles/Shoot_Green/Prefabs/Par_GreenShoot_Hit.prefab
+  uploadId: 740422

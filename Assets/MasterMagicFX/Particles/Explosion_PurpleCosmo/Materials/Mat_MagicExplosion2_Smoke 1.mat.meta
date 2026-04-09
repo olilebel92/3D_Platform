@@ -1,0 +1,16 @@
+fileFormatVersion: 2
+guid: 443ffb17ce3412342a06f7dfc075e984
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 2100000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 312910
+  packageName: MasterMagicFX
+  packageVersion: 0.1
+  assetPath: Assets/MasterMagicFX/Particles/Explosion_PurpleCosmo/Materials/Mat_MagicExplosion2_Smoke
+    1.mat
+  uploadId: 740422

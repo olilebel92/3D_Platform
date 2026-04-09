@@ -1,0 +1,14 @@
+fileFormatVersion: 2
+guid: acca47ccf5a73eb4993c04d0ae14e9c6
+PrefabImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 312910
+  packageName: MasterMagicFX
+  packageVersion: 0.1
+  assetPath: Assets/MasterMagicFX/Particles/Shoot_Light/Prefabs/Par_LightShoot_Trails.prefab
+  uploadId: 740422

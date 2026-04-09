@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: cd1867e17b292b54d98fcf25c82784d0
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 2100000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 312910
+  packageName: MasterMagicFX
+  packageVersion: 0.1
+  assetPath: Assets/MasterMagicFX/Commons/Materials/Mat_Background.mat
+  uploadId: 740422

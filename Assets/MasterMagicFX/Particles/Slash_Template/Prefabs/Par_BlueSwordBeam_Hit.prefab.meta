@@ -1,0 +1,14 @@
+fileFormatVersion: 2
+guid: 6316a7b87c5e7fe47a52ab972cbe5ec8
+PrefabImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 312910
+  packageName: MasterMagicFX
+  packageVersion: 0.1
+  assetPath: Assets/MasterMagicFX/Particles/Slash_Template/Prefabs/Par_BlueSwordBeam_Hit.prefab
+  uploadId: 740422

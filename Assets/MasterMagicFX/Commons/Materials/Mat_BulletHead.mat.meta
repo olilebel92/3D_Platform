@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: 4cab2f5dcf84cfc428496ca9627e615f
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 2100000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 312910
+  packageName: MasterMagicFX
+  packageVersion: 0.1
+  assetPath: Assets/MasterMagicFX/Commons/Materials/Mat_BulletHead.mat
+  uploadId: 740422

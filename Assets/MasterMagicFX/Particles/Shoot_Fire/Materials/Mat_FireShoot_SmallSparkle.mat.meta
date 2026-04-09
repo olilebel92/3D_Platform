@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: 44cef2846eac0764d82caeab76039045
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 2100000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 312910
+  packageName: MasterMagicFX
+  packageVersion: 0.1
+  assetPath: Assets/MasterMagicFX/Particles/Shoot_Fire/Materials/Mat_FireShoot_SmallSparkle.mat
+  uploadId: 740422

@@ -1,0 +1,16 @@
+fileFormatVersion: 2
+guid: 31a269ef7ca8ed14b9e1903a91b796c4
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 2100000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 312910
+  packageName: MasterMagicFX
+  packageVersion: 0.1
+  assetPath: Assets/MasterMagicFX/Particles/Explosion_BlueMagic/Materials/Mat_BlueMagicExplosion_ExpGround
+    3.mat
+  uploadId: 740422

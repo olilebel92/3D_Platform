@@ -1,0 +1,14 @@
+fileFormatVersion: 2
+guid: 76fc3caf3b954d44db6897aa86505504
+PrefabImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 312910
+  packageName: MasterMagicFX
+  packageVersion: 0.1
+  assetPath: Assets/MasterMagicFX/Particles/Laser_Cyan/Prefabs/Par_Laser_CyanLaserStart.prefab
+  uploadId: 740422

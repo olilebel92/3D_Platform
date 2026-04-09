@@ -1,0 +1,14 @@
+fileFormatVersion: 2
+guid: e2ca32e26be851647b2aa113b9a9661a
+PrefabImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 312910
+  packageName: MasterMagicFX
+  packageVersion: 0.1
+  assetPath: Assets/MasterMagicFX/Particles/Shoot_Blue/Prefabs/Par_BlueShoot_Hit.prefab
+  uploadId: 740422

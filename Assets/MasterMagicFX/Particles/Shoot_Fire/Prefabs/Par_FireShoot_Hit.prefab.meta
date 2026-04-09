@@ -1,0 +1,14 @@
+fileFormatVersion: 2
+guid: ebf2524539b465743bcdec6706871934
+PrefabImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 312910
+  packageName: MasterMagicFX
+  packageVersion: 0.1
+  assetPath: Assets/MasterMagicFX/Particles/Shoot_Fire/Prefabs/Par_FireShoot_Hit.prefab
+  uploadId: 740422

@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: 7e53058a04bfbd74496c618d22b1e108
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 2100000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 312910
+  packageName: MasterMagicFX
+  packageVersion: 0.1
+  assetPath: Assets/MasterMagicFX/Particles/Explosion_Fire/Materials/Mat_FireTrail.mat
+  uploadId: 740422

@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: bcc7dc26e9d879c4f88816cbec4816ef
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 2100000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 312910
+  packageName: MasterMagicFX
+  packageVersion: 0.1
+  assetPath: Assets/MasterMagicFX/Particles/Shoot_Fire/Materials/Mat_FireShoot_Background.mat
+  uploadId: 740422

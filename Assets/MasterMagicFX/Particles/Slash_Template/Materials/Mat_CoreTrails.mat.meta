@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: 516b1ac352835c247b982148d0d9be58
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 2100000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 312910
+  packageName: MasterMagicFX
+  packageVersion: 0.1
+  assetPath: Assets/MasterMagicFX/Particles/Slash_Template/Materials/Mat_CoreTrails.mat
+  uploadId: 740422

@@ -1,0 +1,14 @@
+fileFormatVersion: 2
+guid: f7f7b221b134bdf4097445f9151296db
+PrefabImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 312910
+  packageName: MasterMagicFX
+  packageVersion: 0.1
+  assetPath: Assets/MasterMagicFX/Particles/Buff_Heal/Prefabs/Par_HealBuff.prefab
+  uploadId: 740422

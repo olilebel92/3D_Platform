@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: e6216604bb9d0354cbac1875ba28e8c9
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 2100000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 312910
+  packageName: MasterMagicFX
+  packageVersion: 0.1
+  assetPath: Assets/MasterMagicFX/Particles/Slash_Red/Materials/Mat__SlashHead.mat
+  uploadId: 740422

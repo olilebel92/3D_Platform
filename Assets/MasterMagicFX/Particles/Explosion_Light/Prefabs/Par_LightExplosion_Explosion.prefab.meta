@@ -1,0 +1,14 @@
+fileFormatVersion: 2
+guid: 762df867a2b2efc4c815bdb9e9e33718
+PrefabImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 312910
+  packageName: MasterMagicFX
+  packageVersion: 0.1
+  assetPath: Assets/MasterMagicFX/Particles/Explosion_Light/Prefabs/Par_LightExplosion_Explosion.prefab
+  uploadId: 740422

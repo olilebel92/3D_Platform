@@ -1,0 +1,14 @@
+fileFormatVersion: 2
+guid: ff2c6ef3403df044fa11820835b596e5
+PrefabImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 312910
+  packageName: MasterMagicFX
+  packageVersion: 0.1
+  assetPath: Assets/MasterMagicFX/Particles/Shoot_Template/Prefabs/Par_Bullet.prefab
+  uploadId: 740422

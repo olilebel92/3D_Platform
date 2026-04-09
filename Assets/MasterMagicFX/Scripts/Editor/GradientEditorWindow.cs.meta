@@ -1,0 +1,18 @@
+fileFormatVersion: 2
+guid: 98c737e6ca9c57847b31f88ca2e78c1c
+MonoImporter:
+  externalObjects: {}
+  serializedVersion: 2
+  defaultReferences: []
+  executionOrder: 0
+  icon: {instanceID: 0}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 312910
+  packageName: MasterMagicFX
+  packageVersion: 0.1
+  assetPath: Assets/MasterMagicFX/Scripts/Editor/GradientEditorWindow.cs
+  uploadId: 740422

@@ -1,0 +1,14 @@
+fileFormatVersion: 2
+guid: 16ca8d8f6928ada4997bbd3f3e544b67
+PrefabImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 312910
+  packageName: MasterMagicFX
+  packageVersion: 0.1
+  assetPath: Assets/MasterMagicFX/Particles/Examples/Prefabs/Shield.prefab
+  uploadId: 740422

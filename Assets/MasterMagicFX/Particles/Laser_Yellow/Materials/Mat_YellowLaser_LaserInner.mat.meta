@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: cf7efc9bf2dd47941a48aa56f2a1e6d3
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 2100000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 312910
+  packageName: MasterMagicFX
+  packageVersion: 0.1
+  assetPath: Assets/MasterMagicFX/Particles/Laser_Yellow/Materials/Mat_YellowLaser_LaserInner.mat
+  uploadId: 740422

@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: 61c134c7689deeb4d955a65cc501bef7
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 2100000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 312910
+  packageName: MasterMagicFX
+  packageVersion: 0.1
+  assetPath: Assets/MasterMagicFX/Particles/Laser_Red/Materials/Mat_Laser_Red_LaserMain.mat
+  uploadId: 740422

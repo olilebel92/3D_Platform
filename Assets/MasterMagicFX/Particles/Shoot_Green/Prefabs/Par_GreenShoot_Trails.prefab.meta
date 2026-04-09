@@ -1,0 +1,14 @@
+fileFormatVersion: 2
+guid: 85ab61c6b52b45449a14e45a2a3c540a
+PrefabImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 312910
+  packageName: MasterMagicFX
+  packageVersion: 0.1
+  assetPath: Assets/MasterMagicFX/Particles/Shoot_Green/Prefabs/Par_GreenShoot_Trails.prefab
+  uploadId: 740422

@@ -1,0 +1,14 @@
+fileFormatVersion: 2
+guid: eccf785763f729d44a42dd967a1d3dfb
+PrefabImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 312910
+  packageName: MasterMagicFX
+  packageVersion: 0.1
+  assetPath: Assets/MasterMagicFX/Particles/Explosion_Heal/Prefabs/Par_HealExplosion.prefab
+  uploadId: 740422

@@ -1,0 +1,14 @@
+fileFormatVersion: 2
+guid: 16ba61c86f600bf43bf732d1f10b8ed6
+PrefabImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 312910
+  packageName: MasterMagicFX
+  packageVersion: 0.1
+  assetPath: Assets/MasterMagicFX/Particles/Laser_Template/Prefabs/Par_LaserStop.prefab
+  uploadId: 740422

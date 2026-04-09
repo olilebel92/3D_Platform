@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: dd9dc3cb0de0bdb4f8d1a6bfb2c9d6fb
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 2100000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 312910
+  packageName: MasterMagicFX
+  packageVersion: 0.1
+  assetPath: Assets/MasterMagicFX/Particles/Field_Blue/Materials/Mat_FieldWave.mat
+  uploadId: 740422

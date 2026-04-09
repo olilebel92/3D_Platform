@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: 9f99a82e450c7124094ae02933ab6152
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 2100000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 312910
+  packageName: MasterMagicFX
+  packageVersion: 0.1
+  assetPath: Assets/MasterMagicFX/Particles/Explosion_Light/Materials/Mat_LightExplosion_MagicExplosion2_MagicExplosion_Smoke2.mat
+  uploadId: 740422

@@ -1,0 +1,14 @@
+fileFormatVersion: 2
+guid: c8fd4698583843c439b66c946437ebf3
+PrefabImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 312910
+  packageName: MasterMagicFX
+  packageVersion: 0.1
+  assetPath: Assets/MasterMagicFX/Particles/Slash_Red/Prefabs/Par_RedSwordBeam_Hit.prefab
+  uploadId: 740422

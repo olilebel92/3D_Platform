@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: 830c9c977b1128d469e5d5da30930b21
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 2100000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 312910
+  packageName: MasterMagicFX
+  packageVersion: 0.1
+  assetPath: Assets/MasterMagicFX/Particles/Buff_MPHealBlue/Materials/Mat___HorizontalFlare.mat
+  uploadId: 740422

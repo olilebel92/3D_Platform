@@ -1,0 +1,16 @@
+fileFormatVersion: 2
+guid: 9e8f00b8bf9c9344fb616aad8a714a62
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 2100000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 312910
+  packageName: MasterMagicFX
+  packageVersion: 0.1
+  assetPath: Assets/MasterMagicFX/Particles/Shoot_Light/Materials/Mat_LightShoot_DefaultParticle
+    2.mat
+  uploadId: 740422

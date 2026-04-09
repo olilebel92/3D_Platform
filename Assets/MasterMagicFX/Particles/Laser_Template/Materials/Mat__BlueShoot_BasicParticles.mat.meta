@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: 78af9c073b079af4a82fc99a9c7acb9a
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 2100000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 312910
+  packageName: MasterMagicFX
+  packageVersion: 0.1
+  assetPath: Assets/MasterMagicFX/Particles/Laser_Template/Materials/Mat__BlueShoot_BasicParticles.mat
+  uploadId: 740422

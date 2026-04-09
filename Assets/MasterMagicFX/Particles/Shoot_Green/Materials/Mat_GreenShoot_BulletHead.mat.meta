@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: e6ff07f2992245940b4ffc9ba99a2925
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 2100000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 312910
+  packageName: MasterMagicFX
+  packageVersion: 0.1
+  assetPath: Assets/MasterMagicFX/Particles/Shoot_Green/Materials/Mat_GreenShoot_BulletHead.mat
+  uploadId: 740422

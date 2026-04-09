@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: dda499c97aa51f142af590df305760a0
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 2100000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 312910
+  packageName: MasterMagicFX
+  packageVersion: 0.1
+  assetPath: Assets/MasterMagicFX/Particles/Explosion_BlueMagic/Materials/Mat_BlueMagicExplosion_BottomWave.mat
+  uploadId: 740422

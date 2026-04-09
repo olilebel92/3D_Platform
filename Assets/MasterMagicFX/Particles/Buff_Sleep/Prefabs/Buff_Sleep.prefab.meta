@@ -1,0 +1,14 @@
+fileFormatVersion: 2
+guid: ef5932b8fc1da7a4a89a2bc7291777a3
+PrefabImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 312910
+  packageName: MasterMagicFX
+  packageVersion: 0.1
+  assetPath: Assets/MasterMagicFX/Particles/Buff_Sleep/Prefabs/Buff_Sleep.prefab
+  uploadId: 740422

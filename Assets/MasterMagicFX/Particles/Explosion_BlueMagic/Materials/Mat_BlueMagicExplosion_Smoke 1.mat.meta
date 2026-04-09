@@ -1,0 +1,16 @@
+fileFormatVersion: 2
+guid: 393ae0895038d904fb4d3728eee61d2d
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 2100000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 312910
+  packageName: MasterMagicFX
+  packageVersion: 0.1
+  assetPath: Assets/MasterMagicFX/Particles/Explosion_BlueMagic/Materials/Mat_BlueMagicExplosion_Smoke
+    1.mat
+  uploadId: 740422

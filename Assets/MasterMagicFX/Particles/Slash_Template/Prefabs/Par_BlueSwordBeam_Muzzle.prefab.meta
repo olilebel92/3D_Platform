@@ -1,0 +1,14 @@
+fileFormatVersion: 2
+guid: fcfe932c3fad20e49abdb1b34ef9c3ec
+PrefabImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 312910
+  packageName: MasterMagicFX
+  packageVersion: 0.1
+  assetPath: Assets/MasterMagicFX/Particles/Slash_Template/Prefabs/Par_BlueSwordBeam_Muzzle.prefab
+  uploadId: 740422

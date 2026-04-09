@@ -1,0 +1,16 @@
+fileFormatVersion: 2
+guid: bb9af216535fc3e4196bca645a03747b
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 2100000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 312910
+  packageName: MasterMagicFX
+  packageVersion: 0.1
+  assetPath: Assets/MasterMagicFX/Particles/Shoot_Light/Materials/Mat_LightShoot_HorizontalFlare
+    2.mat
+  uploadId: 740422

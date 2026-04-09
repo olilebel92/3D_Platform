@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: eba32f1f93e9b16498d759a72f9d117f
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 2100000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 312910
+  packageName: MasterMagicFX
+  packageVersion: 0.1
+  assetPath: Assets/MasterMagicFX/Particles/Buff_AttackUp/Materials/Mat_TestExplosion.mat
+  uploadId: 740422

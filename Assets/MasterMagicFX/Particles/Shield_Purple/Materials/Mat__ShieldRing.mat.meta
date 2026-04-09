@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: 328bbf2560d5ff74c8a797aeb6755b7b
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 2100000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 312910
+  packageName: MasterMagicFX
+  packageVersion: 0.1
+  assetPath: Assets/MasterMagicFX/Particles/Shield_Purple/Materials/Mat__ShieldRing.mat
+  uploadId: 740422

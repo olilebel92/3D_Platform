@@ -1,0 +1,14 @@
+fileFormatVersion: 2
+guid: 1fcb85616f261094d9b1339d621c9b33
+PrefabImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 312910
+  packageName: MasterMagicFX
+  packageVersion: 0.1
+  assetPath: Assets/MasterMagicFX/Particles/Buff_Stun/Prefabs/Par_StunBuff.prefab
+  uploadId: 740422

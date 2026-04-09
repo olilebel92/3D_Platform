@@ -1,0 +1,14 @@
+fileFormatVersion: 2
+guid: 1a37f25c120f98d49a99d5d0e2aedfde
+DefaultImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 312910
+  packageName: MasterMagicFX
+  packageVersion: 0.1
+  assetPath: Assets/MasterMagicFX/Scene/MasterMagicFXDemoScene.unity
+  uploadId: 740422

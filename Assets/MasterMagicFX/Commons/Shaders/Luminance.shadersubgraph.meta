@@ -1,0 +1,14 @@
+fileFormatVersion: 2
+guid: 9b79549be32daa64cb34c56955029348
+DefaultImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 312910
+  packageName: MasterMagicFX
+  packageVersion: 0.1
+  assetPath: Assets/MasterMagicFX/Commons/Shaders/Luminance.shadersubgraph
+  uploadId: 740422

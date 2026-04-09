@@ -1,0 +1,14 @@
+fileFormatVersion: 2
+guid: df0482248b31cdc44b7e49867746c45b
+PrefabImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 312910
+  packageName: MasterMagicFX
+  packageVersion: 0.1
+  assetPath: Assets/MasterMagicFX/Particles/Field_Heal/Prefabs/Par_HealField.prefab
+  uploadId: 740422

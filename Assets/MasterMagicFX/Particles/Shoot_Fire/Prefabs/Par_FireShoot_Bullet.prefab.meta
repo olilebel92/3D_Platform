@@ -1,0 +1,14 @@
+fileFormatVersion: 2
+guid: f635762555f307047a55c23bfaae3c9f
+PrefabImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 312910
+  packageName: MasterMagicFX
+  packageVersion: 0.1
+  assetPath: Assets/MasterMagicFX/Particles/Shoot_Fire/Prefabs/Par_FireShoot_Bullet.prefab
+  uploadId: 740422

@@ -1,0 +1,14 @@
+fileFormatVersion: 2
+guid: 2f4aa9dd12ba1bd40880ac66f8554bf5
+PrefabImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 312910
+  packageName: MasterMagicFX
+  packageVersion: 0.1
+  assetPath: Assets/MasterMagicFX/Particles/Shoot_Template/Prefabs/Par_Hit.prefab
+  uploadId: 740422

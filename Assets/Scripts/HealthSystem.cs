@@ -9,6 +9,9 @@ public class HealthSystem : MonoBehaviour
     public int maxHealth = 5;
     public int currentHealth;
 
+    [Tooltip("Base HP restored per second (server-side only). Stacks with equipment regen.")]
+    [SerializeField] private float regenPerSecond = 0f;
+
     // ─── UI ───────────────────────────────────────────────────────────────────
     [Header("UI (optional — leave blank for enemies)")]
     [Tooltip("Optional text label showing HP as numbers.")]
@@ -42,7 +45,6 @@ public class HealthSystem : MonoBehaviour
     private int _permanentMaxHealth;
 
     private bool _isDead = false;
-    private float _regenTimer = 0f;
     private PlayerInventory _inventory;
 
     // ─── Unity Lifecycle ──────────────────────────────────────────────────────
@@ -59,28 +61,15 @@ public class HealthSystem : MonoBehaviour
         _permanentMaxHealth = maxHealth;
         currentHealth = maxHealth;
         UpdateHealthUI();
-    }
 
-    // ─── Unity Lifecycle (regen tick) ─────────────────────────────────────────
-
-    void Update()
-    {
-        if (!CompareTag("Player")) return;
-        if (currentHealth >= maxHealth) return;
-        if (_inventory == null) return;
-
-        float regen = _inventory.TotalBonusRegen;
-        if (regen <= 0f) return;
-
-        _regenTimer += Time.deltaTime;
-        if (_regenTimer >= 1f)
-        {
-            _regenTimer -= 1f;
-            Heal(Mathf.RoundToInt(regen));
-        }
     }
 
     // ─── Public API ───────────────────────────────────────────────────────────
+
+    /// <summary>Base regen + any equipment bonus. Read by PlayerController's regen coroutine.</summary>
+    public float TotalRegenPerSecond =>
+        regenPerSecond + (_inventory != null ? _inventory.TotalBonusRegen : 0f);
+
     public void TakeDamage(int amount, bool isCrit = false)
     {
         if (_isDead) return;

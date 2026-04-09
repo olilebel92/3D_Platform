@@ -36,6 +36,12 @@ public class PlayerUILinker : MonoBehaviour
     [Tooltip("Label showing current XP / XP needed (e.g. '40 / 100 XP').")]
     public TextMeshProUGUI xpText;
 
+    // ─── Spell Cast Bar UI ────────────────────────────────────────────────────
+
+    [Header("Spell Cast Bar UI — drag from your Canvas")]
+    [Tooltip("The SpellCastBarUI component on the HUD Canvas.")]
+    public SpellCastBarUI spellCastBarUI;
+
     // ─── Health UI ────────────────────────────────────────────────────────────
 
     [Header("Health UI — drag from your Canvas")]
@@ -125,6 +131,11 @@ public class PlayerUILinker : MonoBehaviour
             health.hpBarPanel = hpBarPanel;
             health.RefreshUI();
         }
+
+        // ── Wire Spell Cast Bar ───────────────────────────────────────────────
+        SpellCaster spellCaster = localPlayer.GetComponent<SpellCaster>();
+        if (spellCastBarUI != null && spellCaster != null)
+            spellCastBarUI.SetSpellCaster(spellCaster);
 
         // ── Wire CharacterWindow ──────────────────────────────────────────────
         // CharacterWindow.Start() runs before the player spawns, so its

@@ -1,0 +1,14 @@
+fileFormatVersion: 2
+guid: 78e3b64488ce7974ab7e2283b3680c0a
+PrefabImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 312910
+  packageName: MasterMagicFX
+  packageVersion: 0.1
+  assetPath: Assets/MasterMagicFX/Particles/Shoot_Blue/Prefabs/Par_BlueShoot_Muzzle.prefab
+  uploadId: 740422

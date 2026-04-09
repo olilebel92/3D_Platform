@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: 06073e8187162b34f8975eb53ed57715
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 2100000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 312910
+  packageName: MasterMagicFX
+  packageVersion: 0.1
+  assetPath: Assets/MasterMagicFX/Particles/Buff_Debuff/Materials/Mat_CommonCurcyTrail.mat
+  uploadId: 740422

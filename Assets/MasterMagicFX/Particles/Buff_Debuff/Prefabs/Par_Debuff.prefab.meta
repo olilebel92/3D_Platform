@@ -1,0 +1,14 @@
+fileFormatVersion: 2
+guid: 762c12a76bad23c4ea77f22b68b69957
+PrefabImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 312910
+  packageName: MasterMagicFX
+  packageVersion: 0.1
+  assetPath: Assets/MasterMagicFX/Particles/Buff_Debuff/Prefabs/Par_Debuff.prefab
+  uploadId: 740422

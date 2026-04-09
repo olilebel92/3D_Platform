@@ -1,0 +1,14 @@
+fileFormatVersion: 2
+guid: ccfc29480954c214686c364670f482a4
+PrefabImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 312910
+  packageName: MasterMagicFX
+  packageVersion: 0.1
+  assetPath: Assets/MasterMagicFX/Particles/Shoot_Green/Prefabs/Par_GreenShoot_Bullet.prefab
+  uploadId: 740422

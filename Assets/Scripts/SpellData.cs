@@ -12,6 +12,9 @@ public class SpellData : ScriptableObject
     [Header("Visuals")]
     public Sprite icon;
 
+    [Tooltip("Optional effect instantiated at the explosion center on impact.")]
+    public GameObject hitEffect;
+
     [Header("Prefab")]
     [Tooltip("Projectile or effect prefab spawned when this spell is cast.")]
     public GameObject prefab;

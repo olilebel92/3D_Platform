@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: 763e82c04d9e47e4e87e532069763d58
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 2100000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 312910
+  packageName: MasterMagicFX
+  packageVersion: 0.1
+  assetPath: Assets/MasterMagicFX/Commons/Materials/Mat_CommonRing.mat
+  uploadId: 740422

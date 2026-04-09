@@ -1,3 +1,4 @@
+using System.Collections;
 using UnityEngine;
 using UnityEngine.InputSystem;
 using Unity.Netcode;
@@ -37,6 +38,12 @@ public class PlayerController : NetworkBehaviour
     [Tooltip("AudioSource used to play jump sound. Auto-found if blank.")]
     public AudioSource audioSource;
 
+    // ─── Regen ────────────────────────────────────────────────────────────────
+
+    [Header("Regen")]
+    [Tooltip("Stamina restored per second. Applied to StaminaSystem.rechargeRate at startup.")]
+    [SerializeField] private float staminaRegenPerSecond = 10f;
+
     // ─── Model Offset ─────────────────────────────────────────────────────────
 
     [Header("Model Offset")]
@@ -51,11 +58,14 @@ public class PlayerController : NetworkBehaviour
     private CharacterController controller;
     private Animator animator;
     private StaminaSystem stamina;
+    private HealthSystem _health;
     private LockOnSystem lockOn;
     private ExperienceManager _xp;
+    private SpellCaster _spellCaster;
     private float verticalVelocity;
     private bool _sprintToggle = false;
     private bool _isJumping = false;
+    private bool _wasCasting = false;
     private PlayerInputActions inputActions;
     private Vector2 moveInput;
 
@@ -74,6 +84,7 @@ public class PlayerController : NetworkBehaviour
     private static readonly int AnimVelocityX  = Animator.StringToHash("VelocityX");
     private static readonly int AnimVelocityZ  = Animator.StringToHash("VelocityZ");
     private static readonly int AnimIsLockedOn = Animator.StringToHash("IsLockedOn");
+    private static readonly int AnimCasting    = Animator.StringToHash("Casting");
 
     // ─── Unity Lifecycle ──────────────────────────────────────────────────────
 
@@ -150,10 +161,15 @@ public class PlayerController : NetworkBehaviour
 
     void Start()
     {
-        controller = GetComponent<CharacterController>();
-        stamina    = GetComponent<StaminaSystem>();
+        controller   = GetComponent<CharacterController>();
+        stamina      = GetComponent<StaminaSystem>();
+        _health      = GetComponent<HealthSystem>();
+        _spellCaster = GetComponent<SpellCaster>();
+        if (stamina != null) stamina.rechargeRate = staminaRegenPerSecond;
         lockOn     = GetComponent<LockOnSystem>();
         _xp        = GetComponent<ExperienceManager>();
+
+        StartCoroutine(HpRegenTick());
         animator   = GetComponentInChildren<Animator>();
 
         if (audioSource == null)
@@ -194,6 +210,51 @@ public class PlayerController : NetworkBehaviour
         // Safety cleanup — always unsubscribe to avoid stale callbacks.
         base.OnDestroy();
         DisableInput();
+    }
+
+    // ─── HP Regen (server-authoritative) ─────────────────────────────────────
+
+    /// <summary>
+    /// Runs on every player instance. In multiplayer only the server applies the heal
+    /// and then broadcasts it to clients. In singleplayer it always runs.
+    /// </summary>
+    IEnumerator HpRegenTick()
+    {
+        var wait = new WaitForSeconds(1f);
+        while (true)
+        {
+            yield return wait;
+
+            if (_health == null) continue;
+            if (_health.currentHealth >= _health.maxHealth) continue;
+
+            float regen = _health.TotalRegenPerSecond;
+            if (regen <= 0f) continue;
+
+            // In a networked session only the server heals; in singleplayer always heal.
+            bool networkActive = NetworkManager.Singleton != null
+                              && NetworkManager.Singleton.IsListening;
+            if (networkActive && !IsServer) continue;
+
+            int amount = Mathf.RoundToInt(regen);
+            _health.Heal(amount);
+
+            // Mirror the heal on all clients.
+            if (IsSpawned)
+                SyncRegenHealClientRpc(amount);
+        }
+    }
+
+    /// <summary>
+    /// Mirrors a server-applied regen heal on every client.
+    /// The server (host) skips it — it already healed above.
+    /// </summary>
+    [ClientRpc]
+    void SyncRegenHealClientRpc(int amount)
+    {
+        if (IsServer) return; // host already healed server-side
+        if (_health != null)
+            _health.Heal(amount);
     }
 
     // ─── Spawn Position (Multiplayer) ─────────────────────────────────────────
@@ -348,6 +409,44 @@ public class PlayerController : NetworkBehaviour
         // ── Read Input ────────────────────────────────────────────────────────
         moveInput = inputActions.Player.Move.ReadValue<Vector2>();
         bool isMoving = moveInput.magnitude > 0.1f;
+
+        // ── Spell Cast Lock ───────────────────────────────────────────────────
+        // While casting or channeling, freeze horizontal movement.
+        // Any movement input cancels the cast and returns control immediately.
+        bool isCastLocked = _spellCaster != null && _spellCaster.IsLocked;
+        if (isCastLocked)
+        {
+            if (isMoving)
+            {
+                _spellCaster.CancelCast();
+                isCastLocked = false;  // movement resumes this frame
+            }
+            else
+            {
+                // Apply gravity + grounded check but zero horizontal movement.
+                if (controller.isGrounded && verticalVelocity < 0f) verticalVelocity = -2f;
+                verticalVelocity += gravity * Time.deltaTime;
+                verticalVelocity  = Mathf.Max(verticalVelocity, -20f);
+                controller.Move(new Vector3(0f, verticalVelocity, 0f) * Time.deltaTime);
+
+                if (animator != null && !_wasCasting)
+                {
+                    animator.SetBool(AnimCasting,    true);
+                    animator.SetBool(AnimWalk,       false);
+                    animator.SetBool(AnimSprint,     false);
+                    animator.SetBool(AnimJump,       false);
+                    animator.SetBool(AnimIsLockedOn, false);
+                    _wasCasting = true;
+                }
+                return;
+            }
+        }
+
+        if (_wasCasting)
+        {
+            if (animator != null) animator.SetBool(AnimCasting, false);
+            _wasCasting = false;
+        }
 
         // ── Sprint Logic ──────────────────────────────────────────────────────
         bool holdingSprint = inputActions.Player.Sprint.IsPressed();

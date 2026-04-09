@@ -1,0 +1,14 @@
+fileFormatVersion: 2
+guid: 5d5108c5314f02745841f74d39128b8f
+PrefabImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 312910
+  packageName: MasterMagicFX
+  packageVersion: 0.1
+  assetPath: Assets/MasterMagicFX/Particles/Buff_Dizzy/Prefabs/Par_Dizzy.prefab
+  uploadId: 740422

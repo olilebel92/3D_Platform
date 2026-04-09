@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: a512171e88c693a42a2af520a7e42136
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 2100000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 312910
+  packageName: MasterMagicFX
+  packageVersion: 0.1
+  assetPath: Assets/MasterMagicFX/Particles/Buff_Debuff/Materials/Mat_HorizontalFlare.mat
+  uploadId: 740422

@@ -1,0 +1,14 @@
+fileFormatVersion: 2
+guid: 82eb2380e8f93e64b9f170537430be84
+PrefabImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 312910
+  packageName: MasterMagicFX
+  packageVersion: 0.1
+  assetPath: Assets/MasterMagicFX/Particles/Shoot_Purple/Prefabs/Par_PurpleShoot_Hit.prefab
+  uploadId: 740422

@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: 8fc4f05a9d46dd3419645b1ea71656dc
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 2100000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 312910
+  packageName: MasterMagicFX
+  packageVersion: 0.1
+  assetPath: Assets/MasterMagicFX/Particles/Buff_Sleep/Materials/Mat__TestExplosion.mat
+  uploadId: 740422

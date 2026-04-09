@@ -1,0 +1,14 @@
+fileFormatVersion: 2
+guid: 82a2cf57431c81d46aa70ce41791a9b6
+PrefabImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 312910
+  packageName: MasterMagicFX
+  packageVersion: 0.1
+  assetPath: Assets/MasterMagicFX/Particles/Shoot_Purple/Prefabs/Par_PurpleShoot_Trails.prefab
+  uploadId: 740422

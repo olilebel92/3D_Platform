@@ -1,0 +1,14 @@
+fileFormatVersion: 2
+guid: a5a422ace2144494b9bf21c35fe09093
+PrefabImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 312910
+  packageName: MasterMagicFX
+  packageVersion: 0.1
+  assetPath: Assets/MasterMagicFX/Particles/Laser_Blue/Prefabs/Par_BlueLaser.prefab
+  uploadId: 740422

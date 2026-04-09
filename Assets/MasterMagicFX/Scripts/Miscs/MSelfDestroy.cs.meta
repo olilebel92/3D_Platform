@@ -1,0 +1,18 @@
+fileFormatVersion: 2
+guid: ceaa77ac270cc854682b545d55da170c
+MonoImporter:
+  externalObjects: {}
+  serializedVersion: 2
+  defaultReferences: []
+  executionOrder: 0
+  icon: {instanceID: 0}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 312910
+  packageName: MasterMagicFX
+  packageVersion: 0.1
+  assetPath: Assets/MasterMagicFX/Scripts/Miscs/MSelfDestroy.cs
+  uploadId: 740422

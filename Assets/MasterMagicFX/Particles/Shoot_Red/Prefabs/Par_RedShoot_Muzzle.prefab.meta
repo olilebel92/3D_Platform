@@ -1,0 +1,14 @@
+fileFormatVersion: 2
+guid: 6a7f24107b6dadb4880beaad47b31192
+PrefabImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 312910
+  packageName: MasterMagicFX
+  packageVersion: 0.1
+  assetPath: Assets/MasterMagicFX/Particles/Shoot_Red/Prefabs/Par_RedShoot_Muzzle.prefab
+  uploadId: 740422

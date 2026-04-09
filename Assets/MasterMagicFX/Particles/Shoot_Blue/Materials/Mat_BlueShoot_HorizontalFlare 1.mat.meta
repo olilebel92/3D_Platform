@@ -1,0 +1,16 @@
+fileFormatVersion: 2
+guid: eb20285d21d4ef74e94186df464d2ccf
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 2100000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 312910
+  packageName: MasterMagicFX
+  packageVersion: 0.1
+  assetPath: Assets/MasterMagicFX/Particles/Shoot_Blue/Materials/Mat_BlueShoot_HorizontalFlare
+    1.mat
+  uploadId: 740422

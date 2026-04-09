@@ -1,0 +1,14 @@
+fileFormatVersion: 2
+guid: 27fc8851b372346499d766565e4db200
+PrefabImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 312910
+  packageName: MasterMagicFX
+  packageVersion: 0.1
+  assetPath: Assets/MasterMagicFX/Particles/Laser_Yellow/Prefabs/Par_YellowLaserStop.prefab
+  uploadId: 740422

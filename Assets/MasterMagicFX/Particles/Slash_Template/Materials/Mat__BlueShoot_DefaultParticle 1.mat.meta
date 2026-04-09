@@ -1,0 +1,16 @@
+fileFormatVersion: 2
+guid: 93f08870a5ffaeb488c2280dc60ac804
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 2100000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 312910
+  packageName: MasterMagicFX
+  packageVersion: 0.1
+  assetPath: Assets/MasterMagicFX/Particles/Slash_Template/Materials/Mat__BlueShoot_DefaultParticle
+    1.mat
+  uploadId: 740422

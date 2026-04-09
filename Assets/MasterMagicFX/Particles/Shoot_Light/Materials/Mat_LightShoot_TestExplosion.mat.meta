@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: 1802ecdc9a3d5074cad2a47a335bc45e
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 2100000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 312910
+  packageName: MasterMagicFX
+  packageVersion: 0.1
+  assetPath: Assets/MasterMagicFX/Particles/Shoot_Light/Materials/Mat_LightShoot_TestExplosion.mat
+  uploadId: 740422

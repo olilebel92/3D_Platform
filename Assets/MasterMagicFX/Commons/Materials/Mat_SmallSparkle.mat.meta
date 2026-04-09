@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: 161878653d0c5354388137d9b2f2864a
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 2100000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 312910
+  packageName: MasterMagicFX
+  packageVersion: 0.1
+  assetPath: Assets/MasterMagicFX/Commons/Materials/Mat_SmallSparkle.mat
+  uploadId: 740422

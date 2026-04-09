@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: 27a48e404a4c2ae4d950e73c054a6672
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 2100000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 312910
+  packageName: MasterMagicFX
+  packageVersion: 0.1
+  assetPath: Assets/MasterMagicFX/Particles/Shoot_Purple/Materials/Mat_PurpleShoot_Smoke2.mat
+  uploadId: 740422

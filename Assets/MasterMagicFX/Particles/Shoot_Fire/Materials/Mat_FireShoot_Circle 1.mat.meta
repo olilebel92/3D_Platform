@@ -1,0 +1,16 @@
+fileFormatVersion: 2
+guid: 648883fac43f7f04facd85ebbce32e1b
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 2100000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 312910
+  packageName: MasterMagicFX
+  packageVersion: 0.1
+  assetPath: Assets/MasterMagicFX/Particles/Shoot_Fire/Materials/Mat_FireShoot_Circle
+    1.mat
+  uploadId: 740422

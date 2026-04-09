@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: 1306091e3894c3440b85ac157eea6221
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 2100000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 312910
+  packageName: MasterMagicFX
+  packageVersion: 0.1
+  assetPath: Assets/MasterMagicFX/Particles/Slash_Template/Materials/Mat__BlueShoot_Background.mat
+  uploadId: 740422

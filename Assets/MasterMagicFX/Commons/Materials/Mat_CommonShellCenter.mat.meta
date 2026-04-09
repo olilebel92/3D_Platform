@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: 0905afd2f4efd104a8f2f067c0b4dd47
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 2100000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 312910
+  packageName: MasterMagicFX
+  packageVersion: 0.1
+  assetPath: Assets/MasterMagicFX/Commons/Materials/Mat_CommonShellCenter.mat
+  uploadId: 740422

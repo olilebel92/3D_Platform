@@ -1,0 +1,14 @@
+fileFormatVersion: 2
+guid: 4df10b04de734f947a36beb5aeda4c27
+PrefabImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 312910
+  packageName: MasterMagicFX
+  packageVersion: 0.1
+  assetPath: Assets/MasterMagicFX/Particles/Shoot_Green/Prefabs/Par_GreenShoot_Muzzle.prefab
+  uploadId: 740422

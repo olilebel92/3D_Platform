@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: 1de0f65c5735a46499602ff3a33198aa
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 2100000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 312910
+  packageName: MasterMagicFX
+  packageVersion: 0.1
+  assetPath: Assets/MasterMagicFX/Particles/Shield_Red/Materials/Mat___TestExplosion.mat
+  uploadId: 740422

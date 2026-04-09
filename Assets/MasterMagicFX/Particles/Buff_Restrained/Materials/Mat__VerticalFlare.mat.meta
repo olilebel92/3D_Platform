@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: 8a949e5a2ec39c948b8923c88b13487a
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 2100000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 312910
+  packageName: MasterMagicFX
+  packageVersion: 0.1
+  assetPath: Assets/MasterMagicFX/Particles/Buff_Restrained/Materials/Mat__VerticalFlare.mat
+  uploadId: 740422

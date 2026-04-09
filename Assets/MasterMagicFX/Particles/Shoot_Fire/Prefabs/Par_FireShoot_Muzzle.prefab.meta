@@ -1,0 +1,14 @@
+fileFormatVersion: 2
+guid: 5dd5e52839ca974469f402d58d37bf9e
+PrefabImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 312910
+  packageName: MasterMagicFX
+  packageVersion: 0.1
+  assetPath: Assets/MasterMagicFX/Particles/Shoot_Fire/Prefabs/Par_FireShoot_Muzzle.prefab
+  uploadId: 740422

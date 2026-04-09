@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: 428654e2f3eb7ae41836e20076e72f08
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 2100000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 312910
+  packageName: MasterMagicFX
+  packageVersion: 0.1
+  assetPath: Assets/MasterMagicFX/Particles/Laser_Red/Materials/Mat_Laser_Red__BlueShoot_DefaultParticle.mat
+  uploadId: 740422

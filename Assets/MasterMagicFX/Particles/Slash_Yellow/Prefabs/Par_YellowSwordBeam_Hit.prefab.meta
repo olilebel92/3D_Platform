@@ -1,0 +1,14 @@
+fileFormatVersion: 2
+guid: 142158cae0579114793adab83788d162
+PrefabImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 312910
+  packageName: MasterMagicFX
+  packageVersion: 0.1
+  assetPath: Assets/MasterMagicFX/Particles/Slash_Yellow/Prefabs/Par_YellowSwordBeam_Hit.prefab
+  uploadId: 740422

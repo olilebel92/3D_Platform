@@ -1,0 +1,14 @@
+fileFormatVersion: 2
+guid: 422f4fd3b53b54a4c882795f05c01892
+PrefabImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 312910
+  packageName: MasterMagicFX
+  packageVersion: 0.1
+  assetPath: Assets/MasterMagicFX/Particles/Shoot_Template/Prefabs/Par_Muzzle.prefab
+  uploadId: 740422

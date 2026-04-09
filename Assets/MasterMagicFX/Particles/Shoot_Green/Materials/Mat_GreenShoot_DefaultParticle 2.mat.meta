@@ -1,0 +1,16 @@
+fileFormatVersion: 2
+guid: b1248c06d29ea194999758217b5654ae
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 2100000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 312910
+  packageName: MasterMagicFX
+  packageVersion: 0.1
+  assetPath: Assets/MasterMagicFX/Particles/Shoot_Green/Materials/Mat_GreenShoot_DefaultParticle
+    2.mat
+  uploadId: 740422

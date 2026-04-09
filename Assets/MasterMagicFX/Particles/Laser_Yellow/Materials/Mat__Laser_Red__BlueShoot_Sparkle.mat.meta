@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: 445a22f1cd5b9e241a08322ec5c5ce95
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 2100000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 312910
+  packageName: MasterMagicFX
+  packageVersion: 0.1
+  assetPath: Assets/MasterMagicFX/Particles/Laser_Yellow/Materials/Mat__Laser_Red__BlueShoot_Sparkle.mat
+  uploadId: 740422

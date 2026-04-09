@@ -1,0 +1,14 @@
+fileFormatVersion: 2
+guid: 7665fd47cd3480c4ea171d8c10872eac
+PrefabImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 312910
+  packageName: MasterMagicFX
+  packageVersion: 0.1
+  assetPath: Assets/MasterMagicFX/Particles/Examples/Prefabs/Buffs.prefab
+  uploadId: 740422

@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: d0119621d9bb7b644a61ed74e2b1e7c7
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 2100000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 312910
+  packageName: MasterMagicFX
+  packageVersion: 0.1
+  assetPath: Assets/MasterMagicFX/Particles/Laser_Template/Materials/Mat__FireExplosion3_MagicExplosion2_Smoke.mat
+  uploadId: 740422

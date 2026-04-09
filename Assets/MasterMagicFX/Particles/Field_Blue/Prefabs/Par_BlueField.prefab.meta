@@ -1,0 +1,14 @@
+fileFormatVersion: 2
+guid: fa82e10a18da0df458733b221d940f48
+PrefabImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 312910
+  packageName: MasterMagicFX
+  packageVersion: 0.1
+  assetPath: Assets/MasterMagicFX/Particles/Field_Blue/Prefabs/Par_BlueField.prefab
+  uploadId: 740422

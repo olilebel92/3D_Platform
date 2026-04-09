@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: 0bf3f43866e550544a3dc276e7e001bf
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 2100000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 312910
+  packageName: MasterMagicFX
+  packageVersion: 0.1
+  assetPath: Assets/MasterMagicFX/Commons/Materials/Mat__HorizontalFlare.mat
+  uploadId: 740422

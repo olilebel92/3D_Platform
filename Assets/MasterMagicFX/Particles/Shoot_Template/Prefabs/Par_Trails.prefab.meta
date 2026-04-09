@@ -1,0 +1,14 @@
+fileFormatVersion: 2
+guid: adb615dbff5b7e74b913523251c44510
+PrefabImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 312910
+  packageName: MasterMagicFX
+  packageVersion: 0.1
+  assetPath: Assets/MasterMagicFX/Particles/Shoot_Template/Prefabs/Par_Trails.prefab
+  uploadId: 740422

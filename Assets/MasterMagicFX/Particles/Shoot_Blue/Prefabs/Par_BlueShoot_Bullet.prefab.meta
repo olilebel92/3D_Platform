@@ -1,0 +1,14 @@
+fileFormatVersion: 2
+guid: 390d6fb5b95c85d4199a646adba244d5
+PrefabImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 312910
+  packageName: MasterMagicFX
+  packageVersion: 0.1
+  assetPath: Assets/MasterMagicFX/Particles/Shoot_Blue/Prefabs/Par_BlueShoot_Bullet.prefab
+  uploadId: 740422

@@ -1,0 +1,14 @@
+fileFormatVersion: 2
+guid: 1ad80003cac7e8e4299d756f641a5ba0
+PrefabImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 312910
+  packageName: MasterMagicFX
+  packageVersion: 0.1
+  assetPath: Assets/MasterMagicFX/Particles/Shoot_Fire/Prefabs/Par_FireShoot_Trails.prefab
+  uploadId: 740422

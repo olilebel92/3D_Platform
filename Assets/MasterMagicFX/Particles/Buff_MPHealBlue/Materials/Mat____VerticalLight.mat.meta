@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: aeee8bc4bb3048a43af56363210f5b79
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 2100000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 312910
+  packageName: MasterMagicFX
+  packageVersion: 0.1
+  assetPath: Assets/MasterMagicFX/Particles/Buff_MPHealBlue/Materials/Mat____VerticalLight.mat
+  uploadId: 740422

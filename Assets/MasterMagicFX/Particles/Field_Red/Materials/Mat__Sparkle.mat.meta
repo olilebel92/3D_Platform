@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: 090f5eef8e66dc94c9e36a702db7dbcd
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 2100000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 312910
+  packageName: MasterMagicFX
+  packageVersion: 0.1
+  assetPath: Assets/MasterMagicFX/Particles/Field_Red/Materials/Mat__Sparkle.mat
+  uploadId: 740422

@@ -1,0 +1,15 @@
+fileFormatVersion: 2
+guid: 8217883075cd4a04eaff51f325a9182b
+NativeFormatImporter:
+  externalObjects: {}
+  mainObjectFileID: 2100000
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 312910
+  packageName: MasterMagicFX
+  packageVersion: 0.1
+  assetPath: Assets/MasterMagicFX/Particles/Slash_Template/Materials/Mat__Smoke2.mat
+  uploadId: 740422

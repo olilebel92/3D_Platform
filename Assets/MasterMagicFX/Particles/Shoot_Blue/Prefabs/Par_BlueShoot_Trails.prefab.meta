@@ -1,0 +1,14 @@
+fileFormatVersion: 2
+guid: 601d949b073c5d44b896df14cc0b6e4c
+PrefabImporter:
+  externalObjects: {}
+  userData: 
+  assetBundleName: 
+  assetBundleVariant: 
+AssetOrigin:
+  serializedVersion: 1
+  productId: 312910
+  packageName: MasterMagicFX
+  packageVersion: 0.1
+  assetPath: Assets/MasterMagicFX/Particles/Shoot_Blue/Prefabs/Par_BlueShoot_Trails.prefab
+  uploadId: 740422
