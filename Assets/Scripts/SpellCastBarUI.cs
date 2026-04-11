@@ -93,7 +93,7 @@ public class SpellCastBarUI : MonoBehaviour
         ShowPanel(spell, "Casting…", castColor);
     }
 
-    void HandleCastComplete() { }  // panel stays; Update() drives fill until channel/idle
+    void HandleCastComplete() => HidePanel();  // channel spells re-show via HandleChannelBegin
 
     void HandleChannelBegin(SpellData spell)
     {
@@ -113,7 +113,7 @@ public class SpellCastBarUI : MonoBehaviour
     void Update()
     {
         if (_caster == null || fillImage == null) return;
-        if (!_caster.IsLocked) return;  // idle — events handle show/hide
+        if (!_caster.IsActive) return;  // idle — events handle show/hide
 
         if (_caster.IsCasting)
             fillImage.fillAmount = _caster.CastProgress;

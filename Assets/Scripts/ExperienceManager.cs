@@ -199,7 +199,7 @@ public class ExperienceManager : MonoBehaviour
     public void GainXP(int amount)
     {
         currentXP += amount;
-        Debug.Log($"[XP] +{amount} XP  →  {currentXP}/{xpToNextLevel}");
+        DebugLogger.Log(DebugLogger.Category.XP, $"+{amount} XP  →  {currentXP}/{xpToNextLevel}");
 
         if (DamagePopupManager.Instance != null)
             DamagePopupManager.Instance.ShowXP(transform.position, amount);
@@ -264,8 +264,8 @@ public class ExperienceManager : MonoBehaviour
         statPoints++;
         OnLevelUp?.Invoke(currentLevel);
 
-        Debug.Log($"[LEVEL UP] Now Level {currentLevel}! +1 stat point ({statPoints} unspent). " +
-                  $"Next level needs {xpToNextLevel} XP.");
+        DebugLogger.Log(DebugLogger.Category.XP,
+            $"LEVEL UP → Level {currentLevel}! +1 stat point ({statPoints} unspent). Next level: {xpToNextLevel} XP.");
 
         if (_audioSource != null && levelUpClip != null)
             _audioSource.PlayOneShot(levelUpClip);

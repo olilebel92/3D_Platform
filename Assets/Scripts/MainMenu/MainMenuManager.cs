@@ -4,6 +4,7 @@ using UnityEngine.UI;
 using TMPro;
 using Unity.Netcode;
 using Unity.Netcode.Transports.UTP;
+using UnityEngine.Serialization;
 
 /// <summary>
 /// Main menu controller — handles solo Play, Host, Spectate, Settings, and Quit.
@@ -29,8 +30,9 @@ public class MainMenuManager : MonoBehaviour
     [Tooltip("Root panel of the settings screen.")]
     public GameObject settingsPanel;
 
-    [Tooltip("Panel shown when entering a host IP to spectate.")]
-    public GameObject spectatePanel;
+    [FormerlySerializedAs("spectatePanel")]
+    [Tooltip("Panel shown when entering a host IP to join.")]
+    public GameObject joinPanel;
 
     [Tooltip("Panel shown while connecting or waiting for the host to load the scene.")]
     public GameObject waitingPanel;
@@ -40,22 +42,24 @@ public class MainMenuManager : MonoBehaviour
     [Header("Main Buttons")]
     public Button playButton;
     public Button hostButton;
-    public Button spectateButton;
+    [FormerlySerializedAs("spectateButton")]
+    public Button joinButton;
     public Button settingsButton;
     public Button settingsBackButton;
     public Button quitButton;
 
-    // ─── Spectate Panel ───────────────────────────────────────────────────────
+    // ─── Join Panel ───────────────────────────────────────────────────────────
 
-    [Header("Spectate Panel")]
-    [Tooltip("Input field where the spectator types the host IP address.")]
+    [Header("Join Panel")]
+    [Tooltip("Input field where the player types the host IP address.")]
     public TMP_InputField ipInputField;
 
     [Tooltip("Port to use. Must match the host. Default: 7777.")]
     public ushort port = 7777;
 
     public Button connectButton;
-    public Button spectateBackButton;
+    [FormerlySerializedAs("spectateBackButton")]
+    public Button joinBackButton;
 
     // ─── Waiting Panel ────────────────────────────────────────────────────────
 
@@ -93,12 +97,12 @@ public class MainMenuManager : MonoBehaviour
         // ── Wire all buttons ──
         if (playButton != null)         playButton.onClick.AddListener(OnPlay);
         if (hostButton != null)         hostButton.onClick.AddListener(OnHost);
-        if (spectateButton != null)     spectateButton.onClick.AddListener(OnSpectate);
+        if (joinButton != null)         joinButton.onClick.AddListener(OnJoin);
         if (settingsButton != null)     settingsButton.onClick.AddListener(OnSettings);
         if (settingsBackButton != null) settingsBackButton.onClick.AddListener(OnSettingsBack);
         if (quitButton != null)         quitButton.onClick.AddListener(OnQuit);
         if (connectButton != null)      connectButton.onClick.AddListener(OnConnect);
-        if (spectateBackButton != null) spectateBackButton.onClick.AddListener(OnSpectateBack);
+        if (joinBackButton != null)     joinBackButton.onClick.AddListener(OnJoinBack);
         if (cancelButton != null)       cancelButton.onClick.AddListener(OnCancel);
 
         ShowMain();
@@ -139,9 +143,9 @@ public class MainMenuManager : MonoBehaviour
         NetworkManager.Singleton.SceneManager.LoadScene(lobbySceneName, LoadSceneMode.Single);
     }
 
-    void OnSpectate()
+    void OnJoin()
     {
-        ShowSpectate();
+        ShowJoin();
     }
 
     void OnSettings()
@@ -165,7 +169,7 @@ public class MainMenuManager : MonoBehaviour
 #endif
     }
 
-    // ─── Spectate Panel Handlers ──────────────────────────────────────────────
+    // ─── Join Panel Handlers ──────────────────────────────────────────────────
 
     /// <summary>Reads the IP field, connects as a client, then waits for the host to load the scene.</summary>
     void OnConnect()
@@ -194,7 +198,7 @@ public class MainMenuManager : MonoBehaviour
         ShowWaiting("Connecting...");
     }
 
-    void OnSpectateBack()
+    void OnJoinBack()
     {
         ShowMain();
     }
@@ -249,22 +253,22 @@ public class MainMenuManager : MonoBehaviour
     {
         if (mainPanel != null)    mainPanel.SetActive(true);
         if (settingsPanel != null) settingsPanel.SetActive(false);
-        if (spectatePanel != null) spectatePanel.SetActive(false);
+        if (joinPanel != null) joinPanel.SetActive(false);
         if (waitingPanel != null)  waitingPanel.SetActive(false);
     }
 
-    void ShowSpectate()
+    void ShowJoin()
     {
         if (mainPanel != null)    mainPanel.SetActive(false);
         if (settingsPanel != null) settingsPanel.SetActive(false);
-        if (spectatePanel != null) spectatePanel.SetActive(true);
+        if (joinPanel != null)    joinPanel.SetActive(true);
         if (waitingPanel != null)  waitingPanel.SetActive(false);
     }
 
     void ShowWaiting(string message)
     {
         if (mainPanel != null)    mainPanel.SetActive(false);
-        if (spectatePanel != null) spectatePanel.SetActive(false);
+        if (joinPanel != null) joinPanel.SetActive(false);
         if (waitingPanel != null)  waitingPanel.SetActive(true);
         if (waitingText != null)   waitingText.text = message;
     }

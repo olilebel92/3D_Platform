@@ -63,7 +63,7 @@ public class EnemyReward : NetworkBehaviour
                 if (xpManager != null)
                     xpManager.GainXP(xpReward);
             }
-            Debug.Log($"[EnemyReward] Awarded {xpReward} XP to all players for killing {gameObject.name}");
+            DebugLogger.Log(DebugLogger.Category.XP, $"Awarded {xpReward} XP to all players for killing {gameObject.name}");
         }
 
         // ── HP — heals the nearest player only ───────────────────────────────

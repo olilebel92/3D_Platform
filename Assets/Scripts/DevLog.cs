@@ -21,7 +21,15 @@ public class DevLog : MonoBehaviour
     private const string LOG_TEXT =
 @"<b><color=#c9a84c>── HACKNSLASH DEVLOG ──</color></b>
 
-<b><color=#e8920a>v0.05 — Networking Polish</color></b>  <color=#7a7a9a>2026-04-07 — In Progress</color>
+<b><color=#e8920a>v0.06 — Spell System Overhaul</color></b>  <color=#7a7a9a>2026-04-09 — In Progress</color>
+• SpellCaster 4-state machine — PreCast, Pending, Channeling, Idle
+• Spell types: Cast, Buff, Aura, Channel — defined per SpellData
+• Interrupt rules — movement & damage grace windows; stun always cancels
+• StatusEffectHandler — stun system, blocks casts and movement
+• PlayerNameTag — world-space billboard label, synced via NGO
+• SpellCastBarUI event-driven — cast (orange) and channel (blue)
+
+<b><color=#3dba6e>v0.05 — Networking Polish</color></b>  <color=#7a7a9a>2026-04-07</color>
 • EnemyColorRandomizer — random hue per enemy on spawn
 • LobbyChatManager — real-time chat in the lobby (NGO synced)
 • NGO optimization pass — reduced unnecessary RPCs and NetworkVariable updates

@@ -72,9 +72,14 @@ public class WaveManager : NetworkBehaviour
     [Tooltip("Linear speed growth per wave (kept linear so enemies don't feel teleport-fast). Wave 20 = ×1.95.")]
     public float speedScalePerWave = 0.05f;
 
+    // ─── Wave Clear Settings ──────────────────────────────────────────────────
+    [Header("Wave Clear Settings")]
+    [Tooltip("When enabled, all players are fully healed at the end of each wave.")]
+    public bool fullHealAfterWave = true;
+
     // ─── Spawn Points ─────────────────────────────────────────────────────────
     [Header("Spawn Points")]
-    [Tooltip("Enemies spawn at these positions. When empty, spawns in a ring around the player instead.")]
+    [Tooltip("Enemies spawn at these positions. When empty, spawns in a ring around each player instead.")]
     public Transform[] spawnPoints;
 
     [Header("Player Ring Spawn (used when Spawn Points is empty)")]
@@ -152,19 +157,22 @@ public class WaveManager : NetworkBehaviour
             SetStatus("Wave " + currentWave + " cleared!");
 
             // ── Full heal — send to every player's owning client ──────────────
-            if (!IsNetworkActive())
+            if (fullHealAfterWave)
             {
-                foreach (GameObject p in GameObject.FindGameObjectsWithTag("Player"))
+                if (!IsNetworkActive())
                 {
-                    HealthSystem h = p.GetComponent<HealthSystem>();
-                    if (h != null) h.Heal(h.maxHealth);
+                    foreach (GameObject p in GameObject.FindGameObjectsWithTag("Player"))
+                    {
+                        HealthSystem h = p.GetComponent<HealthSystem>();
+                        if (h != null) h.Heal(h.maxHealth);
+                    }
                 }
-            }
-            else
-            {
-                // ClientRpc with no params → runs on ALL clients.
-                // Each client finds its own owned player and heals locally.
-                HealAllPlayersClientRpc();
+                else
+                {
+                    // ClientRpc with no params → runs on ALL clients.
+                    // Each client finds its own owned player and heals locally.
+                    HealAllPlayersClientRpc();
+                }
             }
 
             // ── Wave item reward ──────────────────────────────────────────────

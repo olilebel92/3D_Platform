@@ -253,6 +253,8 @@ public class EnemyAI : NetworkBehaviour
     // Sent only to the targeted player's owning client.
     // Finds the locally-owned player on that machine and applies damage directly,
     // so HealthSystem.UpdateHealthUI() runs where the UI references actually live.
+    // After applying damage, syncs the new health back to the server so server-side
+    // checks (e.g. HealingWave heal eligibility) see the real value.
     [ClientRpc]
     private void DealDamageClientRpc(int damage, ClientRpcParams clientRpcParams = default)
     {
@@ -262,7 +264,12 @@ public class EnemyAI : NetworkBehaviour
             if (net != null && net.IsOwner)
             {
                 HealthSystem health = p.GetComponent<HealthSystem>();
-                if (health != null) health.TakeDamage(damage);
+                if (health != null)
+                {
+                    health.TakeDamage(damage);
+                    PlayerController pc = p.GetComponent<PlayerController>();
+                    pc?.SyncServerHealthServerRpc(health.currentHealth);
+                }
                 return;
             }
         }

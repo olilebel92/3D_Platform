@@ -1,0 +1,33 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 4378247a87f53c34aa130d1b75a0dc31, type: 3}
+  m_Name: HealingWave
+  m_EditorClassIdentifier: Assembly-CSharp::SpellData
+  spellName: HealingWave
+  description: A mysterious spell.
+  icon: {fileID: 0}
+  hitEffect: {fileID: 0}
+  prefab: {fileID: 5422418228119156601, guid: 2bb83c31e0883114888c534761bf1e07, type: 3}
+  spellType: 3
+  castStartDelay: 0
+  castTime: 0
+  throwAnimLeadTime: 0
+  movementInterruptGrace: 0.3
+  damageInterruptGrace: 0
+  channelTickRate: 1
+  fireOnChannelStart: 0
+  lockMovementDuringChannel: 1
+  spawnOrigin: 1
+  spawnRotation: 3
+  projectileCount: 1
+  spreadAngle: 20
+  castSound: {fileID: 8300000, guid: 2a1213cd8b4cc40b9be0c8224bc688d7, type: 3}

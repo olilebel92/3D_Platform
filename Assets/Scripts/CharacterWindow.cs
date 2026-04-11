@@ -52,6 +52,9 @@ public class CharacterWindow : MonoBehaviour
     [Tooltip("Shows max stamina pool.")]
     public TextMeshProUGUI staminaLabel;
 
+    [Tooltip("Displays total HP regeneration per second (base + equipment bonus).")]
+    public TextMeshProUGUI regenLabel;
+
     [Tooltip("Shows the Strength stat.")]
     public TextMeshProUGUI strengthLabel;
 
@@ -374,7 +377,17 @@ public class CharacterWindow : MonoBehaviour
 
         // ── Health ────────────────────────────────────────────────────────────
         if (playerHealthSystem != null)
+        {
             SetLabel(hpLabel, "Max HP", playerHealthSystem.maxHealth.ToString());
+
+            float baseRegen  = playerHealthSystem.RegenPerSecond;
+            float totalRegen = playerHealthSystem.TotalRegenPerSecond;
+            float equipBonus = totalRegen - baseRegen;
+            string regenStr  = equipBonus > 0f
+                ? $"{totalRegen:F1} <color=#C9A84C>(+{equipBonus:F1})</color>"
+                : $"{totalRegen:F1}";
+            SetLabel(regenLabel, "HP Regen/s", regenStr);
+        }
         else
             Debug.LogWarning("[CharacterWindow] HealthSystem not found on player!");
 

@@ -61,11 +61,11 @@ public class PlayerController : NetworkBehaviour
     private HealthSystem _health;
     private LockOnSystem lockOn;
     private ExperienceManager _xp;
-    private SpellCaster _spellCaster;
+    private SpellCaster          _spellCaster;
+    private StatusEffectHandler  _statusEffects;
     private float verticalVelocity;
     private bool _sprintToggle = false;
     private bool _isJumping = false;
-    private bool _wasCasting = false;
     private PlayerInputActions inputActions;
     private Vector2 moveInput;
 
@@ -85,6 +85,10 @@ public class PlayerController : NetworkBehaviour
     private static readonly int AnimVelocityZ  = Animator.StringToHash("VelocityZ");
     private static readonly int AnimIsLockedOn = Animator.StringToHash("IsLockedOn");
     private static readonly int AnimCasting    = Animator.StringToHash("Casting");
+    private static readonly int AnimCastThrow  = Animator.StringToHash("CastThrow");
+    private bool _animHasCasting;
+    private bool _animHasCastThrow;
+    private bool _isCastThrowing;
 
     // ─── Unity Lifecycle ──────────────────────────────────────────────────────
 
@@ -161,10 +165,17 @@ public class PlayerController : NetworkBehaviour
 
     void Start()
     {
-        controller   = GetComponent<CharacterController>();
-        stamina      = GetComponent<StaminaSystem>();
-        _health      = GetComponent<HealthSystem>();
-        _spellCaster = GetComponent<SpellCaster>();
+        controller     = GetComponent<CharacterController>();
+        stamina        = GetComponent<StaminaSystem>();
+        _health        = GetComponent<HealthSystem>();
+        _spellCaster   = GetComponent<SpellCaster>();
+        if (_spellCaster != null)
+        {
+            _spellCaster.OnCastThrowStart += OnCastThrow;
+            _spellCaster.OnCastComplete   += () => _isCastThrowing = false;
+            _spellCaster.OnCastCancelled  += () => _isCastThrowing = false;
+        }
+        _statusEffects = GetComponent<StatusEffectHandler>();
         if (stamina != null) stamina.rechargeRate = staminaRegenPerSecond;
         lockOn     = GetComponent<LockOnSystem>();
         _xp        = GetComponent<ExperienceManager>();
@@ -178,7 +189,17 @@ public class PlayerController : NetworkBehaviour
             audioSource = gameObject.AddComponent<AudioSource>();
 
         if (animator == null)
+        {
             Debug.LogWarning("[PlayerController] No Animator found in children!");
+        }
+        else
+        {
+            foreach (var p in animator.parameters)
+            {
+                if (p.nameHash == AnimCasting)   _animHasCasting   = true;
+                if (p.nameHash == AnimCastThrow) _animHasCastThrow = true;
+            }
+        }
 
         Cursor.lockState = CursorLockMode.None;
         Cursor.visible   = true;
@@ -210,6 +231,7 @@ public class PlayerController : NetworkBehaviour
         // Safety cleanup — always unsubscribe to avoid stale callbacks.
         base.OnDestroy();
         DisableInput();
+        if (_spellCaster != null) _spellCaster.OnCastThrowStart -= OnCastThrow;
     }
 
     // ─── HP Regen (server-authoritative) ─────────────────────────────────────
@@ -238,6 +260,8 @@ public class PlayerController : NetworkBehaviour
 
             int amount = Mathf.RoundToInt(regen);
             _health.Heal(amount);
+            DebugLogger.Log(DebugLogger.Category.Regen,
+                $"{gameObject.name} regen tick +{amount} — HP: {_health.currentHealth}/{_health.maxHealth}");
 
             // Mirror the heal on all clients.
             if (IsSpawned)
@@ -255,6 +279,49 @@ public class PlayerController : NetworkBehaviour
         if (IsServer) return; // host already healed server-side
         if (_health != null)
             _health.Heal(amount);
+    }
+
+    /// <summary>
+    /// Called by the owning client after taking damage locally (via DealDamageClientRpc /
+    /// DamageZone) to keep the server's HealthSystem.currentHealth in sync.
+    /// This lets server-side heal checks (e.g. HealingWave) see the correct value.
+    /// Does NOT call TakeDamage — only sets the raw value — so death logic is not
+    /// re-triggered server-side for a remote client.
+    /// </summary>
+    [ServerRpc]
+    public void SyncServerHealthServerRpc(int clientHealth)
+    {
+        if (_health == null) return;
+        _health.currentHealth = Mathf.Clamp(clientHealth, 0, _health.maxHealth);
+        DebugLogger.Log(DebugLogger.Category.NetworkSync,
+            $"{gameObject.name} server health synced → {_health.currentHealth}/{_health.maxHealth}");
+    }
+
+    /// <summary>
+    /// Mirrors a server-applied heal on the owning client and shows the popup.
+    /// Send with ClientRpcParams targeting OwnerClientId so only that client runs it.
+    /// The server (host) skips it — it already healed server-side.
+    /// </summary>
+    [ClientRpc]
+    public void ApplyHealClientRpc(int amount, ClientRpcParams rpcParams = default)
+    {
+        if (IsServer) return; // host already healed server-side
+        if (_health != null)
+            _health.Heal(amount);
+        if (DamagePopupManager.Instance != null)
+            DamagePopupManager.Instance.ShowHeal(transform.position, amount);
+    }
+
+    /// <summary>
+    /// Shows a heal popup on the owning client after a server-side heal (e.g. HealingWave tick).
+    /// Broadcast to all clients but only the owner acts — avoids per-client RPC overhead.
+    /// </summary>
+    [ClientRpc]
+    public void ShowHealPopupClientRpc(int amount)
+    {
+        if (!IsOwner) return;
+        if (DamagePopupManager.Instance != null)
+            DamagePopupManager.Instance.ShowHeal(transform.position, amount);
     }
 
     // ─── Spawn Position (Multiplayer) ─────────────────────────────────────────
@@ -369,6 +436,7 @@ public class PlayerController : NetworkBehaviour
 
     void OnJump(InputAction.CallbackContext ctx)
     {
+        if (_spellCaster != null && _spellCaster.IsMovementLocked) return;
         if (controller != null && controller.isGrounded)
         {
             verticalVelocity = Mathf.Sqrt(jumpHeight * -2f * gravity);
@@ -377,6 +445,13 @@ public class PlayerController : NetworkBehaviour
             if (audioSource != null && jumpSound != null)
                 audioSource.PlayOneShot(jumpSound);
         }
+    }
+
+    void OnCastThrow()
+    {
+        _isCastThrowing = true;
+        if (animator != null && _animHasCastThrow)
+            animator.SetTrigger(AnimCastThrow);
     }
 
     void OnSprintToggle(InputAction.CallbackContext ctx)
@@ -389,6 +464,10 @@ public class PlayerController : NetworkBehaviour
     {
         // Spectator clients have no ownership — skip all input and movement.
         if (IsSpawned && !IsOwner) return;
+
+        // ── Stun ──────────────────────────────────────────────────────────────
+        // While stunned, freeze all input and movement (cast is cancelled by StatusEffectHandler).
+        if (_statusEffects != null && _statusEffects.IsStunned) return;
 
         // ── Camera fallback ───────────────────────────────────────────────────
         // OnNetworkSpawn can fire before Camera.main is ready (especially on the
@@ -408,45 +487,21 @@ public class PlayerController : NetworkBehaviour
 
         // ── Read Input ────────────────────────────────────────────────────────
         moveInput = inputActions.Player.Move.ReadValue<Vector2>();
+
+        // ── Movement Grace Lock ───────────────────────────────────────────────
+        // During a spell's movementInterruptGrace window the player is rooted in
+        // place — suppress movement input so the character stops and holds their
+        // facing direction while the cast animation begins.
+        if (_spellCaster != null && _spellCaster.IsMovementLocked)
+            moveInput = Vector2.zero;
+
         bool isMoving = moveInput.magnitude > 0.1f;
 
-        // ── Spell Cast Lock ───────────────────────────────────────────────────
-        // While casting or channeling, freeze horizontal movement.
-        // Any movement input cancels the cast and returns control immediately.
-        bool isCastLocked = _spellCaster != null && _spellCaster.IsLocked;
-        if (isCastLocked)
-        {
-            if (isMoving)
-            {
-                _spellCaster.CancelCast();
-                isCastLocked = false;  // movement resumes this frame
-            }
-            else
-            {
-                // Apply gravity + grounded check but zero horizontal movement.
-                if (controller.isGrounded && verticalVelocity < 0f) verticalVelocity = -2f;
-                verticalVelocity += gravity * Time.deltaTime;
-                verticalVelocity  = Mathf.Max(verticalVelocity, -20f);
-                controller.Move(new Vector3(0f, verticalVelocity, 0f) * Time.deltaTime);
-
-                if (animator != null && !_wasCasting)
-                {
-                    animator.SetBool(AnimCasting,    true);
-                    animator.SetBool(AnimWalk,       false);
-                    animator.SetBool(AnimSprint,     false);
-                    animator.SetBool(AnimJump,       false);
-                    animator.SetBool(AnimIsLockedOn, false);
-                    _wasCasting = true;
-                }
-                return;
-            }
-        }
-
-        if (_wasCasting)
-        {
-            if (animator != null) animator.SetBool(AnimCasting, false);
-            _wasCasting = false;
-        }
+        // ── Spell Cast Interrupt Check ────────────────────────────────────────
+        // Moving while a cast is active may cancel it, depending on the spell's
+        // movementInterruptGrace. Casting never freezes movement.
+        if (isMoving && _spellCaster != null && _spellCaster.IsActive)
+            _spellCaster.TryCancelByMovement();
 
         // ── Sprint Logic ──────────────────────────────────────────────────────
         bool holdingSprint = inputActions.Player.Sprint.IsPressed();
@@ -513,6 +568,7 @@ public class PlayerController : NetworkBehaviour
 
         if (animator != null)
         {
+            if (_animHasCasting) animator.SetBool(AnimCasting, _spellCaster != null && _spellCaster.IsActive && !_isCastThrowing);
             animator.SetBool(AnimJump,       _isJumping);
             animator.SetBool(AnimIsLockedOn, lockedOnWalk);
             animator.SetBool(AnimWalk,       isMoving && !isSprinting && !_isJumping && !lockedOnWalk);
@@ -531,8 +587,20 @@ public class PlayerController : NetworkBehaviour
         }
 
         // ── Rotation ──────────────────────────────────────────────────────────
+        // While casting: always rotate toward camera forward (includes after grace expires).
+        if (_spellCaster != null && _spellCaster.IsActive)
+        {
+            Vector3 camDir = cameraTransform.forward;
+            camDir.y = 0f;
+            if (camDir.sqrMagnitude > 0.001f)
+            {
+                Quaternion targetRot = Quaternion.LookRotation(camDir);
+                transform.rotation = Quaternion.RotateTowards(
+                    transform.rotation, targetRot, rotationSpeed * Time.deltaTime);
+            }
+        }
         // Face the locked target only when idle or walking (not while sprinting)
-        if (lockOn != null && lockOn.IsLockedOn && !isSprinting)
+        else if (lockOn != null && lockOn.IsLockedOn && !isSprinting)
         {
             Vector3 toTarget = lockOn.LockTarget.position - transform.position;
             toTarget.y = 0f;

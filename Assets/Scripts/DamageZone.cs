@@ -23,6 +23,13 @@ public class DamageZone : MonoBehaviour
 
         HealthSystem health = other.GetComponent<HealthSystem>();
         if (health != null)
+        {
             health.TakeDamage(damageAmount);
+            if (networkActive)
+            {
+                PlayerController pc = other.GetComponent<PlayerController>();
+                pc?.SyncServerHealthServerRpc(health.currentHealth);
+            }
+        }
     }
 }

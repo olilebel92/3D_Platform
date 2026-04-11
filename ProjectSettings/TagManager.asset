@@ -5,6 +5,9 @@ TagManager:
   serializedVersion: 3
   tags:
   - Enemy
+  - Item
+  - SpawnPoint
+  - Loot
   layers:
   - Default
   - TransparentFX
@@ -12,11 +15,11 @@ TagManager:
   - 
   - Water
   - UI
-  - 
-  - 
-  - 
-  - 
-  - 
+  - Player
+  - Enemy
+  - Projectile
+  - Interactable
+  - Ground
   - 
   - 
   - 
@@ -41,6 +44,18 @@ TagManager:
   m_SortingLayers:
   - name: Default
     uniqueID: 0
+    locked: 0
+  - name: World
+    uniqueID: 3778606701
+    locked: 0
+  - name: Characters
+    uniqueID: 3460676161
+    locked: 0
+  - name: VFX
+    uniqueID: 4167716249
+    locked: 0
+  - name: UI
+    uniqueID: 2175595641
     locked: 0
   m_RenderingLayers:
   - Default

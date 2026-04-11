@@ -1,0 +1,444 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>HackNSlash — Development Timeline</title>
+  <style>
+    :root {
+      --bg:#0b0b14; --card:#1a1a2e; --border:#2a2a45;
+      --gold:#c9a84c; --gold-dim:#8a6f2e;
+      --text:#dde1f0; --muted:#7a7a9a;
+      --green:#3dba6e; --orange:#e8920a; --grey:#3a3a5a;
+      --blue:#4488ff; --modal-bg:rgba(5,5,15,0.92);
+    }
+    *{box-sizing:border-box;margin:0;padding:0;}
+    body{background:var(--bg);color:var(--text);font-family:'Segoe UI',system-ui,sans-serif;min-height:100vh;display:flex;flex-direction:column;}
+
+    /* ─── Header ─── */
+    header{background:linear-gradient(180deg,#0d0d1e 0%,var(--bg) 100%);border-bottom:1px solid var(--border);padding:28px 60px 22px;position:relative;overflow:hidden;flex-shrink:0;}
+    header::before{content:'';position:absolute;inset:0;background:radial-gradient(ellipse at 50% -20%,rgba(201,168,76,.07) 0%,transparent 70%);pointer-events:none;}
+    .header-inner{position:relative;max-width:1400px;margin:0 auto;display:flex;align-items:center;justify-content:space-between;gap:20px;flex-wrap:wrap;}
+    .header-left h1{font-size:2rem;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--gold);text-shadow:0 0 30px rgba(201,168,76,.25);}
+    .header-left p{margin-top:5px;color:var(--muted);font-size:.85rem;letter-spacing:.03em;}
+    .header-right{display:flex;flex-direction:column;align-items:flex-end;gap:10px;}
+    .back-link{display:inline-flex;align-items:center;gap:6px;background:rgba(201,168,76,.08);border:1px solid var(--gold-dim);color:var(--gold);font-size:.75rem;font-weight:600;letter-spacing:.08em;text-transform:uppercase;padding:7px 16px;border-radius:8px;text-decoration:none;transition:background .15s,border-color .15s;}
+    .back-link:hover{background:rgba(201,168,76,.15);border-color:var(--gold);}
+    .status-pill{font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.1em;padding:4px 12px;border-radius:20px;background:rgba(232,146,10,.12);color:var(--orange);border:1px solid rgba(232,146,10,.3);}
+
+    /* ─── Main ─── */
+    main{flex:1;display:flex;flex-direction:column;padding:36px 0 0;}
+
+    /* ─── Timeline ─── */
+    .tl-scroll{overflow-x:auto;overflow-y:hidden;cursor:grab;-webkit-overflow-scrolling:touch;user-select:none;flex:1;}
+    .tl-scroll.tl-dragging{cursor:grabbing;}
+    .tl-inner{position:relative;}
+
+    .tl-q-divider{position:absolute;top:0;width:1px;background:rgba(42,42,69,.5);}
+    .tl-q-label{position:absolute;font-size:.62rem;text-transform:uppercase;letter-spacing:.12em;color:var(--muted);text-align:center;transform:translateX(-50%);white-space:nowrap;font-weight:600;}
+
+    .tl-rail-bg  {position:absolute;border-radius:3px;background:var(--border);}
+    .tl-rail-fill{position:absolute;border-radius:3px;background:linear-gradient(90deg,var(--green),var(--gold));}
+    .tl-rail-dot {position:absolute;width:10px;height:10px;border-radius:50%;transform:translate(-50%,-50%);background:var(--gold);box-shadow:0 0 12px rgba(201,168,76,.6);z-index:5;}
+
+    .tl-stem{position:absolute;width:2px;transform:translateX(-50%);}
+    .tl-stem.ts-done  {background:linear-gradient(to bottom,rgba(61,186,110,.5),rgba(61,186,110,.15));}
+    .tl-stem.ts-active{background:linear-gradient(to bottom,rgba(232,146,10,.6),rgba(232,146,10,.15));}
+    .tl-stem.ts-plain {background:linear-gradient(to bottom,var(--border),rgba(42,42,69,.3));}
+
+    .tl-node{position:absolute;border-radius:50%;transform:translate(-50%,-50%);cursor:pointer;transition:transform .15s,box-shadow .15s,filter .15s;z-index:4;box-sizing:border-box;}
+    .tl-node:hover{transform:translate(-50%,-50%) scale(1.4);z-index:6;}
+    .tl-node.tn-completed{background:var(--green);border:2px solid rgba(255,255,255,.2);box-shadow:0 0 10px rgba(61,186,110,.25);}
+    .tl-node.tn-active   {background:var(--orange);border:2px solid rgba(255,255,255,.25);animation:tnpulse 1.8s ease-in-out infinite;}
+    .tl-node.tn-planned  {background:#1a1a2e;border:2px solid #3a3a60;}
+    .tl-node.tn-target   {background:var(--gold);border:2px solid rgba(255,255,255,.3);box-shadow:0 0 14px rgba(201,168,76,.35);}
+    .tl-node.tn-future   {background:#0c1830;border:2px solid #2255aa;}
+    @keyframes tnpulse{0%,100%{box-shadow:0 0 0 0 rgba(232,146,10,.55);}60%{box-shadow:0 0 0 12px rgba(232,146,10,0);}}
+
+    .tl-nlabel{position:absolute;text-align:center;pointer-events:none;transform:translateX(-50%);z-index:2;}
+    .tl-nlabel .tnl-ver  {font-size:.68rem;font-weight:800;color:var(--gold);letter-spacing:.04em;white-space:nowrap;line-height:1.4;}
+    .tl-nlabel .tnl-title{font-size:.57rem;color:var(--muted);line-height:1.35;white-space:nowrap;max-width:100px;overflow:hidden;text-overflow:ellipsis;}
+
+    .tl-endpoint{position:absolute;transform:translate(-50%,-50%);text-align:center;pointer-events:none;z-index:3;}
+    .tl-ep-dot  {width:28px;height:28px;border-radius:50%;margin:0 auto;display:flex;align-items:center;justify-content:center;}
+    .tl-ep-dot.epd-idea  {background:rgba(201,168,76,.08);border:2px dashed var(--gold-dim);}
+    .tl-ep-dot.epd-launch{background:rgba(68,136,255,.08);border:2px solid #2255aa;}
+    .tl-ep-inner{font-size:.65rem;font-weight:700;}
+    .tl-ep-inner.ei-idea  {color:var(--gold-dim);}
+    .tl-ep-inner.ei-launch{color:var(--blue);}
+    .tl-ep-label{font-size:.58rem;text-transform:uppercase;letter-spacing:.1em;margin-top:6px;white-space:nowrap;line-height:1.5;}
+    .tl-ep-label.epl-idea  {color:var(--gold-dim);}
+    .tl-ep-label.epl-launch{color:var(--blue);}
+
+    /* ─── Legend ─── */
+    .tl-legend{display:flex;gap:22px;flex-wrap:wrap;padding:22px 60px 32px;justify-content:center;flex-shrink:0;}
+    .tl-leg{display:flex;align-items:center;gap:7px;font-size:.67rem;color:var(--muted);letter-spacing:.08em;text-transform:uppercase;}
+    .tl-leg-dot{width:9px;height:9px;border-radius:50%;flex-shrink:0;}
+    .tl-leg-dot.ld-c{background:var(--green);}
+    .tl-leg-dot.ld-a{background:var(--orange);}
+    .tl-leg-dot.ld-p{background:#1a1a2e;border:1px solid #3a3a60;}
+    .tl-leg-dot.ld-t{background:var(--gold);}
+    .tl-leg-dot.ld-f{background:#0c1830;border:1px solid #2255aa;}
+
+    /* ─── Modal ─── */
+    .modal-overlay{position:fixed;inset:0;background:var(--modal-bg);z-index:100;display:flex;align-items:center;justify-content:center;padding:20px;opacity:0;pointer-events:none;transition:opacity .2s;backdrop-filter:blur(4px);}
+    .modal-overlay.open{opacity:1;pointer-events:all;}
+    .modal{background:var(--card);border:1px solid var(--border);border-radius:16px;max-width:620px;width:100%;max-height:88vh;overflow-y:auto;transform:translateY(16px);transition:transform .2s;}
+    .modal-overlay.open .modal{transform:translateY(0);}
+    .modal-header{padding:28px 28px 20px;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--card);border-radius:16px 16px 0 0;z-index:1;}
+    .modal-top{display:flex;justify-content:space-between;align-items:flex-start;}
+    .modal-version{font-size:2rem;font-weight:800;color:var(--gold);}
+    .modal-close{background:none;border:1px solid var(--border);color:var(--muted);width:32px;height:32px;border-radius:8px;cursor:pointer;font-size:1rem;display:flex;align-items:center;justify-content:center;transition:color .15s,border-color .15s;}
+    .modal-close:hover{color:var(--text);border-color:var(--gold-dim);}
+    .modal-title{font-size:1.2rem;font-weight:700;margin:6px 0 4px;}
+    .modal-meta{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-top:10px;}
+    .modal-date{font-size:.78rem;color:var(--muted);}
+    .modal-body{padding:24px 28px 28px;}
+    .modal-section-title{font-size:.68rem;text-transform:uppercase;letter-spacing:.12em;color:var(--muted);margin-bottom:10px;margin-top:22px;}
+    .modal-section-title:first-child{margin-top:0;}
+    .modal-list{list-style:none;display:flex;flex-direction:column;gap:8px;}
+    .modal-list li{font-size:.88rem;color:var(--text);padding:8px 12px 8px 24px;background:rgba(255,255,255,.03);border:1px solid var(--border);border-radius:8px;position:relative;line-height:1.5;}
+    .modal-list li::before{content:'→';position:absolute;left:8px;color:var(--gold-dim);font-size:.8rem;}
+    .modal-note{margin-top:18px;padding:12px 16px;background:rgba(201,168,76,.06);border:1px solid rgba(201,168,76,.2);border-radius:8px;font-size:.8rem;color:#b09060;line-height:1.6;}
+    .status-badge{font-size:.65rem;font-weight:700;text-transform:uppercase;letter-spacing:.1em;padding:4px 10px;border-radius:20px;white-space:nowrap;}
+    .badge-completed{background:rgba(61,186,110,.15);color:var(--green);border:1px solid rgba(61,186,110,.3);}
+    .badge-active   {background:rgba(232,146,10,.15);color:var(--orange);border:1px solid rgba(232,146,10,.3);}
+    .badge-planned  {background:rgba(58,58,90,.5);color:var(--muted);border:1px solid var(--border);}
+    .badge-target   {background:rgba(201,168,76,.15);color:var(--gold);border:1px solid var(--gold-dim);}
+    .badge-future   {background:rgba(68,136,255,.15);color:var(--blue);border:1px solid #2255aa;}
+
+    ::-webkit-scrollbar{height:4px;width:6px;}
+    ::-webkit-scrollbar-track{background:var(--bg);}
+    ::-webkit-scrollbar-thumb{background:var(--border);border-radius:3px;}
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="header-inner">
+    <div class="header-left">
+      <h1>HackNSlash</h1>
+      <p>Development Timeline &nbsp;·&nbsp; Q1 2026 — V2.0</p>
+    </div>
+    <div class="header-right">
+      <a href="roadmap.html" class="back-link">&#8592; Roadmap</a>
+      <span class="status-pill" id="currentStatus">Loading...</span>
+    </div>
+  </div>
+</header>
+
+<main>
+  <div class="tl-scroll" id="tlScroll">
+    <div class="tl-inner" id="tlInner"></div>
+  </div>
+  <div class="tl-legend">
+    <span class="tl-leg"><span class="tl-leg-dot ld-c"></span>Completed</span>
+    <span class="tl-leg"><span class="tl-leg-dot ld-a"></span>In Progress</span>
+    <span class="tl-leg"><span class="tl-leg-dot ld-p"></span>Planned</span>
+    <span class="tl-leg"><span class="tl-leg-dot ld-t"></span>V1.0 Target</span>
+    <span class="tl-leg"><span class="tl-leg-dot ld-f"></span>Post-V1.0</span>
+  </div>
+</main>
+
+<!-- Modal -->
+<div class="modal-overlay" id="modalOverlay" onclick="closeModal(event)">
+  <div class="modal">
+    <div class="modal-header">
+      <div class="modal-top">
+        <div><div class="modal-version" id="mVersion"></div><div class="modal-title" id="mTitle"></div></div>
+        <button class="modal-close" onclick="closeModalDirect()">x</button>
+      </div>
+      <div class="modal-meta"><span class="status-badge" id="mBadge"></span><span class="modal-date" id="mDate"></span></div>
+    </div>
+    <div class="modal-body" id="mBody"></div>
+  </div>
+</div>
+
+<script>
+// ─────────────────────────────────────────────────────────────────────────────
+//  DATA
+// ─────────────────────────────────────────────────────────────────────────────
+const VERSIONS = [
+  {version:"V0.01",title:"First Build",status:"completed",quarter:"Q1 2026",date:"April 3, 2026",
+   details:["Player movement, sprinting, stamina, jumping","Melee attack STR scaling, fireball shooter","Isometric and third-person camera","Enemy AI via NavMesh, wave manager","XP/leveling STR/AGI/INT, inventory, spell bar","Character window, damage popups, pause, death screen"],
+   note:"All assets are placeholders. First ever build compiled."},
+
+  {version:"V0.02",title:"Networking Foundation",status:"completed",quarter:"Q1 2026",date:"April 4, 2026",
+   details:["Unity NGO + NetworkManager + UnityTransport set up","Free-roam spectator camera (WASD + gamepad)","LobbyScene: name, class selection, ready system","Force Start for host, Disconnect button","LobbyPlayer NetworkObject survives scene transitions"],
+   note:"All players still use the same character. Co-op spawning comes in V0.03."},
+
+  {version:"V0.03",title:"Co-op Player Prefab",status:"completed",quarter:"Q1 2026",date:"April 5, 2026",
+   details:["Player converted to NetworkObject prefab — PlayerSpawner spawns one per client","Terrain.SampleHeight() finds correct spawn Y on any terrain","OwnerNetworkTransform — client-authoritative movement","ApplySpawnPositionClientRpc — fixes prefab Y=0 desync at spawn","Per-player ExperienceManager and PlayerInventory via SetAsLocalInstance()","PlayerUILinker wires HP/XP/stamina UI at runtime","Death screen: no time freeze, respawn RPC instead of scene reload"],
+   note:"Single most important architectural step for co-op — everything else depends on this being solid."},
+
+  {version:"V0.04",title:"Enemy Networking",status:"completed",quarter:"Q1 2026",date:"April 6, 2026",
+   details:["EnemySpawner uses NetworkObject.Spawn() — enemies appear for all clients","NetworkTransform syncs enemy positions and rotations","EnemyAI runs server-side only — clients receive synced state","AI retargeting: finds nearest player, not just first tagged","Enemy death synced — destruction triggered server-side"],
+   note:null},
+
+  {version:"V0.05",title:"Networking Polish",status:"completed",quarter:"Q1 2026",date:"April 7, 2026",
+   details:["EnemyColorRandomizer — random hue applied per enemy on spawn, visible to all clients","LobbyChatManager — real-time chat in the lobby, messages synced via NGO ServerRpc / ClientRpc","NGO optimization — reduced unnecessary RPC calls and NetworkVariable update frequency","Local networking polish — lag, desync, and edge-case fixes for LAN co-op sessions"],
+   note:null},
+
+  {version:"V0.06",title:"Spell System Overhaul",status:"active",quarter:"Q2 2026",date:"In Progress — April 9, 2026",
+   details:["SpellCaster rewritten with 4-state machine: Idle → PreCast → Pending → Channeling","SpellData expanded: spellType (Cast/Buff/Aura/Channel), castStartDelay, castTime, throwAnimLeadTime per spell","Interrupt rules per SpellData: movementInterruptGrace + damageInterruptGrace — stun always bypasses both","StatusEffectHandler — stun duration tracking, highest-value-wins (no stacking), calls SpellCaster.CancelByStun() on apply","PlayerNameTag — world-space TMP billboard above each player, syncs to LobbyPlayer.PlayerName NetworkVariable","SpellCastBarUI event-driven rewrite — subscribes to SpellCaster events; orange for casting, blue for channeling","Multi-projectile support: projectileCount + spreadAngle fields on SpellData"],
+   note:"The spell system now supports every major cast pattern: instant, timed, channeled, and buffed. StatusEffectHandler is the first status effect — built to extend with burn, slow, and more post-V0.6."},
+
+  {version:"V0.2",title:"Combat Sync",status:"planned",quarter:"Q2 2026",date:"Est. May – Jun 2026",
+   details:["HealthSystem HP becomes NetworkVariable — synced to all clients","TakeDamage() routed through ServerRpc — server validates all hits","PlayerAttack ServerRpc — client requests, server applies damage","FireballShooter spawns projectiles as NetworkObjects","Critical foundation for fair co-op dungeon combat"],
+   note:null},
+
+  {version:"V0.25",title:"Online Multiplayer",status:"planned",quarter:"Q3 2026",date:"Est. July 2026",
+   details:["Replace raw IP connection with Unity Relay — host allocates a relay slot and shares a join code","Client joins by entering the join code instead of an IP address","No port forwarding required on the host's router","Free tier covers up to 50 concurrent users — sufficient for early co-op"],
+   note:"LAN co-op already works. Moving this up to summer 2026 means every subsequent milestone can be tested by anyone, anywhere, without router configuration."},
+
+  {version:"V0.3",title:"First Dungeon Run",status:"planned",quarter:"Q3 2026",date:"Est. Aug – Sep 2026",
+   details:["Simple linear dungeon: 3–4 combat encounters followed by a boss","Dungeon entrance: a zone that loads the dungeon with the party","Placeholder hub area — a flat open space players return to after the run","WaveManager adapted to trigger room clears in sequence","Boss placeholder: a stronger enemy with more HP","XP and loot awarded on run completion, returned to hub"],
+   note:"First time the target loop exists — even in rough form. Ugly is fine. Proving the concept is the goal."},
+
+  {version:"V0.4",title:"Progression + Hub",status:"planned",quarter:"Q4 2026",date:"Est. Oct – Nov 2026",
+   details:["ExperienceManager becomes per-player component — no longer a singleton","Each player has own XP, level, STR/AGI/INT","Hub placeholder: a dedicated scene players return to after each run","LobbyPlayer carries class choice into game — stats scale by class","Shared kill XP distributed equally between players in range"],
+   note:"The hub doesn't need to be beautiful — it needs to exist."},
+
+  {version:"V0.5",title:"Class Stats + Skill Tree",status:"planned",quarter:"Q4 2026",date:"Est. December 2026",
+   details:["Warrior: +STR base, starts near melee/toughness nodes","Mage: +INT base, starts near spell/power nodes","Rogue: +AGI base, starts near speed/crit nodes","All nodes accessible to all classes — costs more points the further from start","First skill tree pass: 30–40 nodes, 3 regions","Skill points awarded on level-up — spent in hub between runs"],
+   note:"No nodes are locked. Class identity comes from where you start, not where you're forbidden to go."},
+
+  {version:"V0.55",title:"Spell Library Expansion",status:"planned",quarter:"Q1 2027",date:"Est. Jan – Feb 2027",
+   details:["Ice Shard — slow cast projectile, applies Slow status effect via StatusEffectHandler","Chain Lightning — Channel type, fires and bounces between nearby enemies","Heal — Buff type, restores HP to caster or lowest-HP nearby ally","Spell tiers: each spell gains a Tier 2 variant requiring higher INT","Buff type fully implemented: duration tracking, active buff UI indicator","StatusEffectHandler extended: Slow and Chill effects wired to ice spells"],
+   note:"The V0.06 system provides the framework — this version fills it with content."},
+
+  {version:"V0.6",title:"Dungeon Loop & Boss",status:"planned",quarter:"Q1 2027",date:"Est. Jan – Mar 2027",
+   details:["Room system: enter room, clear all enemies, door unlocks, next room","WaveManager replaced by RoomManager — rooms have spawn lists, not timed waves","Multiple dungeon floors (3–5 rooms per floor, 2–3 floors per run)","Mini-boss mid-dungeon, boss room at the end","Two dungeon tiers: normal and hard — harder enemies, better rewards","Complete loop: Hub, Dungeon, Boss, Loot, Hub, Upgrade, Repeat"],
+   note:"Largest milestone before V1.0. The WaveManager architectural shift is significant — plan a full dedicated session for it."},
+
+  {version:"V0.65",title:"World Dressing",status:"planned",quarter:"Q1 2027",date:"Est. Feb – Mar 2027",
+   details:["Swap placeholder cubes and flat terrain for detailed terrain, rocks, trees, and dungeon props","Dungeon: stone walls, torches, rubble — consistent visual identity per biome","Hub: environment dressing around the forge, vendor, and dungeon entrance","Final NavMesh bake once all static geometry is placed","Lighting pass per scene: ambient, point lights on props, fog settings"],
+   note:"Blockout first, dress last. This pass happens after V0.6 confirms the dungeon layout and room structure."},
+
+  {version:"V0.75",title:"Audio Pass",status:"planned",quarter:"Q2 2027",date:"Est. Mar – Apr 2027",
+   details:["Player SFX: footsteps, jump, melee swing, melee hit, spell cast, dodge, death","Enemy SFX: alert, attack, hit, death — per enemy type","UI SFX: button click, level up, item equip, inventory open/close","Ambient: dungeon drip and rumble loop, hub outdoor ambience","Music: hub theme (calm), dungeon theme (tense), boss theme (high energy)","Final mix pass: volume balance across all categories — sliders in settings"],
+   note:"A rough audio pass during earlier development makes playtesting feel real. This final pass balances, replaces placeholders, and adds music."},
+
+  {version:"V1.0",title:"First Playable Release",status:"target",quarter:"Q2 2027",date:"Target: Q2 2027",
+   details:["Hub, Lobby, Dungeon, Boss, Return, Upgrade, Repeat — all polished","2–4 player co-op fully functional end-to-end","All three classes feel distinct from their skill tree starting positions","2 dungeon tiers with meaningful difficulty difference","Session length: 20–40 minutes per run","Shareable build for friends and external playtesters"],
+   note:"The 1-year target. A complete, fun, shareable co-op experience. Not a final product — but a real game."},
+
+  {version:"V1.1",title:"Save System",status:"future",quarter:"Q3 2027",date:"Est. Jul – Aug 2027",
+   details:["Local save file per player: name, class, XP, level, stats, gear, skill tree","Save on hub return after each run","Character persists between lobby sessions — pick up where you left off"],
+   note:"Built after V1.0 so the data structure is stable."},
+
+  {version:"V1.2",title:"Character Select",status:"future",quarter:"Q3 2027",date:"Est. September 2027",
+   details:["Create, load, and delete character slots","Character preview: name, class, level, equipped gear","Character select screen between Lobby and Game"],
+   note:null},
+
+  {version:"V1.3",title:"Dungeon Expansion",status:"future",quarter:"Q4 2027",date:"Est. Oct – Nov 2027",
+   details:["Procedural dungeon generation — rooms assembled from a pool each run","Dungeon tier 3 and 4 — harder enemies, unique modifiers, better loot","New room types: trap rooms, puzzle rooms, elite rooms","A second dungeon biome with a distinct visual theme"],
+   note:"The difference between a dungeon you run once and one you run fifty times."},
+
+  {version:"V1.4",title:"Hub World Design",status:"future",quarter:"Q4 2027",date:"Est. December 2027",
+   details:["Replace placeholder hub with intentional visual design","Blacksmith NPC: craft and upgrade gear using dungeon materials","Vendor NPC: buy consumables, sell loot","Terrain pass: hub and dungeon entrance feel connected and atmospheric"],
+   note:null},
+
+  {version:"V1.5",title:"Skill Tree Expansion",status:"future",quarter:"Q1 2028",date:"Est. Jan – Mar 2028",
+   details:["Expand skill tree to 80–100 nodes","One or two new classes with distinct start positions on the tree","Respec system — reset and rebuild your tree between runs"],
+   note:null},
+
+  {version:"V2.0",title:"Full Content Wave",status:"future",quarter:"Q2 2028",date:"Est. Q2 2028",
+   details:["Dungeon biome 3 with unique enemy types and visual identity","2 new boss fights with distinct mechanics","Dungeon modifier system — community daily challenge","Endgame dungeon tier for players at level cap","Balance pass across all classes and gear"],
+   note:null},
+];
+
+const BADGE_CLASS = {completed:"badge-completed",active:"badge-active",planned:"badge-planned",target:"badge-target",future:"badge-future"};
+const BADGE_LABEL = {completed:"Completed",active:"In Progress",planned:"Planned",target:"V1.0 Target",future:"Post-V1.0"};
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  LAYOUT CONSTANTS
+// ─────────────────────────────────────────────────────────────────────────────
+const TL_QUARTERS = [
+  "Q1 2026","Q2 2026","Q3 2026","Q4 2026",
+  "Q1 2027","Q2 2027","Q3 2027","Q4 2027",
+  "Q1 2028","Q2 2028"
+];
+const TL_QW  = 340;   // px per quarter
+const TL_LP  = 160;   // left pad  — idea endpoint
+const TL_RP  = 160;   // right pad — launch endpoint
+const TL_H   = 520;   // total height
+const TL_RY  = 260;   // rail y
+const TL_AY  = 92;    // above-node y
+const TL_BY  = 428;   // below-node y
+const TL_TOT = TL_LP + TL_QUARTERS.length * TL_QW + TL_RP;
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  RENDER
+// ─────────────────────────────────────────────────────────────────────────────
+function render() {
+  const inner = document.getElementById("tlInner");
+  inner.style.width  = TL_TOT + "px";
+  inner.style.height = TL_H   + "px";
+
+  // ── group by quarter ──
+  const byQ = {};
+  TL_QUARTERS.forEach(q => byQ[q] = []);
+  VERSIONS.forEach(v => { if (byQ[v.quarter]) byQ[v.quarter].push(v); });
+
+  // ── assign x / y alternating above-below ──
+  const pos = {};
+  let alt = 0;
+  TL_QUARTERS.forEach(q => {
+    const arr = byQ[q];
+    const n   = arr.length;
+    const cx  = TL_LP + TL_QUARTERS.indexOf(q) * TL_QW + TL_QW / 2;
+    arr.forEach((v, i) => {
+      const spread = n === 1 ? 0 : ((i / (n - 1)) - 0.5) * Math.min(TL_QW * 0.72, n * 60);
+      pos[v.version] = { x: cx + spread, y: alt % 2 === 0 ? TL_AY : TL_BY, above: alt % 2 === 0 };
+      alt++;
+    });
+  });
+
+  // ── furthest active/completed x for fill ──
+  let fillX = TL_LP;
+  VERSIONS.forEach(v => {
+    if ((v.status === "completed" || v.status === "active") && pos[v.version])
+      fillX = Math.max(fillX, pos[v.version].x);
+  });
+
+  let html = "";
+
+  // ── quarter dividers + labels ──
+  TL_QUARTERS.forEach((q, qi) => {
+    const x     = TL_LP + qi * TL_QW;
+    const label = q.replace("2026","'26").replace("2027","'27").replace("2028","'28");
+    if (qi > 0)
+      html += `<div class="tl-q-divider" style="left:${x}px;height:${TL_H}px;"></div>`;
+    html += `<div class="tl-q-label" style="left:${x + TL_QW / 2}px;top:${TL_RY - 30}px;">${label}</div>`;
+  });
+
+  // ── rail background ──
+  const railL = TL_LP, railW = TL_TOT - TL_LP - TL_RP;
+  html += `<div class="tl-rail-bg" style="left:${railL}px;top:${TL_RY - 1}px;width:${railW}px;height:4px;"></div>`;
+
+  // ── rail fill (progress) ──
+  if (fillX > TL_LP)
+    html += `<div class="tl-rail-fill" style="left:${railL}px;top:${TL_RY - 1}px;width:${fillX - railL}px;height:4px;"></div>`;
+
+  // ── active position dot on rail ──
+  const activeV = VERSIONS.find(v => v.status === "active");
+  if (activeV && pos[activeV.version])
+    html += `<div class="tl-rail-dot" style="left:${pos[activeV.version].x}px;top:${TL_RY + 1}px;"></div>`;
+
+  // ── idea endpoint ──
+  html += `
+    <div class="tl-endpoint" style="left:${TL_LP - 72}px;top:${TL_RY}px;">
+      <div class="tl-ep-dot epd-idea"><span class="tl-ep-inner ei-idea">?</span></div>
+      <div class="tl-ep-label epl-idea">Idea<br>Q1 '26</div>
+    </div>`;
+
+  // ── launch endpoint ──
+  html += `
+    <div class="tl-endpoint" style="left:${TL_TOT - TL_RP + 72}px;top:${TL_RY}px;">
+      <div class="tl-ep-dot epd-launch"><span class="tl-ep-inner ei-launch">V2</span></div>
+      <div class="tl-ep-label epl-launch">Launch<br>Q2 '28</div>
+    </div>`;
+
+  // ── stems, nodes, labels ──
+  VERSIONS.forEach((v, vi) => {
+    const p = pos[v.version];
+    if (!p) return;
+
+    const isBig   = v.status === "target" || v.version === "V2.0";
+    const sz      = isBig ? 26 : 18;
+    const stemCls = v.status === "completed" ? "tl-stem ts-done"
+                  : v.status === "active"    ? "tl-stem ts-active"
+                  :                            "tl-stem ts-plain";
+
+    // stem
+    const stemTop = p.above ? p.y      : TL_RY + 2;
+    const stemH   = p.above ? TL_RY - 2 - p.y : p.y - TL_RY - 2;
+    html += `<div class="${stemCls}" style="left:${p.x}px;top:${stemTop}px;height:${Math.max(0, stemH)}px;"></div>`;
+
+    // node
+    html += `<div class="tl-node tn-${v.status}" style="left:${p.x}px;top:${p.y}px;width:${sz}px;height:${sz}px;" onclick="openModal(${vi})" title="${v.version} — ${v.title}"></div>`;
+
+    // label
+    const labelTop = p.above ? p.y - sz / 2 - 40 : p.y + sz / 2 + 8;
+    html += `<div class="tl-nlabel" style="left:${p.x}px;top:${labelTop}px;">
+      <div class="tnl-ver">${v.version}</div>
+      <div class="tnl-title">${v.title}</div>
+    </div>`;
+  });
+
+  inner.innerHTML = html;
+
+  // ── header status pill ──
+  if (activeV) {
+    document.getElementById("currentStatus").textContent =
+      activeV.version + " — " + activeV.title + " — In Progress";
+  }
+
+  // ── auto-scroll to active ──
+  requestAnimationFrame(() => {
+    if (activeV && pos[activeV.version]) {
+      const sc = document.getElementById("tlScroll");
+      sc.scrollLeft = Math.max(0, pos[activeV.version].x - sc.clientWidth / 2);
+    }
+  });
+
+  initDrag();
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  DRAG TO SCROLL
+// ─────────────────────────────────────────────────────────────────────────────
+function initDrag() {
+  const el = document.getElementById("tlScroll");
+  if (!el) return;
+  let down = false, sx = 0, sl = 0;
+  el.addEventListener("mousedown", e => {
+    down = true; sx = e.pageX - el.offsetLeft; sl = el.scrollLeft;
+    el.classList.add("tl-dragging");
+  });
+  window.addEventListener("mouseup",  () => { down = false; el.classList.remove("tl-dragging"); });
+  el.addEventListener("mouseleave",   () => { down = false; el.classList.remove("tl-dragging"); });
+  el.addEventListener("mousemove", e => {
+    if (!down) return;
+    e.preventDefault();
+    el.scrollLeft = sl - (e.pageX - el.offsetLeft - sx) * 1.4;
+  });
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  MODAL
+// ─────────────────────────────────────────────────────────────────────────────
+function openModal(i) {
+  const v = VERSIONS[i];
+  document.getElementById("mVersion").textContent = v.version;
+  document.getElementById("mTitle").textContent   = v.title;
+  document.getElementById("mDate").textContent    = v.date;
+  const badge = document.getElementById("mBadge");
+  badge.className   = "status-badge " + BADGE_CLASS[v.status];
+  badge.textContent = BADGE_LABEL[v.status];
+  const details = v.details.map(d => `<li>${d}</li>`).join("");
+  const note    = v.note ? `<div class="modal-note">${v.note}</div>` : "";
+  document.getElementById("mBody").innerHTML = `
+    <div class="modal-section-title">What's in this version</div>
+    <ul class="modal-list">${details}</ul>${note}`;
+  document.getElementById("modalOverlay").classList.add("open");
+}
+
+function closeModal(e) {
+  if (e.target === document.getElementById("modalOverlay"))
+    document.getElementById("modalOverlay").classList.remove("open");
+}
+
+function closeModalDirect() {
+  document.getElementById("modalOverlay").classList.remove("open");
+}
+
+document.addEventListener("keydown", e => {
+  if (e.key === "Escape") document.getElementById("modalOverlay").classList.remove("open");
+});
+
+render();
+</script>
+</body>
+</html>

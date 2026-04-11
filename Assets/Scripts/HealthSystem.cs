@@ -10,7 +10,7 @@ public class HealthSystem : MonoBehaviour
     public int currentHealth;
 
     [Tooltip("Base HP restored per second (server-side only). Stacks with equipment regen.")]
-    [SerializeField] private float regenPerSecond = 0f;
+    [SerializeField] private float regenPerSecond = 1f;
 
     // ─── UI ───────────────────────────────────────────────────────────────────
     [Header("UI (optional — leave blank for enemies)")]
@@ -70,6 +70,9 @@ public class HealthSystem : MonoBehaviour
     public float TotalRegenPerSecond =>
         regenPerSecond + (_inventory != null ? _inventory.TotalBonusRegen : 0f);
 
+    /// <summary>Base regen only (no equipment). Used by CharacterWindow to split base vs bonus display.</summary>
+    public float RegenPerSecond => regenPerSecond;
+
     public void TakeDamage(int amount, bool isCrit = false)
     {
         if (_isDead) return;
@@ -78,7 +81,8 @@ public class HealthSystem : MonoBehaviour
         currentHealth = Mathf.Clamp(currentHealth, 0, maxHealth);
         UpdateHealthUI();
 
-        Debug.Log(gameObject.name + " took " + amount + " damage! HP: " + currentHealth + "/" + maxHealth);
+        DebugLogger.Log(DebugLogger.Category.Damage,
+            $"{gameObject.name} took {amount} damage — HP: {currentHealth}/{maxHealth}");
 
         // ── Hit Sound ─────────────────────────────────────────────────────────
         if (audioSource != null && hitSound != null)
@@ -95,7 +99,12 @@ public class HealthSystem : MonoBehaviour
             Die();
     }
 
-    public void Heal(int amount)
+    /// <param name="suppressPopup">
+    /// When true, the heal popup is suppressed on this machine.
+    /// Use this from server-authoritative callers (e.g. HealingWave) that send a
+    /// targeted ClientRpc to show the popup on the correct client instead.
+    /// </param>
+    public void Heal(int amount, bool suppressPopup = false)
     {
         int before = currentHealth;
         currentHealth += amount;
@@ -110,9 +119,11 @@ public class HealthSystem : MonoBehaviour
 
         UpdateHealthUI();
 
-        Debug.Log(gameObject.name + " healed " + gained + " HP! HP: " + currentHealth + "/" + maxHealth);
+        if (gained > 0)
+            DebugLogger.Log(DebugLogger.Category.Heal,
+                $"{gameObject.name} healed +{gained} — HP: {currentHealth}/{maxHealth}");
 
-        if (gained > 0 && DamagePopupManager.Instance != null)
+        if (gained > 0 && !suppressPopup && DamagePopupManager.Instance != null)
             DamagePopupManager.Instance.ShowHeal(transform.position, gained);
     }
 

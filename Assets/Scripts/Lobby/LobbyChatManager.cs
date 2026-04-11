@@ -53,9 +53,12 @@ public class LobbyChatManager : NetworkBehaviour
         if (sendButton != null)
             sendButton.onClick.AddListener(OnSendClicked);
 
-        // Allow pressing Enter to send
+        // Allow pressing Enter to send; hard cap at 50 chars
         if (chatInput != null)
+        {
+            chatInput.characterLimit = 50;
             chatInput.onSubmit.AddListener(_ => OnSendClicked());
+        }
     }
 
     void OnDestroy()
@@ -75,10 +78,7 @@ public class LobbyChatManager : NetworkBehaviour
         chatInput.text = string.Empty;
         chatInput.ActivateInputField();
 
-        // Clamp to FixedString128 safe length
-        if (message.Length > 120) message = message[..120];
-
-        string senderName = GetLocalPlayerName();
+string senderName = GetLocalPlayerName();
 
         bool networkActive = NetworkManager.Singleton != null && NetworkManager.Singleton.IsListening;
 

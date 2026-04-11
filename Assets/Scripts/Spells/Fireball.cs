@@ -48,6 +48,17 @@ public class Fireball : NetworkBehaviour
     [Tooltip("Uniform scale applied on spawn.")]
     public float projectileScale = 1f;
 
+    // ─── Audio ────────────────────────────────────────────────────────────────
+
+    [Header("Audio")]
+    [Tooltip("Played on all clients when the fireball launches (3D positional).")]
+    [SerializeField] private AudioClip launchSound;
+
+    [Tooltip("Played on all clients at the impact point when the fireball explodes.")]
+    [SerializeField] private AudioClip hitSound;
+
+    private AudioSource _audio;
+
     // ─── Runtime (set by SpellCaster before Spawn) ────────────────────────────
 
     /// <summary>
@@ -65,6 +76,17 @@ public class Fireball : NetworkBehaviour
     void Start()
     {
         transform.localScale = Vector3.one * projectileScale;
+
+        _audio = GetComponent<AudioSource>();
+        if (_audio == null)
+        {
+            _audio              = gameObject.AddComponent<AudioSource>();
+            _audio.playOnAwake  = false;
+            _audio.spatialBlend = 1f;
+        }
+
+        if (launchSound != null)
+            _audio.PlayOneShot(launchSound);
 
         // Solo / offline: manage own lifetime here.
         // Networked lifetime is handled in OnNetworkSpawn on the server.
@@ -130,7 +152,20 @@ public class Fireball : NetworkBehaviour
         }
 
         SpawnHitEffect(origin);
+
+        if (networked)
+            PlayHitSoundRpc(origin);
+        else if (hitSound != null)
+            AudioSource.PlayClipAtPoint(hitSound, origin);
+
         DespawnOrDestroy();
+    }
+
+    [Rpc(SendTo.ClientsAndHost)]
+    void PlayHitSoundRpc(Vector3 pos)
+    {
+        if (hitSound != null)
+            AudioSource.PlayClipAtPoint(hitSound, pos);
     }
 
     void SpawnHitEffect(Vector3 pos)
