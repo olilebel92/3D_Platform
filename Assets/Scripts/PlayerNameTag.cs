@@ -1,3 +1,4 @@
+using System.Collections;
 using UnityEngine;
 using Unity.Netcode;
 using Unity.Collections;
@@ -59,22 +60,35 @@ public class PlayerNameTag : NetworkBehaviour
 
     public override void OnNetworkSpawn()
     {
-        _lobbyPlayer = FindLobbyPlayer(OwnerClientId);
-
-        if (_lobbyPlayer != null)
-        {
-            SetLabelText(_lobbyPlayer.PlayerName.Value.ToString());
-            _lobbyPlayer.PlayerName.OnValueChanged += OnNameChanged;
-        }
-        else
-        {
-            // LobbyPlayer not found — use a generic placeholder.
-            SetLabelText("Player " + (OwnerClientId + 1));
-            Debug.LogWarning($"[PlayerNameTag] No LobbyPlayer found for client {OwnerClientId}.");
-        }
+        // Default to "Player" immediately; will be overridden if a LobbyPlayer is found.
+        SetLabelText("Player");
 
         if (hideForLocalOwner && IsOwner)
             _label.gameObject.SetActive(false);
+
+        // Try to bind the LobbyPlayer now; if it hasn't spawned yet, retry each frame.
+        StartCoroutine(BindLobbyPlayerCoroutine());
+    }
+
+    // Retries each frame until LobbyPlayer is found or networking stops.
+    IEnumerator BindLobbyPlayerCoroutine()
+    {
+        // Give up after 5 seconds — no lobby in solo play.
+        float timeout = 5f;
+        float elapsed = 0f;
+
+        while (_lobbyPlayer == null && elapsed < timeout)
+        {
+            _lobbyPlayer = FindLobbyPlayer(OwnerClientId);
+            if (_lobbyPlayer != null)
+            {
+                SetLabelText(_lobbyPlayer.PlayerName.Value.ToString());
+                _lobbyPlayer.PlayerName.OnValueChanged += OnNameChanged;
+                yield break;
+            }
+            elapsed += Time.deltaTime;
+            yield return null;
+        }
     }
 
     public override void OnNetworkDespawn()
@@ -121,7 +135,7 @@ public class PlayerNameTag : NetworkBehaviour
         _label.color     = nameColor;
         _label.alignment = TextAlignmentOptions.Center;
         _label.fontStyle = FontStyles.Bold;
-        _label.text      = "";
+        _label.text      = "Player";
 
         // Render on top of geometry so the name is always readable.
         _label.GetComponent<MeshRenderer>().sortingOrder = 1;

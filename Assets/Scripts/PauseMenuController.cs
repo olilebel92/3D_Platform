@@ -22,8 +22,9 @@ public class PauseMenuController : MonoBehaviour
     // ─── State ────────────────────────────────────────────────────────────────
 
     private bool _isPaused = false;
-    private InventoryUI     _inventoryUI;
-    private CharacterWindow _characterWindow;
+    private InventoryUI      _inventoryUI;
+    private CharacterWindow  _characterWindow;
+    private SkillTreeManager _skillTreeManager;
 
     // ─── Unity ────────────────────────────────────────────────────────────────
 
@@ -32,16 +33,18 @@ public class PauseMenuController : MonoBehaviour
         if (pauseMenuPanel != null)
             pauseMenuPanel.SetActive(false);
 
-        _inventoryUI     = FindFirstObjectByType<InventoryUI>();
-        _characterWindow = FindFirstObjectByType<CharacterWindow>();
+        _inventoryUI      = FindFirstObjectByType<InventoryUI>();
+        _characterWindow  = FindFirstObjectByType<CharacterWindow>();
+        _skillTreeManager = FindFirstObjectByType<SkillTreeManager>();
     }
 
     private void Update()
     {
-        // Circle / B closes panels only — never opens the pause menu
+        // Circle / B or Start closes panels; ESC or Start also toggles pause
         bool closePressed =
             (Keyboard.current != null && Keyboard.current.escapeKey.wasPressedThisFrame) ||
-            (Gamepad.current  != null && Gamepad.current.buttonEast.wasPressedThisFrame);
+            (Gamepad.current  != null && Gamepad.current.buttonEast.wasPressedThisFrame)  ||
+            (Gamepad.current  != null && Gamepad.current.startButton.wasPressedThisFrame);
 
         // ESC / Start can also open the pause menu when no panels are open
         bool pausePressed =
@@ -62,6 +65,12 @@ public class PauseMenuController : MonoBehaviour
             if (_characterWindow != null && _characterWindow.IsOpen)
             {
                 _characterWindow.CloseWindow();
+                return;
+            }
+
+            if (_skillTreeManager != null && _skillTreeManager.IsOpen)
+            {
+                _skillTreeManager.CloseWindow();
                 return;
             }
         }

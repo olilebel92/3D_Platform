@@ -98,9 +98,16 @@ public class Fireball : NetworkBehaviour
 
     public override void OnNetworkSpawn()
     {
-        // Server sets the self-destruct timer so all clients despawn together.
         if (IsServer)
+        {
+            // Ensure SpellCaster set precomputedDamage before Spawn — server-side
+            // singletons (ExperienceManager, SkillTreeManager) are not valid here.
+            Debug.Assert(precomputedDamage > 0f,
+                "[Fireball] precomputedDamage not set before Spawn. " +
+                "Ensure SpellCaster assigns it before calling NetworkObject.Spawn().");
+
             Invoke(nameof(SelfDestruct), lifetime);
+        }
     }
 
     // ─── Movement ─────────────────────────────────────────────────────────────
@@ -204,16 +211,14 @@ public class Fireball : NetworkBehaviour
 
     float ComputeRawDamage()
     {
-        float spellBonus = SkillTreeManager.Instance != null
-            ? SkillTreeManager.Instance.TotalSpellDamageBonus : 0f;
-
-        float fireBonus = SkillTreeManager.Instance != null
-            ? SkillTreeManager.Instance.TotalFireDamageBonus : 0f;
+        float spellBonus   = SkillTreeManager.Instance != null ? SkillTreeManager.Instance.TotalSpellDamageBonus   : 0f;
+        float fireBonus    = SkillTreeManager.Instance != null ? SkillTreeManager.Instance.TotalFireDamageBonus    : 0f;
+        float firePctBonus = SkillTreeManager.Instance != null ? SkillTreeManager.Instance.TotalFireDamagePctBonus : 0f;
 
         float intMultiplier = ExperienceManager.Instance != null
             ? ExperienceManager.Instance.SpellDamageMultiplier : 1f;
 
-        return (baseDamage + spellBonus + fireBonus) * intMultiplier;
+        return (baseDamage + spellBonus + fireBonus) * intMultiplier * (1f + firePctBonus);
     }
 
     float ComputeFalloffDamage(float rawDamage, float dist)

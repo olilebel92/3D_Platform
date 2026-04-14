@@ -53,7 +53,12 @@ public class SpellSlot : MonoBehaviour,
         SlotIndex = index;
 
         if (slotNumberText != null)
-            slotNumberText.text = (index + 1).ToString();
+            slotNumberText.text = index switch
+            {
+                0 => "(1) / (R1)",
+                1 => "(2) / (L1)",
+                _ => (index + 1).ToString()
+            };
 
         SetHighlight(false);
         RefreshIcon();

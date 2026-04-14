@@ -7,7 +7,7 @@ using UnityEngine;
 public enum EquipmentSlot { Boots, Helm, Pants, Chest }
 
 /// <summary>Item rarity tier — controls stat count, values, and UI colour.</summary>
-public enum ItemRarity { Normal, Uncommon, Rare, Epic, Legendary }
+public enum ItemRarity { Normal, Uncommon, Rare, Epic, Legendary, Godly }
 
 /// <summary>All stat types a generated item can roll.</summary>
 public enum StatType
@@ -20,6 +20,9 @@ public enum StatType
     AllStats,        // adds to STR, AGI, and INT simultaneously (Rare+ only)
     CritRate,    // stored as whole percentage points  (5 → +5 % crit rate)
     CritDamage,  // stored as whole percentage points  (25 → +25 % crit dmg)
+    FireDamage,  // flat bonus fire damage added to fire spells
+    MovementSpeed, // stored as whole percentage points  (20 → +20 % move speed)
+    SpellPower,  // flat bonus added to all spell damage
 }
 
 // ─── Stat Line ────────────────────────────────────────────────────────────────
@@ -68,7 +71,13 @@ public class ItemData : ScriptableObject
     /// <summary>Crit rate bonus as a 0-1 fraction (e.g. 0.05 = +5%).</summary>
     public float BonusCritRate   => GetFloat(StatType.CritRate)   / 100f;
     /// <summary>Crit damage bonus as a 0-1 fraction (e.g. 0.25 = +25%).</summary>
-    public float BonusCritDamage => GetFloat(StatType.CritDamage) / 100f;
+    public float BonusCritDamage   => GetFloat(StatType.CritDamage)   / 100f;
+    /// <summary>Flat fire damage bonus added to fire spells.</summary>
+    public float BonusFireDamage   => GetFloat(StatType.FireDamage);
+    /// <summary>Movement speed bonus as a 0-1 fraction (e.g. 0.20 = +20%).</summary>
+    public float BonusMovementSpeed => GetFloat(StatType.MovementSpeed) / 100f;
+    /// <summary>Flat spell power bonus added to all spell damage.</summary>
+    public float BonusSpellPower   => GetFloat(StatType.SpellPower);
 
     // ─── Rarity Colours ───────────────────────────────────────────────────────
 
@@ -79,6 +88,7 @@ public class ItemData : ScriptableObject
         ItemRarity.Rare      => new Color(0.00f, 0.44f, 0.87f),   // Blue
         ItemRarity.Epic      => new Color(0.64f, 0.21f, 0.93f),   // Purple
         ItemRarity.Legendary => new Color(1.00f, 0.50f, 0.00f),   // Orange
+        ItemRarity.Godly     => new Color(1.00f, 0.10f, 0.10f),   // Red
         _                    => Color.white,                        // Normal = White
     };
 
@@ -89,6 +99,7 @@ public class ItemData : ScriptableObject
         ItemRarity.Rare      => "0070DD",
         ItemRarity.Epic      => "A335EE",
         ItemRarity.Legendary => "FF8000",
+        ItemRarity.Godly     => "FF1A1A",
         _                    => "FFFFFF",
     };
 
@@ -108,7 +119,9 @@ public class ItemData : ScriptableObject
         var sb = new System.Text.StringBuilder();
         foreach (var line in statLines)
         {
-            bool isPercent  = line.type == StatType.CritRate || line.type == StatType.CritDamage;
+            bool isPercent  = line.type == StatType.CritRate
+                           || line.type == StatType.CritDamage
+                           || line.type == StatType.MovementSpeed;
             bool isDecimal  = line.type == StatType.RegenPerSecond;
             string label = line.type switch
             {
@@ -118,9 +131,12 @@ public class ItemData : ScriptableObject
                 StatType.FlatHP     => "HP",
                 StatType.RegenPerSecond => "HP Regen/s",
                 StatType.AllStats       => "All Stats",
-                StatType.CritRate   => "Crit Rate",
-                StatType.CritDamage => "Crit Damage",
-                _                   => line.type.ToString(),
+                StatType.CritRate     => "Crit Rate",
+                StatType.CritDamage   => "Crit Damage",
+                StatType.FireDamage   => "Fire Damage",
+                StatType.MovementSpeed => "Movement Speed",
+                StatType.SpellPower   => "Spell Power",
+                _                     => line.type.ToString(),
             };
             string valStr = isPercent ? $"+{line.value:F0}%" : isDecimal ? $"+{line.value:F1}" : $"+{line.value:F0}";
             sb.AppendLine($"{valStr} {label}");

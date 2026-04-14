@@ -39,6 +39,9 @@ public class SkillNodeUI : MonoBehaviour,
     [Tooltip("(Optional) TMP label showing the node's cost.")]
     public TextMeshProUGUI costLabel;
 
+    [Tooltip("(Optional) TMP label showing current level (e.g. '2/3').")]
+    public TextMeshProUGUI levelLabel;
+
     [Header("State Colors")]
     public Color colorLearned   = new Color(1f,   0.84f, 0f,   1f); // gold
     public Color colorAvailable = new Color(1f,   1f,    1f,   1f); // white
@@ -92,26 +95,34 @@ public class SkillNodeUI : MonoBehaviour,
 
         bool learned   = SkillTreeManager.Instance.IsLearned(node);
         bool available = SkillTreeManager.Instance.CanLearn(node);
+        int  lvl       = SkillTreeManager.Instance.GetNodeLevel(node);
+        bool maxed     = lvl >= node.maxLevel;
 
-        // Icon
+        // Icon — fall back to the unlocked spell's icon if the node has no icon of its own
         if (iconImage != null)
         {
-            iconImage.sprite = node.icon;
+            iconImage.sprite = node.icon != null ? node.icon
+                             : node.unlocksSpell  != null ? node.unlocksSpell.icon
+                             : null;
             iconImage.color  = learned || available ? Color.white : colorLocked;
         }
 
-        // Border tint
+        // Border tint — maxed nodes keep gold
         if (borderImage != null)
-            borderImage.color = learned ? colorLearned
+            borderImage.color = maxed     ? colorLearned
                               : available ? colorAvailable
                               : colorLocked;
 
         // Overlays
-        if (learnedOverlay != null) learnedOverlay.SetActive(learned);
+        if (learnedOverlay != null) learnedOverlay.SetActive(maxed);
         if (lockedOverlay  != null) lockedOverlay.SetActive(!learned && !available);
 
-        // Cost label
+        // Cost label — hide when maxed
         if (costLabel != null)
-            costLabel.text = learned ? "" : $"{node.cost} pt";
+            costLabel.text = maxed ? "" : $"{node.cost} pt";
+
+        // Level label — only show for multi-level nodes
+        if (levelLabel != null)
+            levelLabel.text = node.maxLevel > 1 ? $"{lvl}/{node.maxLevel}" : "";
     }
 }

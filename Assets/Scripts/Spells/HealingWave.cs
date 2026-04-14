@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEngine;
 using Unity.Netcode;
 
@@ -102,12 +103,15 @@ public class HealingWave : NetworkBehaviour
 
         // Physics.OverlapSphere cannot be used here: CharacterController (the player's
         // collider) is disabled on non-owner instances on the server, so remote players
-        // are invisible to physics queries. Iterate by tag + distance instead.
+        // are invisible to physics queries. Iterate by cached registry + distance instead.
+        //
+        // PlayerController.All is populated in Start() and cleared in OnDestroy() —
+        // no allocation per tick unlike FindGameObjectsWithTag.
         //
         // The caster is ALWAYS healed regardless of distance: OwnerNetworkTransform is
         // client-authoritative, so the server's copy of the caster's position can lag
         // behind the firePos sent in the RPC, causing a false distance mismatch.
-        GameObject[] players = GameObject.FindGameObjectsWithTag("Player");
+        List<GameObject> players = PlayerController.All;
 
         int healedCount = 0;
         int totalHealed  = 0;

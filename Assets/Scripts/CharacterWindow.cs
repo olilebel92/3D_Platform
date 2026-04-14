@@ -139,6 +139,12 @@ public class CharacterWindow : MonoBehaviour
 
     // ─── Unity Lifecycle ──────────────────────────────────────────────────────
 
+    void Awake()
+    {
+        if (windowRoot != null)
+            windowRoot.SetActive(false);
+    }
+
     void Start()
     {
         // Auto-find player components if not assigned
@@ -186,9 +192,6 @@ public class CharacterWindow : MonoBehaviour
         if (btnSpendCritDamage != null) { btnSpendCritDamage.onClick.AddListener(OnSpendCritDamage); btnSpendCritDamage.navigation = noNav; }
 
         _inventoryUI = FindFirstObjectByType<InventoryUI>();
-
-        if (windowRoot != null)
-            windowRoot.SetActive(false);
     }
 
     void Update()
@@ -211,13 +214,17 @@ public class CharacterWindow : MonoBehaviour
 
     private void ToggleWindow()
     {
-        // Block opening while a popup or tutorial is showing
-        if (!_isOpen && PopupManager.IsShowing) return;
+        // Dismiss any active tutorial popup when opening a panel
+        if (!_isOpen && PopupManager.IsShowing)
+            PopupManager.Instance.Hide();
 
         _isOpen = !_isOpen;
 
         if (_isOpen && SkillTreeManager.Instance != null)
             SkillTreeManager.Instance.CloseWindow();
+
+        if (_isOpen && _inventoryUI != null)
+            _inventoryUI.CloseInventory();
 
 
         if (windowRoot != null)
@@ -423,12 +430,19 @@ public class CharacterWindow : MonoBehaviour
         // ── Movement (PlayerController) ───────────────────────────────────────
         if (_playerController != null && xp != null)
         {
-            float computedMove   = xp.ComputedMoveSpeed(_baseMoveSpeed);
-            float computedSprint = xp.ComputedSprintSpeed(_baseSprintSpeed);
-            int movePct   = Mathf.RoundToInt(computedMove   / _baseMoveSpeed   * 100f);
-            int sprintPct = Mathf.RoundToInt(computedSprint / _baseSprintSpeed * 100f);
-            SetLabel(moveSpeedLabel,   "Move Speed",   $"{movePct}%");
-            SetLabel(sprintSpeedLabel, "Sprint Speed", $"{sprintPct}%");
+            float equipBonus   = PlayerInventory.Instance != null
+                ? PlayerInventory.Instance.TotalBonusMovementSpeed : 0f; // 0-1 fraction
+            int agiMovePct    = Mathf.RoundToInt(xp.ComputedMoveSpeed(_baseMoveSpeed)   / _baseMoveSpeed   * 100f);
+            int agiSprintPct  = Mathf.RoundToInt(xp.ComputedSprintSpeed(_baseSprintSpeed) / _baseSprintSpeed * 100f);
+            int equipBonusPct = Mathf.RoundToInt(equipBonus * 100f);
+            string moveStr   = equipBonusPct > 0
+                ? $"{agiMovePct + equipBonusPct}% <color=#C9A84C>(+{equipBonusPct}%)</color>"
+                : $"{agiMovePct}%";
+            string sprintStr = equipBonusPct > 0
+                ? $"{agiSprintPct + equipBonusPct}% <color=#C9A84C>(+{equipBonusPct}%)</color>"
+                : $"{agiSprintPct}%";
+            SetLabel(moveSpeedLabel,   "Move Speed",   moveStr);
+            SetLabel(sprintSpeedLabel, "Sprint Speed", sprintStr);
         }
 
     }

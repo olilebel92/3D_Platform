@@ -3,6 +3,20 @@ using UnityEngine;
 using TMPro;
 using Unity.Netcode;
 
+// ─── Wave Custom Reward Entry ─────────────────────────────────────────────────
+[System.Serializable]
+public class WaveRewardEntry
+{
+    [Tooltip("Wave number on which this reward is granted (checked after wave clear).")]
+    public int wave;
+
+    [Tooltip("Specific ItemData assets given to the player on this wave.")]
+    public ItemData[] items;
+
+    [Tooltip("When true the normal random item drop is skipped — only these items are given.")]
+    public bool replaceRandomReward = false;
+}
+
 // ─── Wave Enemy Definition ────────────────────────────────────────────────────
 [System.Serializable]
 public class WaveEnemyDefinition
@@ -77,6 +91,12 @@ public class WaveManager : NetworkBehaviour
     [Tooltip("When enabled, all players are fully healed at the end of each wave.")]
     public bool fullHealAfterWave = true;
 
+    // ─── Custom Wave Rewards ──────────────────────────────────────────────────
+    [Header("Custom Wave Rewards")]
+    [Tooltip("Specific items granted on set wave numbers. Drag any ItemData asset here and set the wave. " +
+             "Enable 'Replace Random Reward' to skip the normal random drop on that wave.")]
+    public WaveRewardEntry[] customRewards;
+
     // ─── Spawn Points ─────────────────────────────────────────────────────────
     [Header("Spawn Points")]
     [Tooltip("Enemies spawn at these positions. When empty, spawns in a ring around each player instead.")]
@@ -116,13 +136,29 @@ public class WaveManager : NetworkBehaviour
         // In solo (no NetworkManager), ShouldRunWaves() returns true.
         if (!ShouldRunWaves()) return;
 
-        GameObject playerObj = GameObject.FindGameObjectWithTag("Player");
-        if (playerObj != null)
-            playerTransform = playerObj.transform;
+        // playerTransform is set via RegisterPlayer() called from PlayerController.
+        // FindGameObjectWithTag is intentionally removed: players may not exist yet
+        // when WaveManager.Start() fires (spawn-order race in multiplayer).
+        if (PlayerController.All.Count > 0)
+            playerTransform = PlayerController.All[0].transform;
         else
-            Debug.LogWarning("[WaveManager] No Player found at Start — ring spawn will use spawner position.");
+            Debug.LogWarning("[WaveManager] No Player registered at Start — ring spawn will use spawner position until RegisterPlayer() is called.");
 
         StartCoroutine(RunWaves());
+    }
+
+    /// <summary>
+    /// Called by PlayerController.Start() so WaveManager always has a valid target
+    /// even when players spawn after WaveManager.Start() completes (common in MP).
+    /// The first registered player becomes the ring-spawn origin; subsequent calls
+    /// are stored for future multi-player ring distribution.
+    /// </summary>
+    public void RegisterPlayer(Transform t)
+    {
+        if (t == null) return;
+        if (playerTransform == null)
+            playerTransform = t;
+        Debug.Log($"[WaveManager] RegisterPlayer: {t.name} (playerTransform={playerTransform.name})");
     }
 
     // ─── Wave Loop ────────────────────────────────────────────────────────────
@@ -278,14 +314,48 @@ public class WaveManager : NetworkBehaviour
     }
 
     // ─── Wave Reward ──────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Grants rewards after a wave clears.
+    /// First checks for any custom entries matching this wave number, then
+    /// falls through to a random item drop unless the entry suppresses it.
+    /// </summary>
     void GrantWaveReward(int wave)
     {
+        // ── Find a matching custom reward entry ───────────────────────────────
+        int customIndex     = -1;
+        bool skipRandom     = false;
+        if (customRewards != null)
+        {
+            for (int i = 0; i < customRewards.Length; i++)
+            {
+                if (customRewards[i].wave == wave && customRewards[i].items != null
+                    && customRewards[i].items.Length > 0)
+                {
+                    customIndex = i;
+                    skipRandom  = customRewards[i].replaceRandomReward;
+                    break;
+                }
+            }
+        }
+
+        // ── Grant custom items ────────────────────────────────────────────────
+        if (customIndex >= 0)
+        {
+            if (!IsNetworkActive())
+                GrantCustomItemsSolo(customIndex);
+            else
+                GrantCustomItemsClientRpc(customIndex);
+        }
+
+        // ── Grant random item (skipped if the custom entry replaces it) ───────
+        if (skipRandom) return;
+
         if (!IsNetworkActive())
         {
-            // Solo: generate once and give it to every player directly.
             if (ItemGenerator.Instance == null)
             {
-                Debug.LogWarning("[WaveManager] ItemGenerator not found — no item reward given.");
+                Debug.LogWarning("[WaveManager] ItemGenerator not found — no random item reward given.");
                 return;
             }
             ItemData reward = ItemGenerator.Instance.GenerateItemForWave(wave);
@@ -299,8 +369,54 @@ public class WaveManager : NetworkBehaviour
         {
             // MP: ItemData is a ScriptableObject and cannot be sent over RPC directly.
             // Broadcast the wave number; each client rolls and applies its own item.
-            // Same rarity table, independent stat rolls — avoids needing an item-ID registry.
             GrantWaveItemClientRpc(wave);
+        }
+    }
+
+    /// <summary>Solo path — grants every item in the custom entry to all players.</summary>
+    void GrantCustomItemsSolo(int entryIndex)
+    {
+        WaveRewardEntry entry = customRewards[entryIndex];
+        foreach (ItemData item in entry.items)
+        {
+            if (item == null) continue;
+            foreach (GameObject p in GameObject.FindGameObjectsWithTag("Player"))
+            {
+                PlayerInventory inv = p.GetComponent<PlayerInventory>();
+                if (inv != null)
+                {
+                    inv.AddItem(item);
+                    Debug.Log($"[WaveManager] Wave {entry.wave} custom reward: {item.itemName}");
+                }
+            }
+        }
+    }
+
+    /// <summary>
+    /// MP path — sends the entry index so every client looks up the same
+    /// ScriptableObject assets from its local customRewards array.
+    /// </summary>
+    [ClientRpc]
+    private void GrantCustomItemsClientRpc(int entryIndex)
+    {
+        if (customRewards == null || entryIndex >= customRewards.Length) return;
+        WaveRewardEntry entry = customRewards[entryIndex];
+
+        foreach (GameObject p in GameObject.FindGameObjectsWithTag("Player"))
+        {
+            NetworkObject net = p.GetComponent<NetworkObject>();
+            if (net == null || !net.IsOwner) continue;
+
+            PlayerInventory inv = p.GetComponent<PlayerInventory>();
+            if (inv == null) return;
+
+            foreach (ItemData item in entry.items)
+            {
+                if (item == null) continue;
+                inv.AddItem(item);
+                Debug.Log($"[WaveManager] Wave {entry.wave} custom reward: {item.itemName}");
+            }
+            return;
         }
     }
 
@@ -317,7 +433,6 @@ public class WaveManager : NetworkBehaviour
             return;
         }
 
-        // Find the player owned by this client
         foreach (GameObject p in GameObject.FindGameObjectsWithTag("Player"))
         {
             NetworkObject net = p.GetComponent<NetworkObject>();
@@ -328,7 +443,7 @@ public class WaveManager : NetworkBehaviour
                 {
                     ItemData reward = ItemGenerator.Instance.GenerateItemForWave(wave);
                     inv.AddItem(reward);
-                    Debug.Log($"[WaveManager] Wave {wave} item reward granted: {reward.itemName}");
+                    Debug.Log($"[WaveManager] Wave {wave} random item reward granted: {reward.itemName}");
                 }
                 return;
             }

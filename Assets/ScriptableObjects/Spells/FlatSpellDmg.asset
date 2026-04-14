@@ -10,23 +10,20 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: c0b980580335b47449a56865ef1b9e07, type: 3}
-  m_Name: FireballNode
+  m_Name: FlatSpellDmg
   m_EditorClassIdentifier: Assembly-CSharp::SkillTreeNode
-  nodeName: Fireball
-  description: Your Fireball erupts on impact, scorching all enemies within the blast
-    radius. Base damage 5. Each rank amplifies all fire damage by 10%.
-  icon: {fileID: 21300000, guid: e5c0b87925d29e94ebca51fd98b06d37, type: 3}
-  cost: 2
+  nodeName: New Skill
+  description: Describe what this skill does.
+  icon: {fileID: 0}
+  cost: 1
   prerequisites: []
-  maxLevel: 5
+  maxLevel: 1
   scalingFactor: 1
   strBonus: 0
   agiBonus: 0
   intBonus: 0
   spellDamageBonus: 0
   fireDamageBonus: 0
-  healBonus: 0
-  spellDamagePctBonus: 0
-  fireDamagePctBonus: 0.1
-  healPctBonus: 0
-  unlocksSpell: {fileID: 11400000, guid: 4b1f89da9991a3f47853bd5be20165ff, type: 2}
+  spellDamagePctBonus: 0.05
+  fireDamagePctBonus: 0
+  unlocksSpell: {fileID: 0}

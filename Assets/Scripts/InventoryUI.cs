@@ -43,10 +43,14 @@ public class InventoryUI : MonoBehaviour
 
     // ─── Unity Lifecycle ──────────────────────────────────────────────────────
 
-    void Start()
+    void Awake()
     {
         if (inventoryPanel != null)
             inventoryPanel.SetActive(false);
+    }
+
+    void Start()
+    {
 
         _characterWindow = FindFirstObjectByType<CharacterWindow>();
 
@@ -101,10 +105,17 @@ public class InventoryUI : MonoBehaviour
 
     private void ToggleInventory()
     {
-        // Block opening while a popup or tutorial is showing
-        if (!_isOpen && PopupManager.IsShowing) return;
+        // Dismiss any active tutorial popup when opening a panel
+        if (!_isOpen && PopupManager.IsShowing)
+            PopupManager.Instance.Hide();
 
         _isOpen = !_isOpen;
+
+        if (_isOpen && _characterWindow != null)
+            _characterWindow.CloseWindow();
+
+        if (_isOpen && SkillTreeManager.Instance != null)
+            SkillTreeManager.Instance.CloseWindow();
 
         if (inventoryPanel != null)
             inventoryPanel.SetActive(_isOpen);

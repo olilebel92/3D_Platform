@@ -53,14 +53,38 @@ public class SkillTreeManager : MonoBehaviour
 
     // ─── Public State ─────────────────────────────────────────────────────────
 
+    /// <summary>True while the skill tree window is visible.</summary>
+    public bool IsOpen => _windowOpen;
+
     /// <summary>Available skill points the player has not yet spent.</summary>
     public int SkillPoints { get; private set; } = 0;
+
+    /// <summary>Sum of all flat STR bonuses from learned nodes.</summary>
+    public int TotalStrBonus { get; private set; } = 0;
+
+    /// <summary>Sum of all flat AGI bonuses from learned nodes.</summary>
+    public int TotalAgiBonus { get; private set; } = 0;
+
+    /// <summary>Sum of all flat INT bonuses from learned nodes.</summary>
+    public int TotalIntBonus { get; private set; } = 0;
 
     /// <summary>Sum of all spellDamageBonus values from learned nodes.</summary>
     public float TotalSpellDamageBonus { get; private set; } = 0f;
 
     /// <summary>Sum of all fireDamageBonus values from learned nodes.</summary>
     public float TotalFireDamageBonus { get; private set; } = 0f;
+
+    /// <summary>Sum of all percent spell damage bonuses from learned nodes (0.10 = +10%).</summary>
+    public float TotalSpellDamagePctBonus { get; private set; } = 0f;
+
+    /// <summary>Sum of all percent fire damage bonuses from learned nodes (0.10 = +10%).</summary>
+    public float TotalFireDamagePctBonus { get; private set; } = 0f;
+
+    /// <summary>Sum of all flat heal bonuses from learned nodes.</summary>
+    public float TotalHealBonus { get; private set; } = 0f;
+
+    /// <summary>Sum of all percent heal bonuses from learned nodes (0.10 = +10%).</summary>
+    public float TotalHealPctBonus { get; private set; } = 0f;
 
     // ─── Events ───────────────────────────────────────────────────────────────
 
@@ -69,9 +93,11 @@ public class SkillTreeManager : MonoBehaviour
 
     // ─── Private State ────────────────────────────────────────────────────────
 
-    private readonly HashSet<SkillTreeNode> _learned = new HashSet<SkillTreeNode>();
+    private readonly Dictionary<SkillTreeNode, int> _nodeLevels = new Dictionary<SkillTreeNode, int>();
     private bool _windowOpen = false;
     private CharacterWindow _characterWindow;
+    private InventoryUI _inventoryUI;
+    private SkillTreeNode _hoveredNode;
 
     // ─── Unity Lifecycle ──────────────────────────────────────────────────────
 
@@ -83,11 +109,16 @@ public class SkillTreeManager : MonoBehaviour
             return;
         }
         Instance = this;
+
+        // Hide immediately in Awake so the panel never flashes on the first frame.
+        if (skillTreeWindow != null)
+            skillTreeWindow.SetActive(false);
     }
 
     void Start()
     {
         _characterWindow = FindFirstObjectByType<CharacterWindow>();
+        _inventoryUI = FindFirstObjectByType<InventoryUI>();
         HideTooltip();
         SetWindowOpen(false, force: true);
 
@@ -104,9 +135,6 @@ public class SkillTreeManager : MonoBehaviour
     {
         if (Keyboard.current != null && Keyboard.current[toggleKey].wasPressedThisFrame)
             SetWindowOpen(!_windowOpen);
-
-        if (Keyboard.current != null && Keyboard.current.escapeKey.wasPressedThisFrame && _windowOpen)
-            CloseWindow();
     }
 
     // ─── Public API ───────────────────────────────────────────────────────────
@@ -120,21 +148,25 @@ public class SkillTreeManager : MonoBehaviour
         OnTreeChanged?.Invoke();
     }
 
-    /// <summary>Returns true if the player meets the prerequisites and has enough points.</summary>
+    /// <summary>Returns the current level of a node (0 = not learned).</summary>
+    public int GetNodeLevel(SkillTreeNode node) =>
+        node != null && _nodeLevels.TryGetValue(node, out int lvl) ? lvl : 0;
+
+    /// <summary>Returns true if the player meets the prerequisites and can gain another level.</summary>
     public bool CanLearn(SkillTreeNode node)
     {
         if (node == null) return false;
-        if (_learned.Contains(node)) return false;
+        if (GetNodeLevel(node) >= node.maxLevel) return false;
         if (SkillPoints < node.cost) return false;
 
         foreach (var req in node.prerequisites)
-            if (!_learned.Contains(req)) return false;
+            if (GetNodeLevel(req) < 1) return false;
 
         return true;
     }
 
-    /// <summary>Returns true if this node has already been learned.</summary>
-    public bool IsLearned(SkillTreeNode node) => node != null && _learned.Contains(node);
+    /// <summary>Returns true if this node has been learned at least once.</summary>
+    public bool IsLearned(SkillTreeNode node) => GetNodeLevel(node) > 0;
 
     /// <summary>
     /// Attempt to learn a node. Returns true on success.
@@ -149,13 +181,27 @@ public class SkillTreeManager : MonoBehaviour
         }
 
         SkillPoints -= node.cost;
-        _learned.Add(node);
-        TotalSpellDamageBonus += node.spellDamageBonus;
-        TotalFireDamageBonus  += node.fireDamageBonus;
-        Debug.Log($"[SkillTree] Learned '{node.nodeName}'. Remaining points: {SkillPoints}. Spell damage bonus: +{TotalSpellDamageBonus}");
 
-        // If this node unlocks a spell, add it to the first empty slot
-        if (node.unlocksSpell != null)
+        _nodeLevels.TryGetValue(node, out int currentLevel);
+        int newLevel = currentLevel + 1;
+        _nodeLevels[node] = newLevel;
+
+        // Bonus delta per level = baseStat * scalingFactor
+        TotalStrBonus             += Mathf.RoundToInt(node.strBonus           * node.scalingFactor);
+        TotalAgiBonus             += Mathf.RoundToInt(node.agiBonus           * node.scalingFactor);
+        TotalIntBonus             += Mathf.RoundToInt(node.intBonus           * node.scalingFactor);
+        TotalSpellDamageBonus     += node.spellDamageBonus    * node.scalingFactor;
+        TotalFireDamageBonus      += node.fireDamageBonus     * node.scalingFactor;
+        TotalSpellDamagePctBonus  += node.spellDamagePctBonus * node.scalingFactor;
+        TotalFireDamagePctBonus   += node.fireDamagePctBonus  * node.scalingFactor;
+        TotalHealBonus            += node.healBonus           * node.scalingFactor;
+        TotalHealPctBonus         += node.healPctBonus        * node.scalingFactor;
+
+        Debug.Log($"[SkillTree] '{node.nodeName}' leveled to {newLevel}/{node.maxLevel}. " +
+                  $"Points left: {SkillPoints}. Spell bonus total: +{TotalSpellDamageBonus}");
+
+        // Unlock spell only on first learn
+        if (newLevel == 1 && node.unlocksSpell != null)
             AddSpellToBar(node.unlocksSpell);
 
         RefreshUI();
@@ -168,6 +214,7 @@ public class SkillTreeManager : MonoBehaviour
     {
         if (node == null || tooltipPanel == null) return;
 
+        _hoveredNode = node;
         tooltipPanel.SetActive(true);
 
         if (tooltipName != null)
@@ -175,16 +222,26 @@ public class SkillTreeManager : MonoBehaviour
 
         if (tooltipDesc != null)
         {
-            string status = IsLearned(node) ? " <color=#00FF88>[Learned]</color>"
-                          : CanLearn(node)  ? $" <color=#FFD700>[Cost: {node.cost} pt]</color>"
-                          :                   $" <color=#FF6666>[Locked]</color>";
-            tooltipDesc.text = node.description + status;
+            int lvl    = GetNodeLevel(node);
+            bool maxed = lvl >= node.maxLevel;
+
+            string levelInfo = node.maxLevel > 1
+                ? $" <color=#AAAAFF>[Lv {lvl}/{node.maxLevel}]</color>"
+                : "";
+
+            string status = maxed          ? $" <color=#00FF88>[Maxed]</color>"
+                          : CanLearn(node) ? $" <color=#FFD700>[Cost: {node.cost} pt]</color>"
+                          : lvl > 0        ? $" <color=#FFD700>[Cost: {node.cost} pt — Locked]</color>"
+                          :                  $" <color=#FF6666>[Locked]</color>";
+
+            tooltipDesc.text = node.description + levelInfo + status;
         }
     }
 
     /// <summary>Hide the tooltip panel.</summary>
     public void HideTooltip()
     {
+        _hoveredNode = null;
         if (tooltipPanel != null)
             tooltipPanel.SetActive(false);
     }
@@ -202,9 +259,16 @@ public class SkillTreeManager : MonoBehaviour
         if (!force && _windowOpen == open) return;
         _windowOpen = open;
 
-        // Close the character window if we're opening this one
+        // Dismiss any active tutorial popup when opening this panel
+        if (open && PopupManager.IsShowing)
+            PopupManager.Instance?.Hide();
+
+        // Close other panels if we're opening this one
         if (open && _characterWindow != null)
             _characterWindow.CloseWindow();
+
+        if (open && _inventoryUI != null)
+            _inventoryUI.CloseInventory();
 
         if (skillTreeWindow != null)
             skillTreeWindow.SetActive(open);
@@ -264,5 +328,9 @@ public class SkillTreeManager : MonoBehaviour
             skillPointsText.gameObject.SetActive(SkillPoints > 0);
             skillPointsText.text = $"Skill Points: {SkillPoints}";
         }
+
+        // Re-render the tooltip if the player is hovering a node while state changes
+        if (_hoveredNode != null)
+            ShowTooltip(_hoveredNode);
     }
 }

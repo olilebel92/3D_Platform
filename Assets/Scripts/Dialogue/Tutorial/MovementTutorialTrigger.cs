@@ -86,8 +86,16 @@ public class MovementTutorialTrigger : MonoBehaviour
 
     private IEnumerator WaitForXPManager()
     {
+        int attempts = 0;
         while (ExperienceManager.Instance == null)
+        {
+            if (++attempts > 600) // ~10 s at 60 fps
+            {
+                Debug.LogWarning("[MovementTutorialTrigger] ExperienceManager not found after 10 s — level hints disabled.");
+                yield break;
+            }
             yield return null;
+        }
 
         _subscribedXP = ExperienceManager.Instance;
         _subscribedXP.OnLevelUp += OnLevelUp;
@@ -103,6 +111,14 @@ public class MovementTutorialTrigger : MonoBehaviour
     void Update()
     {
         if (!_activeHint) return;
+
+        // Popup was externally dismissed (e.g. player opened a UI panel) — sync state.
+        if (!PopupManager.IsShowing)
+        {
+            _activeHint     = false;
+            _startDismissed = true;
+            return;
+        }
 
         // Grace period: don't accept movement input right after the popup appears
         _inputTimer += Time.unscaledDeltaTime;

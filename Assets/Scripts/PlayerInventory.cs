@@ -91,12 +91,23 @@ public class PlayerInventory : MonoBehaviour
         }
     }
 
+    // ─── Constants ────────────────────────────────────────────────────────────
+
+    public const int MaxItems = 50;
+
     // ─── Inventory API ────────────────────────────────────────────────────────
 
-    /// <summary>Add an item to the player's inventory, filling the first empty slot.</summary>
+    /// <summary>Add an item to the player's inventory, filling the first empty slot. Destroys the item if inventory is full.</summary>
     public void AddItem(ItemData item)
     {
         if (item == null) return;
+
+        int filledCount = _items.Count(i => i != null);
+        if (filledCount >= MaxItems)
+        {
+            Debug.Log($"[Inventory] Full ({MaxItems} items) — {item.itemName} destroyed.");
+            return;
+        }
 
         int emptyIndex = _items.IndexOf(null);
         if (emptyIndex >= 0)
@@ -224,5 +235,14 @@ public class PlayerInventory : MonoBehaviour
     public float TotalBonusCritRate   => _equipped.Values.Sum(i => i.BonusCritRate);
 
     /// <summary>Total Crit Damage bonus (0-1) from all equipped items.</summary>
-    public float TotalBonusCritDamage => _equipped.Values.Sum(i => i.BonusCritDamage);
+    public float TotalBonusCritDamage   => _equipped.Values.Sum(i => i.BonusCritDamage);
+
+    /// <summary>Total flat movement speed bonus (0-1 fraction) from all equipped items.</summary>
+    public float TotalBonusMovementSpeed => _equipped.Values.Sum(i => i.BonusMovementSpeed);
+
+    /// <summary>Total flat fire damage bonus from all equipped items.</summary>
+    public float TotalBonusFireDamage    => _equipped.Values.Sum(i => i.BonusFireDamage);
+
+    /// <summary>Total flat spell power bonus from all equipped items.</summary>
+    public float TotalBonusSpellPower    => _equipped.Values.Sum(i => i.BonusSpellPower);
 }

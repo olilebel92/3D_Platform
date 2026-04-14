@@ -1,5 +1,16 @@
 using UnityEngine;
 
+/// <summary>Determines which damage school bonuses apply to this spell.</summary>
+public enum SpellSchool
+{
+    /// <summary>Generic magic — benefits from spell damage bonuses only.</summary>
+    Arcane,
+    /// <summary>Fire magic — benefits from spell damage AND fire damage bonuses.</summary>
+    Fire,
+    /// <summary>Healing — benefits from spell damage bonuses as heal power; fire bonuses are ignored.</summary>
+    Healing,
+}
+
 /// <summary>Where the spell prefab is spawned.</summary>
 public enum SpellSpawnOrigin
 {
@@ -38,6 +49,10 @@ public enum SpellType
 [CreateAssetMenu(fileName = "NewSpell", menuName = "Spells/New Spell")]
 public class SpellData : ScriptableObject
 {
+    [Header("School")]
+    [Tooltip("Fire: applies fire damage bonuses. Healing: treated as a heal. Arcane: base spell bonuses only.")]
+    public SpellSchool school = SpellSchool.Arcane;
+
     [Header("Basic Info")]
     public string spellName = "Unnamed Spell";
 

@@ -47,6 +47,9 @@ public class MusicManager : MonoBehaviour
         transform.SetParent(null);
         DontDestroyOnLoad(gameObject);
 
+        // Load saved music volume so the fade-in targets the correct level
+        volume = PlayerPrefs.GetFloat("vol_music", volume);
+
         // Set up AudioSource
         _audioSource = GetComponent<AudioSource>();
         if (_audioSource == null)
@@ -58,6 +61,9 @@ public class MusicManager : MonoBehaviour
         _audioSource.spatialBlend = 0f;
         _audioSource.ignoreListenerPause = true;
         _audioSource.volume = 0f; // start silent, fade in
+
+        // Apply master volume (AudioListener) from saved settings
+        AudioListener.volume = PlayerPrefs.GetFloat("vol_master", 1f);
     }
 
     void Start()

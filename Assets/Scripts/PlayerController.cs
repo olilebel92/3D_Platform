@@ -1,4 +1,5 @@
 using System.Collections;
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.InputSystem;
 using Unity.Netcode;
@@ -53,6 +54,14 @@ public class PlayerController : NetworkBehaviour
     [Tooltip("Local position offset of the model relative to the player root.")]
     public Vector3 modelPositionOffset = Vector3.zero;
 
+    // ─── Player Registry ──────────────────────────────────────────────────────
+    /// <summary>
+    /// All active player GameObjects in the scene. Populated in Start(), cleared in
+    /// OnDestroy(). Used by server-side systems (HealingWave, WaveManager) as a
+    /// GC-free alternative to FindGameObjectsWithTag("Player") on every tick.
+    /// </summary>
+    public static readonly List<GameObject> All = new();
+
     // ─── Private State ────────────────────────────────────────────────────────
 
     private CharacterController controller;
@@ -63,8 +72,23 @@ public class PlayerController : NetworkBehaviour
     private ExperienceManager _xp;
     private SpellCaster          _spellCaster;
     private StatusEffectHandler  _statusEffects;
+
+    /// <summary>True while the player is actively sprinting (moving + sprint input + stamina).</summary>
+    public bool IsSprinting { get; private set; }
+
+    /// <summary>
+    /// Stops the current sprint immediately. Suppresses re-entry from held sprint input
+    /// until the sprint button is fully released, so a held sprint key doesn't instantly
+    /// re-enable sprint on the next frame.
+    /// </summary>
+    public void CancelSprint()
+    {
+        _sprintToggle    = false;
+        _sprintSuppressed = true;
+    }
     private float verticalVelocity;
-    private bool _sprintToggle = false;
+    private bool _sprintToggle    = false;
+    private bool _sprintSuppressed = false; // true while a cast is suppressing sprint
     private bool _isJumping = false;
     private PlayerInputActions inputActions;
     private Vector2 moveInput;
@@ -89,6 +113,8 @@ public class PlayerController : NetworkBehaviour
     private bool _animHasCasting;
     private bool _animHasCastThrow;
     private bool _isCastThrowing;
+    private Vector3 _castHorizontalMomentum = Vector3.zero; // horizontal carry-through during airborne movement lock
+    private bool    _wasMovementLocked       = false;
 
     // ─── Unity Lifecycle ──────────────────────────────────────────────────────
 
@@ -165,6 +191,9 @@ public class PlayerController : NetworkBehaviour
 
     void Start()
     {
+        All.Add(gameObject);
+        WaveManager.Instance?.RegisterPlayer(transform);
+
         controller     = GetComponent<CharacterController>();
         stamina        = GetComponent<StaminaSystem>();
         _health        = GetComponent<HealthSystem>();
@@ -230,6 +259,7 @@ public class PlayerController : NetworkBehaviour
     {
         // Safety cleanup — always unsubscribe to avoid stale callbacks.
         base.OnDestroy();
+        All.Remove(gameObject);
         DisableInput();
         if (_spellCaster != null) _spellCaster.OnCastThrowStart -= OnCastThrow;
     }
@@ -295,6 +325,21 @@ public class PlayerController : NetworkBehaviour
         _health.currentHealth = Mathf.Clamp(clientHealth, 0, _health.maxHealth);
         DebugLogger.Log(DebugLogger.Category.NetworkSync,
             $"{gameObject.name} server health synced → {_health.currentHealth}/{_health.maxHealth}");
+    }
+
+    /// <summary>
+    /// Called by the owning client whenever maxHealth changes (STR stat spend, equipment).
+    /// Keeps the server's HealthSystem.maxHealth in sync so regen and healing checks
+    /// (which run server-side) use the correct cap instead of the initial prefab value.
+    /// </summary>
+    [ServerRpc]
+    public void SyncMaxHealthServerRpc(int newMaxHealth)
+    {
+        if (_health == null) return;
+        _health.maxHealth = newMaxHealth;
+        _health.currentHealth = Mathf.Clamp(_health.currentHealth, 0, newMaxHealth);
+        DebugLogger.Log(DebugLogger.Category.NetworkSync,
+            $"{gameObject.name} server maxHealth synced → {newMaxHealth}");
     }
 
     /// <summary>
@@ -465,6 +510,11 @@ public class PlayerController : NetworkBehaviour
         // Spectator clients have no ownership — skip all input and movement.
         if (IsSpawned && !IsOwner) return;
 
+        // ── UI Panel Open ─────────────────────────────────────────────────────
+        // In multiplayer Time.timeScale stays at 1 (pausing one client would desync
+        // the server), so we must explicitly block input while any panel is open.
+        if (PauseManager.IsPaused) return;
+
         // ── Stun ──────────────────────────────────────────────────────────────
         // While stunned, freeze all input and movement (cast is cancelled by StatusEffectHandler).
         if (_statusEffects != null && _statusEffects.IsStunned) return;
@@ -487,6 +537,7 @@ public class PlayerController : NetworkBehaviour
 
         // ── Read Input ────────────────────────────────────────────────────────
         moveInput = inputActions.Player.Move.ReadValue<Vector2>();
+        Vector2 rawMoveInput = moveInput; // preserve before possible lock suppression
 
         // ── Movement Grace Lock ───────────────────────────────────────────────
         // During a spell's movementInterruptGrace window the player is rooted in
@@ -505,7 +556,11 @@ public class PlayerController : NetworkBehaviour
 
         // ── Sprint Logic ──────────────────────────────────────────────────────
         bool holdingSprint = inputActions.Player.Sprint.IsPressed();
-        bool wantsToSprint = holdingSprint || _sprintToggle;
+
+        // Clear suppression once the player fully releases the sprint button.
+        if (!holdingSprint) _sprintSuppressed = false;
+
+        bool wantsToSprint = (holdingSprint || _sprintToggle) && !_sprintSuppressed;
 
         if (!isMoving)
             _sprintToggle = false;
@@ -517,17 +572,26 @@ public class PlayerController : NetworkBehaviour
         }
 
         bool isSprinting = wantsToSprint && isMoving;
+        IsSprinting = isSprinting;
+
+        // ── Sprint cancels active cast ─────────────────────────────────────────
+        if (isSprinting && _spellCaster != null && _spellCaster.IsActive)
+            _spellCaster.CancelCast();
 
         // ── AGI Speed Bonus ───────────────────────────────────────────────────
         // ExperienceManager applies the per-point AGI multiplier to the base speeds
         // set in this Inspector. Tweak agiMoveSpeedBonus / agiSprintSpeedBonus there.
-        float effectiveMoveSpeed = _xp != null
-            ? _xp.ComputedMoveSpeed(moveSpeed)
-            : moveSpeed;
+        float equipMoveBonus = PlayerInventory.Instance != null
+            ? PlayerInventory.Instance.TotalBonusMovementSpeed
+            : 0f;
 
-        float effectiveSprintSpeed = _xp != null
+        float effectiveMoveSpeed = (_xp != null
+            ? _xp.ComputedMoveSpeed(moveSpeed)
+            : moveSpeed) * (1f + equipMoveBonus);
+
+        float effectiveSprintSpeed = (_xp != null
             ? _xp.ComputedSprintSpeed(sprintSpeed)
-            : sprintSpeed;
+            : sprintSpeed) * (1f + equipMoveBonus);
 
         float currentSpeed = isSprinting ? effectiveSprintSpeed : effectiveMoveSpeed;
 
@@ -553,6 +617,34 @@ public class PlayerController : NetworkBehaviour
 
         Vector3 move = (camForward * moveInput.y +
                         camRight * moveInput.x).normalized * currentSpeed;
+
+        // ── Cast Momentum ──────────────────────────────────────────────────────
+        // When movement lock begins while airborne, carry the horizontal velocity
+        // forward so the jump arc completes naturally instead of stopping dead.
+        // Momentum is cleared once the player lands.
+        bool moveLocked = _spellCaster != null && _spellCaster.IsMovementLocked;
+        if (moveLocked)
+        {
+            if (!_wasMovementLocked && !controller.isGrounded && rawMoveInput.magnitude > 0.1f)
+            {
+                Vector3 rawMove = (camForward * rawMoveInput.y + camRight * rawMoveInput.x).normalized * currentSpeed;
+                _castHorizontalMomentum = new Vector3(rawMove.x, 0f, rawMove.z);
+            }
+            if (!controller.isGrounded && _castHorizontalMomentum.sqrMagnitude > 0.001f)
+            {
+                move.x = _castHorizontalMomentum.x;
+                move.z = _castHorizontalMomentum.z;
+            }
+            else if (controller.isGrounded)
+            {
+                _castHorizontalMomentum = Vector3.zero;
+            }
+        }
+        else
+        {
+            _castHorizontalMomentum = Vector3.zero;
+        }
+        _wasMovementLocked = moveLocked;
 
         // ── Single Move Call ──────────────────────────────────────────────────
         move.y = verticalVelocity;

@@ -19,8 +19,6 @@ public class SpellCaster : NetworkBehaviour
     [Tooltip("Spawn point for projectiles. Defaults to this transform if unassigned.")]
     public Transform firePoint;
 
-    [Tooltip("Spell cast and held on L1 (left shoulder). Assign the HealingWave SpellData here.")]
-    [SerializeField] private SpellData _l1ChannelSpell;
 
     // ─── Cast State ───────────────────────────────────────────────────────────
 
@@ -46,6 +44,7 @@ public class SpellCaster : NetworkBehaviour
     // ─── Dependencies ─────────────────────────────────────────────────────────
 
     private StatusEffectHandler _statusEffects;
+    private PlayerController    _playerController;
     private AudioSource         _audioSource;
 
     // ─── Public Cast State API (for UI) ──────────────────────────────────────
@@ -200,6 +199,7 @@ public class SpellCaster : NetworkBehaviour
         PlayerController pc = GetComponent<PlayerController>();
         if (pc != null)
         {
+            _playerController = pc;
             _inputActions = pc.InputActions;
         }
         else
@@ -248,13 +248,13 @@ public class SpellCaster : NetworkBehaviour
             }
         }
 
-        // Gamepad R1: cast currently selected spell
+        // Gamepad R1: cast slot 1
         if (Gamepad.current != null && Gamepad.current.rightShoulder.wasPressedThisFrame)
-            BeginCast(SpellBarManager.Instance?.GetSelectedSpell());
+            BeginCast(SpellBarManager.Instance?.GetSpellAt(0));
 
-        // Gamepad L1: dedicated channel spell (HealingWave)
+        // Gamepad L1: cast slot 2
         if (Gamepad.current != null && Gamepad.current.leftShoulder.wasPressedThisFrame)
-            BeginCast(_l1ChannelSpell);
+            BeginCast(SpellBarManager.Instance?.GetSpellAt(1));
 
         TickCastState();
     }
@@ -383,6 +383,13 @@ public class SpellCaster : NetworkBehaviour
             return;
         }
 
+        // Sprinting → cancel sprint and proceed with the cast.
+        if (_playerController != null && _playerController.IsSprinting)
+            _playerController.CancelSprint();
+
+        // Already casting this exact spell — keep going, don't restart.
+        if (_state != CastState.Idle && _active == spell) return;
+
         _active            = spell;
         _castStartTime     = Time.time;
         _throwEventFired   = false;
@@ -504,7 +511,10 @@ public class SpellCaster : NetworkBehaviour
             {
                 GameObject go = Instantiate(_active.prefab, firePos, rot);
                 if (go.TryGetComponent<Fireball>(out Fireball fb))
+                {
+                    fb.precomputedDamage = rawDamage;
                     fb.hitEffect = _active.hitEffect;
+                }
             }
         }
 
@@ -625,20 +635,28 @@ public class SpellCaster : NetworkBehaviour
     float ComputeRawDamage(SpellData spell)
     {
         float baseDmg = 0f;
-        bool  isHeal  = false;
         if (spell.prefab.TryGetComponent<Fireball>(out Fireball fb))
             baseDmg = fb.baseDamage;
         else if (spell.prefab.TryGetComponent<HealingWave>(out HealingWave hw))
-        {
             baseDmg = hw.baseHeal;
-            isHeal  = true;
-        }
 
-        float spellBonus = SkillTreeManager.Instance?.TotalSpellDamageBonus ?? 0f;
-        float fireBonus  = isHeal ? 0f : (SkillTreeManager.Instance?.TotalFireDamageBonus ?? 0f);
-        float intMult    = ExperienceManager.Instance?.SpellDamageMultiplier ?? 1f;
+        bool isFire  = spell.school == SpellSchool.Fire;
+        bool isHeal  = spell.school == SpellSchool.Healing;
 
-        return (baseDmg + spellBonus + fireBonus) * intMult;
+        float spellBonus    = SkillTreeManager.Instance?.TotalSpellDamageBonus   ?? 0f;
+        float fireBonus     = isFire ? (SkillTreeManager.Instance?.TotalFireDamageBonus    ?? 0f) : 0f;
+        float firePctBonus  = isFire ? (SkillTreeManager.Instance?.TotalFireDamagePctBonus ?? 0f) : 0f;
+        float healBonus     = isHeal ? (SkillTreeManager.Instance?.TotalHealBonus          ?? 0f) : 0f;
+        float healPctBonus  = isHeal ? (SkillTreeManager.Instance?.TotalHealPctBonus       ?? 0f) : 0f;
+        float intMult       = ExperienceManager.Instance?.SpellDamageMultiplier ?? 1f;
+
+        // Equipment bonuses — only valid on the owner's client (singleplayer or pre-server-RPC path)
+        float equipSpell    = PlayerInventory.Instance?.TotalBonusSpellPower ?? 0f;
+        float equipFire     = isFire ? (PlayerInventory.Instance?.TotalBonusFireDamage ?? 0f) : 0f;
+
+        // Formula: (Base + SpellPower + FireDamage) × INT multiplier × (1 + fire%)
+        return (baseDmg + spellBonus + equipSpell + fireBonus + equipFire + healBonus)
+               * intMult * (1f + firePctBonus + healPctBonus);
     }
 
     bool IsCastHeld()

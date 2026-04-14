@@ -64,14 +64,20 @@ public class PopupManager : MonoBehaviour
     /// </summary>
     public static bool IsShowing { get; private set; }
 
+    // Reset static state on each play session so IsShowing never leaks across domain reloads.
+    [UnityEngine.RuntimeInitializeOnLoadMethod(UnityEngine.RuntimeInitializeLoadType.SubsystemRegistration)]
+    static void ResetStatic() => IsShowing = false;
+
     // ─── Private State ────────────────────────────────────────────────────────
 
     private Queue<DialogueEntry> _queue = new Queue<DialogueEntry>();
     private Coroutine _activeCoroutine;
+    private Coroutine _fadePanelCoroutine;  // tracked separately — nested coroutines survive StopCoroutine on the outer one
     private CanvasGroup _canvasGroup;
     private bool _inputReady = false;
     private bool _skipRequested = false;
     private bool _pauseRequested = false;   // tracks whether we've called RequestPause so we can always pair it with ReleasePause
+    private bool _pauseGameOnShow = true;   // set to false for popups that should not freeze the game (e.g. movement tutorial)
 
     // ─── Unity Lifecycle ──────────────────────────────────────────────────────
 
@@ -103,13 +109,19 @@ public class PopupManager : MonoBehaviour
     // ─── Public API ───────────────────────────────────────────────────────────
 
     /// <summary>Show a sequence of DialogueEntry lines one after another.</summary>
-    public void Show(IEnumerable<DialogueEntry> entries)
+    /// <param name="pauseGame">
+    /// When true (default) the game is paused while the popup is visible.
+    /// Pass false for popups where the player should remain in control (e.g. movement tutorials).
+    /// </param>
+    public void Show(IEnumerable<DialogueEntry> entries, bool pauseGame = true)
     {
         StopActive();
 
         _queue.Clear();
         foreach (var e in entries)
             _queue.Enqueue(e);
+
+        _pauseGameOnShow = pauseGame;
 
         // Close all open panels so camera lock and pause state are clean
         CloseAllPanels();
@@ -124,7 +136,11 @@ public class PopupManager : MonoBehaviour
     }
 
     /// <summary>Show a single quick message with an optional custom duration.</summary>
-    public void Show(string message, float duration = 0f)
+    /// <param name="pauseGame">
+    /// When true (default) the game is paused while the popup is visible.
+    /// Pass false for popups where the player should remain in control (e.g. movement tutorials).
+    /// </param>
+    public void Show(string message, float duration = 0f, bool pauseGame = true)
     {
         Show(new[]
         {
@@ -133,16 +149,17 @@ public class PopupManager : MonoBehaviour
                 message        = message,
                 customDuration = duration
             }
-        });
+        },
+        pauseGame: pauseGame);
     }
 
     /// <summary>Force-close the popup immediately.</summary>
     public void Hide()
     {
-        StopActive();   // releases the pause if RunSequence had already requested it
+        StopActive();   // stops RunSequence AND any in-progress fade; releases pause if needed
         _queue.Clear();
         IsShowing = false;
-        StartCoroutine(FadePanel(false));
+        _fadePanelCoroutine = StartCoroutine(FadePanel(false));
     }
 
     // ─── Panel Management ─────────────────────────────────────────────────────
@@ -165,16 +182,21 @@ public class PopupManager : MonoBehaviour
         if (_queue.Count > 0 && messageText != null)
             messageText.text = _queue.Peek().message;
 
-        // Wait one frame before requesting a pause so NetworkManager.IsListening
-        // has time to become true. Without this delay, a popup that fires during
-        // early scene setup (e.g. the start-of-game tutorial at t=1.5s) would call
-        // RequestPause before NGO is connected, making IsMultiplayer return false
-        // and briefly setting Time.timeScale=0 in a multiplayer session.
-        yield return null;
-        _pauseRequested = true;
-        PauseManager.RequestPause();
+        // Fade in first so the popup is visible before the game freezes.
+        // Track the coroutine so StopActive() can kill it if Hide() is called mid-fade.
+        _fadePanelCoroutine = StartCoroutine(FadePanel(true));
+        yield return _fadePanelCoroutine;
+        _fadePanelCoroutine = null;
 
-        yield return StartCoroutine(FadePanel(true));
+        // Request pause after the popup is fully visible.
+        // The one-frame yield also ensures NetworkManager.IsListening is stable (avoids
+        // briefly setting timeScale=0 before NGO is connected in early-scene popups).
+        if (_pauseGameOnShow)
+        {
+            yield return null;
+            _pauseRequested = true;
+            PauseManager.RequestPause();
+        }
 
         while (_queue.Count > 0)
         {
@@ -182,7 +204,9 @@ public class PopupManager : MonoBehaviour
             yield return StartCoroutine(ShowEntry(entry));
         }
 
-        yield return StartCoroutine(FadePanel(false));
+        _fadePanelCoroutine = StartCoroutine(FadePanel(false));
+        yield return _fadePanelCoroutine;
+        _fadePanelCoroutine = null;
 
         _pauseRequested = false;
         PauseManager.ReleasePause();
@@ -307,6 +331,17 @@ public class PopupManager : MonoBehaviour
         {
             StopCoroutine(_activeCoroutine);
             _activeCoroutine = null;
+        }
+
+        // Stop any in-progress fade. Nested coroutines survive StopCoroutine on the outer
+        // coroutine, so FadePanel must be tracked and killed separately to prevent it from
+        // completing and making the popup visible again after Hide() was called.
+        if (_fadePanelCoroutine != null)
+        {
+            StopCoroutine(_fadePanelCoroutine);
+            _fadePanelCoroutine = null;
+            // Snap the panel to fully hidden so no partial alpha remains.
+            SetPanelVisible(false, instant: true);
         }
 
         // If RunSequence had already called RequestPause before being stopped,

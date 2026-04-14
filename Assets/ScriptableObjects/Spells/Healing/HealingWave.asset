@@ -12,15 +12,17 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 4378247a87f53c34aa130d1b75a0dc31, type: 3}
   m_Name: HealingWave
   m_EditorClassIdentifier: Assembly-CSharp::SpellData
+  school: 2
   spellName: HealingWave
   description: A mysterious spell.
-  icon: {fileID: 0}
+  icon: {fileID: 21300000, guid: ab4f3dd8117ea9e4c86d84f6d79822ca, type: 3}
   hitEffect: {fileID: 0}
   prefab: {fileID: 5422418228119156601, guid: 2bb83c31e0883114888c534761bf1e07, type: 3}
   spellType: 3
   castStartDelay: 0
   castTime: 0
   throwAnimLeadTime: 0
+  lockMovementDuringCast: 1
   movementInterruptGrace: 0.3
   damageInterruptGrace: 0
   channelTickRate: 1

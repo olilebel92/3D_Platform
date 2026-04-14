@@ -8,8 +8,8 @@ public class SpellBarManager : MonoBehaviour
     public static SpellBarManager Instance { get; private set; }
 
     // ─── Inspector ───────────────────────────────────────────────────────────
-    [Header("Slot Setup")]
-    [Tooltip("Drag your 10 SpellSlot GameObjects here (in order, 0-9).")]
+    // Populated automatically from children at runtime — no manual wiring needed.
+    [HideInInspector]
     public List<SpellSlot> slots = new List<SpellSlot>();
 
     [Header("Spell Bar Panel")]
@@ -37,11 +37,7 @@ public class SpellBarManager : MonoBehaviour
     // ─── Unity Lifecycle ──────────────────────────────────────────────────────
     private void Awake()
     {
-        if (Instance != null && Instance != this)
-        {
-            Destroy(gameObject);
-            return;
-        }
+        if (Instance != null && Instance != this) return;
         Instance = this;
     }
 
@@ -53,7 +49,7 @@ public class SpellBarManager : MonoBehaviour
         if (slots.Count > 0)
             SelectSlot(0);
 
-        HideSpellBar();
+        Debug.Log($"[SpellBarManager] Initialized with {slots.Count} slots.");
     }
 
     private void Update()
@@ -65,11 +61,10 @@ public class SpellBarManager : MonoBehaviour
     // ─── Initialization ───────────────────────────────────────────────────────
     private void InitializeSlots()
     {
+        slots.Clear();
+        slots.AddRange(GetComponentsInChildren<SpellSlot>());
         for (int i = 0; i < slots.Count; i++)
-        {
-            if (slots[i] != null)
-                slots[i].Initialize(i);
-        }
+            slots[i].Initialize(i);
     }
 
     private void PopulateStartingSpells()

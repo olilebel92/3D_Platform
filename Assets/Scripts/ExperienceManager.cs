@@ -1,6 +1,7 @@
 using UnityEngine;
 using UnityEngine.UI;
 using TMPro;
+using Unity.Netcode;
 
 /// <summary>
 /// Manages the player's Level, XP, and three core stats: STR, AGI, INT.
@@ -158,7 +159,34 @@ public class ExperienceManager : MonoBehaviour
         if (_inventory != null)
             _inventory.OnInventoryChanged += OnEquipmentChanged;
 
+        if (currentLevel > 1)
+            InitializeStartingLevel();
+
         UpdateUI();
+    }
+
+    /// <summary>
+    /// When currentLevel is set above 1 in the Inspector (e.g. for testing),
+    /// simulates all preceding level-ups: scales xpToNextLevel correctly and
+    /// grants the accumulated stat points and skill points.
+    /// </summary>
+    private void InitializeStartingLevel()
+    {
+        int levelsGained = currentLevel - 1;
+
+        // Scale xpToNextLevel as if we levelled up (levelsGained) times from base
+        for (int i = 0; i < levelsGained; i++)
+            xpToNextLevel = Mathf.RoundToInt(xpToNextLevel * xpScalingFactor);
+
+        statPoints += levelsGained;
+
+        if (SkillTreeManager.Instance != null)
+            for (int i = 0; i < levelsGained; i++)
+                SkillTreeManager.Instance.AddSkillPoint();
+        else
+            Debug.LogWarning("[ExperienceManager] SkillTreeManager not found — skill points not granted for starting level.");
+
+        Debug.Log($"[ExperienceManager] Initialized to level {currentLevel}: +{levelsGained} stat points, +{levelsGained} skill points, xpToNextLevel={xpToNextLevel}");
     }
 
     void OnDestroy()
@@ -189,6 +217,19 @@ public class ExperienceManager : MonoBehaviour
         int strHP  = EquipBonusSTR * hpPerStr;
         int flatHP = _inventory != null ? _inventory.TotalBonusHP : 0;
         _playerHealth.ApplyEquipmentHP(strHP + flatHP);
+        SyncMaxHealthToServer();
+    }
+
+    /// <summary>
+    /// Pushes the local player's current maxHealth to the server so server-side regen
+    /// and healing checks stay in sync. No-op in singleplayer.
+    /// </summary>
+    private void SyncMaxHealthToServer()
+    {
+        if (_playerHealth == null) return;
+        bool networkActive = NetworkManager.Singleton != null && NetworkManager.Singleton.IsListening;
+        if (!networkActive) return;
+        GetComponent<PlayerController>()?.SyncMaxHealthServerRpc(_playerHealth.maxHealth);
     }
 
     // ─── Public XP API ───────────────────────────────────────────────────────
@@ -217,9 +258,13 @@ public class ExperienceManager : MonoBehaviour
     private int EquipBonusAGI => _inventory != null ? _inventory.TotalBonusAGI : 0;
     private int EquipBonusINT => _inventory != null ? _inventory.TotalBonusINT : 0;
 
-    public int EffectiveSTR => strength    + EquipBonusSTR;
-    public int EffectiveAGI => agility     + EquipBonusAGI;
-    public int EffectiveINT => intelligence + EquipBonusINT;
+    private int SkillTreeBonusSTR => SkillTreeManager.Instance != null ? SkillTreeManager.Instance.TotalStrBonus : 0;
+    private int SkillTreeBonusAGI => SkillTreeManager.Instance != null ? SkillTreeManager.Instance.TotalAgiBonus : 0;
+    private int SkillTreeBonusINT => SkillTreeManager.Instance != null ? SkillTreeManager.Instance.TotalIntBonus : 0;
+
+    public int EffectiveSTR => strength     + EquipBonusSTR + SkillTreeBonusSTR;
+    public int EffectiveAGI => agility      + EquipBonusAGI + SkillTreeBonusAGI;
+    public int EffectiveINT => intelligence + EquipBonusINT + SkillTreeBonusINT;
 
     // ─── Computed Stat Properties ─────────────────────────────────────────────
 
@@ -235,8 +280,10 @@ public class ExperienceManager : MonoBehaviour
     public float ComputedAttackCooldown(float baseAttackCooldown)
         => Mathf.Max(agiMinAttackCooldown, baseAttackCooldown * (1f - EffectiveAGI * agiCooldownReductionPct));
 
-    /// <summary>Spell damage multiplier from INT (includes equipment). +intSpellDamagePct% per point.</summary>
-    public float SpellDamageMultiplier => 1f + EffectiveINT * intSpellDamagePct;
+    /// <summary>Spell damage multiplier from INT + skill tree % bonus (includes equipment). +intSpellDamagePct% per point.</summary>
+    public float SpellDamageMultiplier
+        => 1f + EffectiveINT * intSpellDamagePct
+             + (SkillTreeManager.Instance != null ? SkillTreeManager.Instance.TotalSpellDamagePctBonus : 0f);
 
     /// <summary>Min damage using effective STR. Base at STR 1, +minDamagePerStr per point above.</summary>
     public int ComputedMinDamage => Mathf.Max(1, Mathf.RoundToInt(baseMinDamage + (EffectiveSTR - 1) * minDamagePerStr));
@@ -285,7 +332,10 @@ public class ExperienceManager : MonoBehaviour
         statPoints--;
         strength++;
         if (_playerHealth != null)
+        {
             _playerHealth.IncreaseMaxHealth(hpPerStr);
+            SyncMaxHealthToServer();
+        }
         Debug.Log($"[STAT] +1 STR → {strength} (dmg {ComputedMinDamage}-{ComputedMaxDamage}, +{hpPerStr} HP)  |  {statPoints} points remaining");
         UpdateUI();
         return true;
