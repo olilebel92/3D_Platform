@@ -1,5 +1,18 @@
 using UnityEngine;
 
+/// <summary>Ground shape drawn as a telegraph before a spell fires.</summary>
+public enum TelegraphShape
+{
+    /// <summary>No telegraph — spell fires without a preview.</summary>
+    None,
+    /// <summary>Filled circle. Use for targeted AOE (e.g. meteor landing zone).</summary>
+    Circle,
+    /// <summary>Filled sector/wedge from the caster toward the cursor. Use for frontal cones.</summary>
+    Cone,
+    /// <summary>Filled rectangle extending forward from the caster. Use for linear beams.</summary>
+    Line,
+}
+
 /// <summary>Determines which damage school bonuses apply to this spell.</summary>
 public enum SpellSchool
 {
@@ -124,4 +137,33 @@ public class SpellData : ScriptableObject
     [Header("Audio")]
     [Tooltip("Sound played locally when the player initiates this spell's cast.")]
     public AudioClip castSound;
+
+    // ─── Telegraph ────────────────────────────────────────────────────────────
+
+    [Header("Telegraph")]
+    [Tooltip("Shape drawn on the ground to preview the spell's area before it fires. None = no preview.")]
+    public TelegraphShape telegraphShape = TelegraphShape.None;
+
+    [Tooltip("Radius of the circle telegraph (TelegraphShape.Circle only).")]
+    public float telegraphRadius = 3f;
+
+    [Tooltip("Full opening angle in degrees of the cone telegraph (TelegraphShape.Cone only). E.g. 90 = ±45° each side.")]
+    public float telegraphAngle = 90f;
+
+    [Tooltip("Length of the cone or line telegraph in world units.")]
+    public float telegraphLength = 6f;
+
+    [Tooltip("Width of the line telegraph in world units (TelegraphShape.Line only).")]
+    public float telegraphWidth = 1.5f;
+
+    [Tooltip("Fill colour of the telegraph decal (alpha controls opacity).")]
+    public Color telegraphColor = new Color(1f, 0.5f, 0f, 0.45f);
+
+    [Tooltip("When true, Circle telegraphs follow the cursor (targeted AOE). " +
+             "When false, the shape stays centred on the caster (self-cast AOE).")]
+    public bool telegraphFollowsCursor = true;
+
+    [Tooltip("How far forward from the caster the Cone or Line telegraph begins (world units). " +
+             "Use this to push the shape past the character's feet.")]
+    public float telegraphOriginOffset = 0f;
 }

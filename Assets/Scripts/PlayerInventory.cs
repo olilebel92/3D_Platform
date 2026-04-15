@@ -27,6 +27,7 @@ public class PlayerInventory : MonoBehaviour
     private readonly List<ItemData> _items    = new();
     private readonly Dictionary<EquipmentSlot, ItemData> _equipped = new();
     private readonly Dictionary<EquipmentSlot, int> _equippedIndex = new();
+    private bool _suppressEvents = false;
 
     // ─── Events ───────────────────────────────────────────────────────────────
 
@@ -136,7 +137,59 @@ public class PlayerInventory : MonoBehaviour
 
         Debug.Log($"[Inventory] Removed: {item.itemName}");
         _items[inventoryIndex] = null;   // null instead of RemoveAt — keeps all other indices stable
-        OnInventoryChanged?.Invoke();
+        if (!_suppressEvents) OnInventoryChanged?.Invoke();
+    }
+
+    /// <summary>
+    /// Returns the number of non-equipped items whose rarity is ≤ maxRarity.
+    /// Used to populate the batch-delete confirmation dialog.
+    /// </summary>
+    public int CountDeletable(ItemRarity maxRarity)
+    {
+        int count = 0;
+        for (int i = 0; i < _items.Count; i++)
+        {
+            ItemData item = _items[i];
+            if (item == null) continue;
+            if ((int)item.rarity > (int)maxRarity) continue;
+            if (IsEquippedAtIndex(item.slot, i)) continue;
+            count++;
+        }
+        return count;
+    }
+
+    /// <summary>
+    /// Deletes all non-equipped items whose rarity is ≤ maxRarity.
+    /// Fires OnInventoryChanged once after all deletions.
+    /// Returns the number of items deleted.
+    /// </summary>
+    public int DeleteByMaxRarity(ItemRarity maxRarity)
+    {
+        int deleted = 0;
+        _suppressEvents = true;
+        try
+        {
+            for (int i = 0; i < _items.Count; i++)
+            {
+                ItemData item = _items[i];
+                if (item == null) continue;
+                if ((int)item.rarity > (int)maxRarity) continue;
+                if (IsEquippedAtIndex(item.slot, i)) continue;
+                _items[i] = null;
+                deleted++;
+                Debug.Log($"[Inventory] Batch deleted: {item.itemName} ({item.rarity})");
+            }
+        }
+        finally
+        {
+            _suppressEvents = false;
+        }
+
+        if (deleted > 0)
+            OnInventoryChanged?.Invoke();
+
+        Debug.Log($"[Inventory] Batch delete complete — {deleted} item(s) removed (≤ {maxRarity}).");
+        return deleted;
     }
 
     /// <summary>Returns a copy of all owned items.</summary>

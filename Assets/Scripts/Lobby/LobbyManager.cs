@@ -271,6 +271,8 @@ public class LobbyManager : MonoBehaviour
 
     void OnNameSubmitted(string input)
     {
+        if (!string.IsNullOrWhiteSpace(input))
+            PlayerPrefs.SetString("PlayerName", input.Trim());
         GetMyPlayer()?.SetName(input);
     }
 
@@ -280,6 +282,8 @@ public class LobbyManager : MonoBehaviour
         LobbyPlayer mine = GetMyPlayer();
         if (mine != null)
             nameInputField.text = mine.PlayerName.Value.ToString();
+        else if (PlayerPrefs.HasKey("PlayerName"))
+            nameInputField.text = PlayerPrefs.GetString("PlayerName");
     }
 
     // ─── Host Actions ─────────────────────────────────────────────────────────

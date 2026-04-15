@@ -23,8 +23,10 @@ public class UI_FPSCounter : MonoBehaviour
 
     void Start()
     {
+        Application.targetFrameRate = 60;
+
         if (panel != null)
-            panel.SetActive(false); // Start hidden
+            panel.SetActive(true); // Start visible
     }
 
     void Update()
@@ -71,7 +73,7 @@ public class UI_FPSCounter : MonoBehaviour
             fpsText.text = $"{Mathf.RoundToInt(fps)} FPS\n{memory:0} MB";
 
         // 🎨 Color based on performance
-        if (fps >= 60f)
+        if (fps >= 55f)
             fpsText.color = Color.green;
         else if (fps >= 30f)
             fpsText.color = Color.yellow;

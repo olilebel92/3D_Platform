@@ -53,7 +53,7 @@ public class PlayerNameTag : NetworkBehaviour
         bool networkingActive = NetworkManager.Singleton != null
                              && NetworkManager.Singleton.IsListening;
         if (!networkingActive)
-            SetLabelText("Player");
+            SetLabelText(PlayerPrefs.GetString("PlayerName", "Player"));
     }
 
     // ─── NGO Lifecycle ────────────────────────────────────────────────────────

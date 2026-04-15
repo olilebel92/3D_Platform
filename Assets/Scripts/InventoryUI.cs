@@ -1,6 +1,8 @@
 using System.Collections.Generic;
+using TMPro;
 using UnityEngine;
 using UnityEngine.InputSystem;
+using UnityEngine.UI;
 
 /// <summary>
 /// Opens and closes the inventory panel with the I key.
@@ -29,6 +31,25 @@ public class InventoryUI : MonoBehaviour
     [Tooltip("Pause the game (Time.timeScale = 0) while the inventory is open.")]
     public bool pauseGameWhileOpen = true;
 
+    [Header("Batch Delete")]
+    [Tooltip("Dropdown for selecting the max rarity threshold to delete.")]
+    [SerializeField] private TMP_Dropdown batchRarityDropdown;
+
+    [Tooltip("Button that opens the batch-delete confirmation panel.")]
+    [SerializeField] private Button batchDeleteButton;
+
+    [Tooltip("Confirmation overlay panel (hidden by default).")]
+    [SerializeField] private GameObject batchConfirmPanel;
+
+    [Tooltip("Label inside the confirmation panel describing what will be deleted.")]
+    [SerializeField] private TMP_Text batchConfirmLabel;
+
+    [Tooltip("Confirm button inside the confirmation panel.")]
+    [SerializeField] private Button batchConfirmButton;
+
+    [Tooltip("Cancel button inside the confirmation panel.")]
+    [SerializeField] private Button batchCancelButton;
+
     // ─── Private State ────────────────────────────────────────────────────────
 
     public static bool IsDragging { get; set; }
@@ -49,15 +70,27 @@ public class InventoryUI : MonoBehaviour
             inventoryPanel.SetActive(false);
     }
 
+    // Rarity colours for TMP rich-text dropdown labels (matches ItemData.RarityHex)
+    private static readonly string[] RarityHex =
+    {
+        "FFFFFF", // Normal
+        "1EFF00", // Uncommon
+        "0070DD", // Rare
+        "A335EE", // Epic
+        "FF8000", // Legendary
+        "FF1A1A", // Godly
+    };
+
     void Start()
     {
-
         _characterWindow = FindFirstObjectByType<CharacterWindow>();
 
         // In solo mode the player instance is ready at Start; in MP it may arrive later
         // via PlayerInventory.SetAsLocalInstance() → call SubscribeToInventoryIfNeeded()
         // there and also whenever the inventory is opened as a safety net.
         SubscribeToInventoryIfNeeded();
+
+        InitBatchDeleteUI();
     }
 
     void OnDestroy()
@@ -99,6 +132,83 @@ public class InventoryUI : MonoBehaviour
             _pendingRefresh = false;
             RefreshGrid();
         }
+    }
+
+    // ─── Batch Delete ─────────────────────────────────────────────────────────
+
+    private void InitBatchDeleteUI()
+    {
+        if (batchConfirmPanel != null)
+            batchConfirmPanel.SetActive(false);
+
+        if (batchRarityDropdown != null)
+        {
+            batchRarityDropdown.ClearOptions();
+            var options = new List<TMP_Dropdown.OptionData>();
+            var rarities = (ItemRarity[])System.Enum.GetValues(typeof(ItemRarity));
+            foreach (ItemRarity r in rarities)
+            {
+                string hex = RarityHex[(int)r];
+                options.Add(new TMP_Dropdown.OptionData($"<color=#{hex}>{r}</color>"));
+            }
+            batchRarityDropdown.AddOptions(options);
+        }
+
+        if (batchDeleteButton != null)
+            batchDeleteButton.onClick.AddListener(OnBatchDeleteClicked);
+
+        if (batchConfirmButton != null)
+            batchConfirmButton.onClick.AddListener(OnConfirmBatchDelete);
+
+        if (batchCancelButton != null)
+            batchCancelButton.onClick.AddListener(OnCancelBatchDelete);
+    }
+
+    private void OnBatchDeleteClicked()
+    {
+        if (batchRarityDropdown == null || batchConfirmPanel == null || batchConfirmLabel == null) return;
+        if (PlayerInventory.Instance == null) return;
+
+        ItemRarity maxRarity = (ItemRarity)batchRarityDropdown.value;
+        int count = PlayerInventory.Instance.CountDeletable(maxRarity);
+        string hex = RarityHex[(int)maxRarity];
+
+        if (count == 0)
+        {
+            batchConfirmLabel.text = $"No non-equipped items of <color=#{hex}>{maxRarity}</color> or below to delete.";
+        }
+        else
+        {
+            batchConfirmLabel.text =
+                $"Delete all <color=#{hex}>{maxRarity}</color> and below?\n" +
+                $"<b>{count} item{(count == 1 ? "" : "s")}</b> will be removed.\n" +
+                "<size=80%>Equipped items are safe.</size>";
+        }
+
+        batchConfirmPanel.SetActive(true);
+
+        // Only enable confirm if there's something to delete
+        if (batchConfirmButton != null)
+            batchConfirmButton.interactable = count > 0;
+    }
+
+    private void OnConfirmBatchDelete()
+    {
+        if (PlayerInventory.Instance == null) return;
+
+        ItemRarity maxRarity = (ItemRarity)batchRarityDropdown.value;
+        int deleted = PlayerInventory.Instance.DeleteByMaxRarity(maxRarity);
+
+        if (batchConfirmPanel != null)
+            batchConfirmPanel.SetActive(false);
+
+        Debug.Log($"[InventoryUI] Batch deleted {deleted} item(s) ≤ {maxRarity}.");
+    }
+
+    private void OnCancelBatchDelete()
+    {
+        if (batchConfirmPanel != null)
+            batchConfirmPanel.SetActive(false);
     }
 
     // ─── Toggle ───────────────────────────────────────────────────────────────

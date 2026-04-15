@@ -446,9 +446,9 @@ public class PlayerController : NetworkBehaviour
         if (SceneTransitionManager.Instance != null)
             SceneTransitionManager.Instance.FadeIn();
 
-        // Re-lock cursor for gameplay
-        Cursor.lockState = CursorLockMode.Locked;
-        Cursor.visible   = false;
+        // Isometric: cursor must always be visible and free for aiming.
+        Cursor.lockState = CursorLockMode.None;
+        Cursor.visible   = true;
 
         Debug.Log($"[PlayerController] Respawned at {spawnPos}");
     }
@@ -679,20 +679,8 @@ public class PlayerController : NetworkBehaviour
         }
 
         // ── Rotation ──────────────────────────────────────────────────────────
-        // While casting: always rotate toward camera forward (includes after grace expires).
-        if (_spellCaster != null && _spellCaster.IsActive)
-        {
-            Vector3 camDir = cameraTransform.forward;
-            camDir.y = 0f;
-            if (camDir.sqrMagnitude > 0.001f)
-            {
-                Quaternion targetRot = Quaternion.LookRotation(camDir);
-                transform.rotation = Quaternion.RotateTowards(
-                    transform.rotation, targetRot, rotationSpeed * Time.deltaTime);
-            }
-        }
-        // Face the locked target only when idle or walking (not while sprinting)
-        else if (lockOn != null && lockOn.IsLockedOn && !isSprinting)
+        // Priority 1 — soft-lock: face the locked enemy while not sprinting.
+        if (lockOn != null && lockOn.IsLockedOn && !isSprinting)
         {
             Vector3 toTarget = lockOn.LockTarget.position - transform.position;
             toTarget.y = 0f;
@@ -703,14 +691,27 @@ public class PlayerController : NetworkBehaviour
                     transform.rotation, targetRotation, lockOn.lockRotationSpeed * Time.deltaTime);
             }
         }
-        else
+        // Priority 2 — unified aim: IsoAim provides the world point for whichever
+        // device is active (mouse cursor or gamepad right stick via IsoControllerAim).
+        else if (IsoAim.HasHit)
+        {
+            Vector3 aimDir = IsoAim.AimDirectionFrom(transform.position);
+            if (aimDir.sqrMagnitude > 0.001f)
+            {
+                Quaternion targetRot = Quaternion.LookRotation(aimDir);
+                transform.rotation = Quaternion.RotateTowards(
+                    transform.rotation, targetRot, rotationSpeed * Time.deltaTime);
+            }
+        }
+        // Priority 3 — fallback: face movement direction when no aim data exists.
+        else if (isMoving)
         {
             Vector3 flatMove = new Vector3(move.x, 0f, move.z);
             if (flatMove.magnitude > 0.1f)
             {
-                Quaternion targetRotation = Quaternion.LookRotation(flatMove);
+                Quaternion targetRot = Quaternion.LookRotation(flatMove);
                 transform.rotation = Quaternion.RotateTowards(
-                    transform.rotation, targetRotation, rotationSpeed * Time.deltaTime);
+                    transform.rotation, targetRot, rotationSpeed * Time.deltaTime);
             }
         }
 

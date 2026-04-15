@@ -1,15 +1,31 @@
 using UnityEngine;
 using UnityEngine.InputSystem;
 
+/// <summary>
+/// Isometric soft-target system.
+///
+/// Tab (keyboard) / R3 (gamepad) cycles to the nearest enemy and locks the player's
+/// facing toward it. The camera does NOT move — this is purely a rotation aid and
+/// combat-focus tool, not a third-person orbit.
+///
+/// While a target is soft-locked:
+///   - The player rotates to face the enemy at all times (except while sprinting).
+///   - The strafing blend tree activates so movement reads as directional relative
+///     to the target.
+///   - Spells still aim toward the mouse cursor; the soft-lock only controls facing.
+///
+/// The right-stick switch (gamepad) cycles between visible enemies in the pushed
+/// direction without changing the camera.
+/// </summary>
 public class LockOnSystem : MonoBehaviour
 {
-    // ─── Lock-On Settings ─────────────────────────────────────────────────────
+    // ─── Soft-Target Settings ─────────────────────────────────────────────────
 
-    [Header("Lock-On Settings")]
-    [Tooltip("Maximum distance to search for lockable enemies.")]
+    [Header("Soft-Target Settings")]
+    [Tooltip("Maximum distance to search for targetable enemies.")]
     public float lockRange = 20f;
 
-    [Tooltip("How fast the player rotates toward the locked target.")]
+    [Tooltip("How fast the player rotates toward the soft-locked target.")]
     public float lockRotationSpeed = 720f;
 
     [Tooltip("Tag used to identify enemy GameObjects.")]
@@ -17,8 +33,8 @@ public class LockOnSystem : MonoBehaviour
 
     // ─── Indicator ────────────────────────────────────────────────────────────
 
-    [Header("Indicator")]
-    [Tooltip("Prefab shown above the locked enemy (assign a sprite/quad with your target icon).")]
+    [Header("Target Indicator")]
+    [Tooltip("Prefab shown above the soft-locked enemy (assign a sprite/quad with your target icon).")]
     [SerializeField] private GameObject indicatorPrefab;
 
     [Tooltip("Height offset above the enemy pivot where the indicator floats.")]
@@ -42,13 +58,13 @@ public class LockOnSystem : MonoBehaviour
     // ─── Input ────────────────────────────────────────────────────────────────
 
     [Header("Input")]
-    [Tooltip("Button that toggles lock-on. Default: Tab (keyboard).")]
+    [Tooltip("Button that toggles soft-target. Default: Tab (keyboard) / R3 (gamepad).")]
     [SerializeField] private InputAction lockOnAction = new InputAction(
         type: InputActionType.Button,
         binding: "<Keyboard>/tab"
     );
 
-    [Tooltip("Axis used to switch between targets. Default: right gamepad stick.")]
+    [Tooltip("Axis used to cycle between targets (isometric: camera stays put). Default: right gamepad stick.")]
     [SerializeField] private InputAction switchAction = new InputAction(
         name: "SwitchTarget",
         type: InputActionType.Value,
@@ -58,10 +74,10 @@ public class LockOnSystem : MonoBehaviour
 
     // ─── Public State ─────────────────────────────────────────────────────────
 
-    /// <summary>Currently locked enemy transform, or null.</summary>
+    /// <summary>Currently soft-locked enemy transform, or null.</summary>
     public Transform LockTarget { get; private set; }
 
-    /// <summary>True when a target is actively locked.</summary>
+    /// <summary>True when an enemy is soft-locked.</summary>
     public bool IsLockedOn => LockTarget != null;
 
     // ─── Private ──────────────────────────────────────────────────────────────

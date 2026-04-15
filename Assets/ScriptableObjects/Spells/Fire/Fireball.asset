@@ -33,3 +33,11 @@ MonoBehaviour:
   projectileCount: 1
   spreadAngle: 20
   castSound: {fileID: 0}
+  telegraphShape: 3
+  telegraphRadius: 3
+  telegraphAngle: 90
+  telegraphLength: 6
+  telegraphWidth: 0.5
+  telegraphColor: {r: 0.7264151, g: 0, b: 0, a: 0.5372549}
+  telegraphFollowsCursor: 1
+  telegraphOriginOffset: 1

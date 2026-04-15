@@ -19,6 +19,9 @@ public class SpellCaster : NetworkBehaviour
     [Tooltip("Spawn point for projectiles. Defaults to this transform if unassigned.")]
     public Transform firePoint;
 
+    [Tooltip("Telegraph projector on this player. Assign the TelegraphProjector component here.")]
+    [SerializeField] private TelegraphProjector _telegraphProjector;
+
 
     // ─── Cast State ───────────────────────────────────────────────────────────
 
@@ -143,6 +146,7 @@ public class SpellCaster : NetworkBehaviour
         if (_state == CastState.Idle) return;
         _audioSource?.Stop();
         StopChannel();
+        _telegraphProjector?.Hide();
         _state  = CastState.Idle;
         _timer  = 0f;
         _active = null;
@@ -298,6 +302,7 @@ public class SpellCaster : NetworkBehaviour
                     }
                     else
                     {
+                        _telegraphProjector?.Hide();
                         _state  = CastState.Idle;
                         _active = null;
                         _timer  = 0f;
@@ -309,6 +314,7 @@ public class SpellCaster : NetworkBehaviour
                 if (!IsCastHeld())
                 {
                     StopChannel();
+                    _telegraphProjector?.Hide();
                     _state  = CastState.Idle;
                     _active = null;
                     OnChannelEnd?.Invoke();
@@ -362,6 +368,7 @@ public class SpellCaster : NetworkBehaviour
             }
             else
             {
+                _telegraphProjector?.Hide();
                 _state  = CastState.Idle;
                 _active = null;
                 _timer  = 0f;
@@ -393,6 +400,10 @@ public class SpellCaster : NetworkBehaviour
         _active            = spell;
         _castStartTime     = Time.time;
         _throwEventFired   = false;
+
+        // Show telegraph as soon as the cast begins so the player sees the preview
+        // during the full windup + cast-bar window.
+        _telegraphProjector?.Show(spell, transform);
 
         if (spell.castStartDelay > 0f)
         {
@@ -426,6 +437,7 @@ public class SpellCaster : NetworkBehaviour
         }
         else
         {
+            _telegraphProjector?.Hide();
             _state  = CastState.Idle;
             _active = null;
             _timer  = 0f;
@@ -442,10 +454,27 @@ public class SpellCaster : NetworkBehaviour
         // Lazy-init camera (may not be ready at Start in multiplayer)
         if (_cameraTransform == null) _cameraTransform = Camera.main?.transform;
 
-        // Use the camera's full rotation (pitch + yaw) so the spell aims where the
-        // player is looking, including up/down. Falls back to the fire point rotation
-        // if no camera is found (e.g. dedicated server context).
-        Quaternion aimRot = _cameraTransform != null ? _cameraTransform.rotation : origin.rotation;
+        // Isometric aim: point toward the cursor's world position (flat, no pitch).
+        // Falls back to camera forward (flattened) if the cursor ray missed, then to
+        // the fire-point rotation for dedicated-server contexts with no camera.
+        Quaternion aimRot;
+        if (IsoAim.HasHit)
+        {
+            Vector3 aimDir = IsoAim.AimDirectionFrom(origin.position);
+            aimRot = Quaternion.LookRotation(aimDir);
+        }
+        else if (_cameraTransform != null)
+        {
+            Vector3 camFwd = _cameraTransform.forward;
+            camFwd.y = 0f;
+            aimRot = camFwd.sqrMagnitude > 0.001f
+                ? Quaternion.LookRotation(camFwd.normalized)
+                : origin.rotation;
+        }
+        else
+        {
+            aimRot = origin.rotation;
+        }
 
         Vector3 firePos = _active.spawnOrigin == SpellSpawnOrigin.Caster
             ? transform.position : origin.position;

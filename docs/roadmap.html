@@ -180,11 +180,11 @@
 <!-- ROADMAP TAB -->
 <div id="view-roadmap">
   <div class="timeline-section">
-    <div class="timeline-label">Progress — V0.1 · Q1 2026 to V2.0 · Mid 2028</div>
-    <div class="timeline-bar"><div class="timeline-fill" style="width:25%"></div></div>
+    <div class="timeline-label">Progress — V0.1 Complete · Q1 2026 to V2.0 · Mid 2028</div>
+    <div class="timeline-bar"><div class="timeline-fill" style="width:10%"></div></div>
     <div class="timeline-quarters">
-      <span class="timeline-q current">Q1 '26</span>
-      <span class="timeline-q">Q2 '26</span>
+      <span class="timeline-q">Q1 '26</span>
+      <span class="timeline-q current">Q2 '26</span>
       <span class="timeline-q">Q3 '26</span>
       <span class="timeline-q">Q4 '26</span>
       <span class="timeline-q">Q1 '27</span>
@@ -204,187 +204,66 @@
 
     <div class="cl-entry">
       <div class="cl-header">
-        <div class="cl-version">V0.06</div>
-        <div><div class="cl-title">Spell System Overhaul</div><span class="status-badge badge-active">In Progress</span></div>
-        <div class="cl-date">April 9, 2026</div>
+        <div class="cl-version">V0.2</div>
+        <div><div class="cl-title">Spells, Skill Tree &amp; Polish</div><span class="status-badge badge-active">In Progress</span></div>
+        <div class="cl-date">April 2026 — In Progress</div>
       </div>
-      <div class="cl-section-title">Spell Cast State Machine</div>
+      <div class="cl-section-title">Spells</div>
       <ul class="cl-list">
-        <li>SpellCaster rewritten with 4-state machine: Idle → PreCast → Pending → Channeling</li>
-        <li>SpellData expanded: spellType (Cast / Buff / Aura / Channel), castStartDelay, castTime, throwAnimLeadTime per spell</li>
-        <li>Multi-projectile support: projectileCount + spreadAngle fields on SpellData</li>
-        <li>Server resolves spell prefab by name from NetworkManager registry — no ordered array or enum mapping needed</li>
+        <li>HealingWave — AoE heal spell, server-authoritative, SpellData asset + runtime</li>
+        <li>StatusEffectHandler — stun system; stun blocks casts and movement; highest-value-wins (no stacking)</li>
+        <li>PlayerNameTag — world-space TMP billboard, NGO-synced to LobbyPlayer.PlayerName</li>
+        <li>DebugLogger — in-game dev log overlay</li>
       </ul>
-      <div class="cl-section-title">Interrupt System</div>
+      <div class="cl-section-title">Skill Tree</div>
       <ul class="cl-list">
-        <li>Per-spell interrupt rules: movementInterruptGrace + damageInterruptGrace configurable on SpellData</li>
-        <li>Stun always bypasses both grace windows and cancels the cast immediately</li>
+        <li>SkillTreeNode: multi-level support (maxLevel, scalingFactor) — nodes can be leveled up multiple times</li>
+        <li>New stat bonuses: STR/AGI/INT flat per level; spell/fire/heal damage percent bonuses</li>
+        <li>SkillTreeManager: aggregates all per-stat totals; _nodeLevels Dictionary; Awake panel-hide</li>
       </ul>
-      <div class="cl-section-title">Status Effects</div>
+      <div class="cl-section-title">Wave &amp; Player Systems</div>
       <ul class="cl-list">
-        <li>StatusEffectHandler — stun duration tracking, highest-value-wins (no stacking), calls SpellCaster.CancelByStun() on apply</li>
-        <li>PlayerController honours IsStunned — all movement and input blocked while stunned</li>
+        <li>WaveManager: WaveRewardEntry — per-wave custom item drops; RegisterPlayer() fixes MP spawn-order race</li>
+        <li>PlayerController.All — static registry, GC-free alternative to FindGameObjectsWithTag</li>
+        <li>PlayerController: IsSprinting / CancelSprint() for spell-cast interaction; cast momentum carry-through</li>
+        <li>ExperienceManager: InitializeStartingLevel() for inspector testing; SyncMaxHealthToServer()</li>
       </ul>
-      <div class="cl-section-title">Player Name Tags</div>
+      <div class="cl-section-title">Settings &amp; Debug</div>
       <ul class="cl-list">
-        <li>PlayerNameTag — world-space TMP billboard above each player, syncs to LobbyPlayer.PlayerName NetworkVariable</li>
-        <li>Billboards to Camera.main each LateUpdate; hidden for the local owner when configured</li>
-        <li>Solo fallback: shows "Player" when NGO is not active</li>
+        <li>SettingsManager + SettingsUI — master &amp; music volume sliders, persisted via PlayerPrefs</li>
+        <li>UI_FPSCounter — F3 toggle overlay showing smoothed FPS, ms, and memory usage</li>
       </ul>
-      <div class="cl-section-title">Cast Bar UI</div>
-      <ul class="cl-list">
-        <li>SpellCastBarUI fully event-driven — subscribes to OnCastBegin / OnCastComplete / OnChannelBegin / OnChannelEnd</li>
-        <li>Orange fill for casting, blue for channeling; channel tick resets bar on each tick</li>
-      </ul>
-      <div class="cl-note"><strong>WIP:</strong> Spell system framework is in — wiring remaining spell types (Buff, Aura) and integrating status effects into enemy hits. Ships when all four spell types have at least one working implementation.</div>
     </div>
 
     <div class="cl-entry">
       <div class="cl-header">
-        <div class="cl-version">V0.05</div>
-        <div><div class="cl-title">Networking Polish</div><span class="status-badge badge-completed">Completed</span></div>
-        <div class="cl-date">April 7, 2026</div>
+        <div class="cl-version">V0.1</div>
+        <div><div class="cl-title">Foundation</div><span class="status-badge badge-completed">Completed</span></div>
+        <div class="cl-date">April 3–11, 2026</div>
       </div>
-      <div class="cl-section-title">Enemy & Visuals</div>
+      <div class="cl-section-title">Core Systems (v0.01)</div>
       <ul class="cl-list">
-        <li>EnemyColorRandomizer — random hue applied to each enemy on spawn, replicated to all clients</li>
+        <li>Player movement, sprint, stamina, melee, fireball — isometric and third-person camera</li>
+        <li>Enemy AI state machine via NavMesh; wave manager; XP/leveling with STR/AGI/INT stats</li>
+        <li>Spell bar (10 slots), character window, inventory, item drops, damage popups, pause, death screen</li>
       </ul>
-      <div class="cl-section-title">Lobby</div>
+      <div class="cl-section-title">Networking (v0.02–v0.03)</div>
       <ul class="cl-list">
-        <li>LobbyChatManager — real-time chat in the lobby, messages sent via ServerRpc and broadcast via ClientRpc</li>
+        <li>Unity NGO integrated — Host/Join from Main Menu, lobby (class select, ready system, Force Start)</li>
+        <li>Spectator free-cam mode (WASD + gamepad); LobbyPlayer NetworkObject survives scene transitions</li>
+        <li>Player as spawnable NetworkObject with OwnerNetworkTransform; per-player ExperienceManager &amp; PlayerInventory</li>
+        <li>PlayerUILinker wires HP/XP/Stamina bars after NGO spawn; ServerRpc death/respawn</li>
       </ul>
-      <div class="cl-section-title">NGO Optimization</div>
+      <div class="cl-section-title">Enemy Networking &amp; Polish (v0.04–v0.05)</div>
       <ul class="cl-list">
-        <li>Reduced unnecessary RPC calls across enemy and player systems</li>
-        <li>NetworkVariable update frequency tuned — fewer dirty checks per frame</li>
+        <li>EnemyAI &amp; EnemyReward as NetworkBehaviour — server-authoritative AI, nearest-player targeting</li>
+        <li>LootPickup replaces CoinPickup &amp; ItemPickup — XP, HP, Mana, Items in one component</li>
+        <li>CollectServerRpc — no double-collect in co-op; NetworkObject.Despawn() on pickup</li>
+        <li>EnemyColorRandomizer; LobbyChatManager; NGO RPC/NetworkVariable optimization</li>
+        <li>PlayerAttack promoted to NetworkBehaviour; OnNetworkSpawn disables on non-owners</li>
+        <li>URP finalized; SpellCaster state machine (PreCast, Pending, Channeling); SpellCastBarUI event-driven; HP regen</li>
       </ul>
-      <div class="cl-note"><strong>Next:</strong> Spell system overhaul — cast types, interrupt rules, status effects, player name tags — V0.06</div>
-    </div>
-
-    <div class="cl-entry">
-      <div class="cl-header">
-        <div class="cl-version">V0.04</div>
-        <div><div class="cl-title">Enemy Networking</div><span class="status-badge badge-completed">Completed</span></div>
-        <div class="cl-date">April 6, 2026</div>
-      </div>
-      <div class="cl-section-title">Enemy AI — Multiplayer</div>
-      <ul class="cl-list">
-        <li>EnemyAI promoted from MonoBehaviour to NetworkBehaviour — all AI logic runs server-side only</li>
-        <li>Attack animation synced to all clients via TriggerAttackAnimClientRpc</li>
-        <li>Multi-player targeting: RefreshNearestTarget() scans all Player-tagged objects every retargetInterval seconds and locks onto the closest one</li>
-        <li>SetTarget() retained for EnemySpawner compatibility; retarget loop overrides it if a closer player exists</li>
-      </ul>
-      <div class="cl-section-title">Enemy Reward — Multiplayer</div>
-      <ul class="cl-list">
-        <li>EnemyReward promoted to NetworkBehaviour — rewards fire server-side only, not on every client</li>
-        <li>XP awarded to all connected players via per-player GetComponent — no global singleton</li>
-        <li>HP heal targets the nearest player instead of a random FindGameObjectWithTag result</li>
-        <li>Drops use NetworkObject.Spawn() so they replicate to all clients; warns if a drop prefab lacks NetworkObject</li>
-      </ul>
-      <div class="cl-section-title">LootPickup — Replaces CoinPickup & ItemPickup</div>
-      <ul class="cl-list">
-        <li>CoinPickup renamed and expanded to LootPickup — supports XP, HP, Mana (stub), and Item/Material in one component</li>
-        <li>OnTriggerEnter → CollectServerRpc pattern prevents double-collection across clients</li>
-        <li>Server resolves the collecting player by ClientId — rewards go to the correct player</li>
-        <li>NetworkObject.Despawn() replaces Destroy() — pickup disappears for all clients simultaneously</li>
-        <li>FX (particles/sound) fire on all clients via PlayFXClientRpc; lifetime expiry is server-authoritative</li>
-        <li>ItemPickup merged in — LootPickup type Material fully replaces it</li>
-        <li>CoinPickup.cs and ItemPickup.cs left as deprecation stubs — safe to delete after prefabs are updated</li>
-      </ul>
-      <div class="cl-note"><strong>Next:</strong> Combat sync — server-authoritative HP, networked damage and projectiles — V0.2</div>
-    </div>
-
-    <div class="cl-entry">
-      <div class="cl-header">
-        <div class="cl-version">V0.03</div>
-        <div><div class="cl-title">Co-op Player Prefab</div><span class="status-badge badge-completed">Completed</span></div>
-        <div class="cl-date">April 5, 2026</div>
-      </div>
-      <div class="cl-section-title">Player Spawning</div>
-      <ul class="cl-list">
-        <li>Player converted from scene object to spawnable NetworkObject prefab</li>
-        <li>PlayerSpawner — one player per connected client with correct NGO ownership</li>
-        <li>Terrain.SampleHeight() for accurate spawn Y regardless of terrain elevation</li>
-        <li>OwnerNetworkTransform — client-authoritative movement, no server lag</li>
-        <li>ApplySpawnPositionClientRpc — owner client sets its own position, fixes prefab Y=0 desync</li>
-        <li>CharacterController frozen on spawn, re-enabled only after position is confirmed</li>
-        <li>Spectators skipped from spawn; non-spectators use contiguous spawn points</li>
-        <li>Tested and working for 1–4 players simultaneously</li>
-      </ul>
-      <div class="cl-section-title">Per-Player UI & Singletons</div>
-      <ul class="cl-list">
-        <li>SetAsLocalInstance() — ExperienceManager and PlayerInventory isolated per player</li>
-        <li>PlayerUILinker — dynamically wires HP bar, XP bar, stamina and labels after NGO spawn</li>
-        <li>SpectatorSetup fix — HUD only hidden when class = Spectator, not for all non-host clients</li>
-        <li>Camera retry loop — handles null Camera.main at spawn time without crashing</li>
-      </ul>
-      <div class="cl-section-title">Multiplayer Compatibility</div>
-      <ul class="cl-list">
-        <li>PauseManager — opening panels no longer freezes Time.timeScale in multiplayer</li>
-        <li>Death screen — no timeScale freeze in MP, respawn RPC heals and teleports instead of scene reload</li>
-        <li>CoinPickup — awards XP to the player who touches the coin, not a global singleton</li>
-        <li>PlayerAttack and HealthSystem — use per-player cached component references</li>
-      </ul>
-      <div class="cl-section-title">Lobby Polish</div>
-      <ul class="cl-list">
-        <li>Spectator added as a selectable class in the lobby</li>
-        <li>Session mode label — shows Single Player Session or Multiplayer Mode live</li>
-        <li>Player numbering is 1-based — Player 1, 2, 3 instead of 0, 1, 2</li>
-      </ul>
-      <div class="cl-note"><strong>Next:</strong> Combat sync — server-authoritative damage, networked HP bar, networked projectiles — V0.2</div>
-    </div>
-
-    <div class="cl-entry">
-      <div class="cl-header">
-        <div class="cl-version">V0.02</div>
-        <div><div class="cl-title">Networking Foundation</div><span class="status-badge badge-completed">Completed</span></div>
-        <div class="cl-date">April 4, 2026</div>
-      </div>
-      <div class="cl-section-title">Networking</div>
-      <ul class="cl-list">
-        <li>Unity Netcode for GameObjects (NGO) integrated</li>
-        <li>NetworkManager + UnityTransport set up in MainMenu scene</li>
-        <li>Host / Spectate flow from Main Menu — no port forwarding needed on LAN</li>
-        <li>NGO scene management moves all clients between scenes automatically</li>
-      </ul>
-      <div class="cl-section-title">Spectator Mode</div>
-      <ul class="cl-list">
-        <li>Free-roam spectator camera — WASD, Q/E up/down, Right Mouse to look, Shift for fast speed</li>
-        <li>Mouse and gamepad both supported in spectator</li>
-        <li>All player HUD hidden for spectators</li>
-      </ul>
-      <div class="cl-section-title">Lobby Scene</div>
-      <ul class="cl-list">
-        <li>LobbyScene added to build</li>
-        <li>LobbyPlayer NetworkObject spawned per client — survives scene transitions</li>
-        <li>Synced player name editable in lobby</li>
-        <li>Class selection: Random, Warrior, Mage, Rogue</li>
-        <li>Ready system — Start Game only enables when all players ready</li>
-        <li>Force Start override for host</li>
-        <li>Player list shows P# in yellow, Host in red, class and ready status per row</li>
-        <li>Disconnect button returns cleanly to Main Menu</li>
-      </ul>
-      <div class="cl-note"><strong>Next:</strong> Convert player to spawnable prefab — required for co-op (V0.03)</div>
-    </div>
-
-    <div class="cl-entry">
-      <div class="cl-header">
-        <div class="cl-version">V0.01</div>
-        <div><div class="cl-title">First Build</div><span class="status-badge badge-completed">Completed</span></div>
-        <div class="cl-date">April 3, 2026</div>
-      </div>
-      <div class="cl-section-title">Core Systems</div>
-      <ul class="cl-list">
-        <li>Player movement, sprinting, stamina system</li>
-        <li>Melee attack with STR scaling and AGI cooldown reduction</li>
-        <li>Fireball shooter, isometric and third-person camera</li>
-        <li>Enemy AI state machine — Idle, Chase, Attack via NavMesh</li>
-        <li>Enemy spawner, wave manager, XP and leveling with STR/AGI/INT stats</li>
-        <li>Coin pickups, item spawner, inventory and equip system</li>
-        <li>Spell bar 10 slots, character window, damage popups, pause menu, death screen</li>
-        <li>Scene transitions with fade to black</li>
-      </ul>
-      <div class="cl-note"><strong>Note:</strong> All assets are placeholders. First ever build compiled and uploaded.</div>
+      <div class="cl-note"><strong>Note:</strong> All assets are placeholders. Covers builds v0.01 through v0.05 + spell system framework.</div>
     </div>
 
   </div>
@@ -433,8 +312,8 @@
       <div class="reco-card-title">Suggested Timeline</div>
       <table class="phase-table">
         <tr><th>Version</th><th>When</th><th>Focus</th><th>Serves the loop</th></tr>
-        <tr><td class="v">V0.01–V0.04</td><td class="w">Done</td><td class="focus">Core game + networking + player prefab + enemy networking</td><td class="why">Foundation</td></tr>
-        <tr><td class="v">V0.2</td><td class="w">Q2 2026</td><td class="focus">Combat sync</td><td class="why">Fair co-op hits</td></tr>
+        <tr><td class="v">V0.1–V0.2</td><td class="w">Done</td><td class="focus">Foundation + spells, skill tree, settings, FPS overlay</td><td class="why">Foundation</td></tr>
+        <tr><td class="v">V0.3</td><td class="w">Q2 2026</td><td class="focus">Combat sync</td><td class="why">Fair co-op hits</td></tr>
         <tr><td class="v">V0.25</td><td class="w">Q3 2026 — Summer</td><td class="focus">Online multiplayer (Unity Relay)</td><td class="why">Play anywhere, no port forwarding</td></tr>
         <tr><td class="v">V0.3</td><td class="w">Q3 2026</td><td class="focus">First dungeon run prototype</td><td class="why loop-marker">Loop proof-of-concept</td></tr>
         <tr><td class="v">V0.4</td><td class="w">Q4 2026</td><td class="focus">Per-player XP + hub placeholder</td><td class="why loop-marker">Return to hub works</td></tr>
@@ -485,77 +364,58 @@
 //  phase:  "p1" | "p2" | "p3" | "p4"
 // ─────────────────────────────────────────────────────────────────────────────
 const VERSIONS = [
-  {version:"V0.01",title:"First Build",status:"completed",quarter:"Q1 2026",date:"April 3, 2026",phase:"p1",loop:null,
-   bullets:["Core player systems","Enemy AI & spawning","XP & leveling"],
-   details:["Player movement, sprinting, stamina, jumping","Melee attack STR scaling, fireball shooter","Isometric and third-person camera","Enemy AI via NavMesh, wave manager","XP/leveling STR/AGI/INT, inventory, spell bar","Character window, damage popups, pause, death screen"],
-   note:"All assets are placeholders. First ever build compiled."},
+  {version:"V0.1",title:"Foundation",status:"completed",quarter:"Q1 2026",date:"April 3–11, 2026",phase:"p1",loop:null,
+   bullets:["Core player, enemy AI, waves, XP, inventory","NGO networking — Host/Join, lobby, co-op player prefab","Networked enemies, LootPickup, NGO optimizations","SpellCaster state machine + SpellCastBarUI"],
+   details:["Player movement, sprint, stamina, melee, fireball; Enemy AI via NavMesh; wave manager","XP/leveling STR/AGI/INT; spell bar (10 slots); character window; inventory; damage popups","NGO integrated: Host/Join, lobby (class select, ready system), spectator free-cam","Player as spawnable NetworkObject with OwnerNetworkTransform — per-player ExperienceManager & PlayerInventory","PlayerUILinker wires HP/XP/Stamina bars after NGO spawn; ServerRpc death/respawn","EnemyAI & EnemyReward as NetworkBehaviour; server-authoritative AI; nearest-player targeting","LootPickup replaces CoinPickup & ItemPickup — CollectServerRpc prevents double-collect","EnemyColorRandomizer; LobbyChatManager; NGO optimization; PlayerAttack promoted to NetworkBehaviour","SpellCaster state machine (PreCast, Pending, Channeling, Idle); SpellCastBarUI event-driven; HP regen; URP finalized"],
+   note:"Covers v0.01 through v0.05 + spell system framework. All assets are placeholders."},
 
-  {version:"V0.02",title:"Networking Foundation",status:"completed",quarter:"Q1 2026",date:"April 4, 2026",phase:"p1",loop:null,
-   bullets:["Host/Join from Main Menu","Lobby with class selection","Ready system + LobbyPlayer persists"],
-   details:["Unity NGO + NetworkManager + UnityTransport set up","Free-roam spectator camera (WASD + gamepad)","LobbyScene: name, class selection, ready system","Force Start for host, Disconnect button","LobbyPlayer NetworkObject survives scene transitions"],
-   note:"All players still use the same character. Co-op spawning comes in V0.03."},
-
-  {version:"V0.03",title:"Co-op Player Prefab",status:"completed",quarter:"Q1 2026",date:"April 5, 2026",phase:"p1",loop:null,
-   bullets:["Player is a spawnable NetworkObject","1–4 players each own their character","UI, pause, and death all multiplayer-aware"],
-   details:["Player converted to NetworkObject prefab — PlayerSpawner spawns one per client","Terrain.SampleHeight() finds correct spawn Y on any terrain","OwnerNetworkTransform — client-authoritative movement","ApplySpawnPositionClientRpc — fixes prefab Y=0 desync at spawn","CharacterController frozen until spawn position confirmed","Per-player ExperienceManager and PlayerInventory via SetAsLocalInstance()","PlayerUILinker wires HP/XP/stamina UI at runtime","SpectatorSetup fixed — HUD only hidden when class = Spectator","PauseManager skips Time.timeScale freeze in multiplayer","Death screen: no time freeze, respawn RPC instead of scene reload","Spectator added as lobby class, session mode label, 1-based player numbering"],
-   note:"Single most important architectural step for co-op — everything else depends on this being solid."},
-
-  {version:"V0.04",title:"Enemy Networking",status:"completed",quarter:"Q1 2026",date:"April 6, 2026",phase:"p1",loop:null,
-   bullets:["Enemies visible on all clients","Server-authoritative AI","Multi-player targeting — nearest player"],
-   details:["EnemySpawner uses NetworkObject.Spawn() — enemies appear for all clients","NetworkTransform syncs enemy positions and rotations","EnemyAI runs server-side only — clients receive synced state","AI retargeting: finds nearest player, not just first tagged","Enemy death synced — destruction triggered server-side","Foundation for dungeon room enemies at V0.6"],
+    {
+        version: "V0.2", title: "Spells, Skill Tree & Polish", status:"active",quarter:"Q2 2026",date:"In Progress — April 2026",phase:"p1",loop:null,
+   bullets:["HealingWave spell + stun system","Skill tree multi-level nodes with stat bonuses","Settings panel, FPS overlay, wave custom rewards"],
+   details:["HealingWave — AoE heal spell, server-authoritative, SpellData asset + runtime","StatusEffectHandler — stun system; stun blocks casts and movement; highest-value-wins","PlayerNameTag — world-space TMP billboard, NGO-synced to LobbyPlayer.PlayerName","SkillTreeNode: multi-level support (maxLevel, scalingFactor); STR/AGI/INT flat bonuses; spell/fire/heal % bonuses","WaveManager WaveRewardEntry — per-wave custom item drops; RegisterPlayer() fixes MP spawn-order race","PlayerController.All — static registry, GC-free alternative to FindGameObjectsWithTag","PlayerController: IsSprinting / CancelSprint() for spell-cast interaction; cast momentum carry-through","ExperienceManager: InitializeStartingLevel() for inspector testing; SyncMaxHealthToServer()","SettingsManager + SettingsUI — master & music volume sliders, persisted via PlayerPrefs","UI_FPSCounter — F3 toggle overlay showing smoothed FPS, ms, and memory usage"],
    note:null},
 
-  {version:"V0.05",title:"Networking Polish",status:"completed",quarter:"Q1 2026",date:"April 7, 2026",phase:"p1",loop:null,
-   bullets:["Enemy color randomization","Lobby chat (NGO synced)","NGO optimization pass","Local networking polish — WIP"],
-   details:["EnemyColorRandomizer — random hue applied per enemy on spawn, visible to all clients","LobbyChatManager — real-time chat in the lobby, messages synced via NGO ServerRpc / ClientRpc","NGO optimization — reduced unnecessary RPC calls and NetworkVariable update frequency","Local networking polish — lag, desync, and edge-case fixes for LAN co-op sessions"],
-   note:"Local networking polish is still in progress — this version ships when LAN co-op feels tight and stable before moving to combat sync."},
-
-  {version:"V0.06",title:"Spell System Overhaul",status:"active",quarter:"Q2 2026",date:"In Progress — April 9, 2026",phase:"p1",loop:null,
-   bullets:["Full cast state machine — PreCast, Pending, Channeling","Spell types: Cast, Buff, Aura, Channel","Interrupt rules with movement & damage grace windows","StatusEffectHandler — stun blocks casts and input","PlayerNameTag — world-space billboard labels"],
-   details:["SpellCaster rewritten with 4-state machine: Idle → PreCast → Pending → Channeling","SpellData expanded: spellType (Cast/Buff/Aura/Channel), castStartDelay, castTime, throwAnimLeadTime per spell","Interrupt rules per SpellData: movementInterruptGrace + damageInterruptGrace — stun always bypasses both","StatusEffectHandler — stun duration tracking, highest-value-wins (no stacking), calls SpellCaster.CancelByStun() on apply","PlayerController honours IsStunned — all movement and input blocked while stunned","PlayerNameTag — world-space TMP billboard above each player, syncs to LobbyPlayer.PlayerName NetworkVariable, billboards to Camera.main each LateUpdate","SpellCastBarUI event-driven rewrite — subscribes to OnCastBegin / OnCastComplete / OnChannelBegin / OnChannelEnd events; orange fill for casting, blue for channeling","Multi-projectile support: projectileCount + spreadAngle fields on SpellData","Server resolves spell prefab by name from NetworkManager registry — no ordered array or enum mapping needed"],
-   note:"The spell system now supports every major cast pattern: instant, timed, channeled, and buffed. Interrupt rules give each spell configurable resilience to movement and damage. StatusEffectHandler is the first status effect — built to extend with burn, slow, and more post-V0.6."},
-
-  {version:"V0.2",title:"Combat Sync",status:"planned",quarter:"Q2 2026",date:"Est. May – Jun 2026",phase:"p2",loop:null,
+  {version:"V0.25",title:"Combat Sync",status:"planned",quarter:"Q2 2026",date:"Est. May – Jun 2026",phase:"p2",loop:null,
    bullets:["HP synced across all clients","Server-authoritative damage","Networked projectiles"],
    details:["HealthSystem HP becomes NetworkVariable — synced to all clients","TakeDamage() routed through ServerRpc — server validates all hits","PlayerAttack ServerRpc — client requests, server applies damage","FireballShooter spawns projectiles as NetworkObjects","Critical foundation for fair co-op dungeon combat"],
    note:null},
 
-  {version:"V0.25",title:"Online Multiplayer (Unity Relay)",status:"planned",quarter:"Q3 2026",date:"Est. July 2026",phase:"p2",loop:"Play with anyone, anywhere",
+  {version:"V0.3",title:"Online Multiplayer (Unity Relay)",status:"planned",quarter:"Q3 2026",date:"Est. July 2026",phase:"p2",loop:"Play with anyone, anywhere",
    bullets:["Play over the internet without port forwarding","Join via a short code instead of an IP address","Powered by Unity Gaming Services Relay"],
    details:["Replace raw IP connection with Unity Relay — host allocates a relay slot and shares a join code (e.g. 'ABC-123')","Client joins by entering the join code instead of an IP address","No port forwarding required on the host's router","Free tier covers up to 50 concurrent users — sufficient for early co-op","Requires: Unity Gaming Services project link, Relay + Lobby packages, and changes to OnHost() / OnConnect() in MainMenuManager"],
    note:"LAN co-op already works. Moving this up to summer 2026 — before the dungeon is built — means every subsequent milestone can be tested by anyone, anywhere, without router configuration."},
 
-  {version:"V0.3",title:"First Dungeon Run Prototype",status:"planned",quarter:"Q3 2026",date:"Est. Aug – Sep 2026",phase:"p2",loop:"Proves the core loop end-to-end",
+  {version:"V0.4",title:"First Dungeon Run Prototype",status:"planned",quarter:"Q3 2026",date:"Est. Aug – Sep 2026",phase:"p2",loop:"Proves the core loop end-to-end",
    bullets:["Linear sequence of enemy encounters","First dungeon entrance from a hub area","Enter, fight, boss, return — even if rough"],
    details:["Simple linear dungeon: 3–4 combat encounters followed by a boss","Dungeon entrance: a zone that loads the dungeon with the party","Placeholder hub area — a flat open space players return to after the run","WaveManager adapted to trigger room clears in sequence","Boss placeholder: a stronger enemy with more HP","XP and loot awarded on run completion, returned to hub"],
    note:"First time the target loop exists — even in rough form. Ugly is fine. Proving the concept is the goal."},
 
-  {version:"V0.4",title:"Progression Co-op + Hub",status:"planned",quarter:"Q4 2026",date:"Est. Oct – Nov 2026",phase:"p3",loop:"Return to hub fully works",
+  {version:"V0.5",title:"Progression Co-op + Hub",status:"planned",quarter:"Q4 2026",date:"Est. Oct – Nov 2026",phase:"p3",loop:"Return to hub fully works",
    bullets:["Per-player XP & stats","Hub placeholder area","ExperienceManager refactor"],
    details:["ExperienceManager becomes per-player component — no longer a singleton","Each player has own XP, level, STR/AGI/INT","Hub placeholder: a dedicated scene players return to after each run","Hub has a visible dungeon entrance and a spot to review stats/gear","LobbyPlayer carries class choice into game — stats scale by class","Shared kill XP distributed equally between players in range"],
    note:"The hub doesn't need to be beautiful — it needs to exist. Players must have somewhere to return to for the loop to feel complete."},
 
-  {version:"V0.5",title:"Class Stats + Open Skill Tree",status:"planned",quarter:"Q4 2026",date:"Est. December 2026",phase:"p3",loop:"Upgrade phase works — spend points after each run",
+  {version:"V0.55",title:"Class Stats + Open Skill Tree",status:"planned",quarter:"Q4 2026",date:"Est. December 2026",phase:"p3",loop:"Upgrade phase works — spend points after each run",
    bullets:["Class sets base stats + skill tree start position","One shared open tree — no locked nodes","Build anything from any class"],
    details:["Warrior: +STR base, starts near melee/toughness nodes","Mage: +INT base, starts near spell/power nodes","Rogue: +AGI base, starts near speed/crit nodes","Random: average stats, starts at tree centre","All nodes accessible to all classes — costs more points the further from start","First skill tree pass: 30–40 nodes, 3 regions","Skill points awarded on level-up — spent in hub between runs"],
    note:"No nodes are locked. Class identity comes from where you start, not where you're forbidden to go. A Warrior who invests in spell nodes becomes a battlemage — naturally."},
 
-  {version:"V0.55",title:"Spell Library Expansion",status:"planned",quarter:"Q1 2027",date:"Est. Jan – Feb 2027",phase:"p3",loop:null,
+  {version:"V0.6",title:"Spell Library Expansion",status:"planned",quarter:"Q1 2027",date:"Est. Jan – Feb 2027",phase:"p3",loop:null,
    bullets:["New spells — Ice Shard, Chain Lightning, Heal","Spell tiers — upgraded variants of existing spells","Buff and Channel spells with full effect implementation"],
    details:["Ice Shard — slow cast projectile, applies Slow status effect via StatusEffectHandler","Chain Lightning — Channel type, fires and bounces between nearby enemies","Heal — Buff type, restores HP to caster or lowest-HP nearby ally","Spell tiers: each spell gains a Tier 2 variant requiring higher INT — more damage, larger area","Buff type fully implemented: duration tracking, active buff UI indicator","Channel implementation: sustained cast for at least one beam-style spell","SpellData: add spellTier field and damageType (Fire/Ice/Lightning/Arcane) for future resistance system","StatusEffectHandler extended: Slow and Chill effects wired to ice spells"],
    note:"The V0.06 system provides the framework — this version fills it with content. Focus on variety of feel: instant, channeled, and buff spells should all feel mechanically distinct from the base Fireball."},
 
-  {version:"V0.6",title:"Dungeon Loop & Boss",status:"planned",quarter:"Q1 2027",date:"Est. Jan – Mar 2027",phase:"p3",loop:"Full loop — all phases working",
+  {version:"V0.7",title:"Dungeon Loop & Boss",status:"planned",quarter:"Q1 2027",date:"Est. Jan – Mar 2027",phase:"p3",loop:"Full loop — all phases working",
    bullets:["Room-based dungeon replaces wave system","Locked doors open on room clear","Dungeon boss + multiple tiers"],
    details:["Room system: enter room, clear all enemies, door unlocks, next room","WaveManager replaced by RoomManager — rooms have spawn lists, not timed waves","Multiple dungeon floors (3–5 rooms per floor, 2–3 floors per run)","Mini-boss mid-dungeon, boss room at the end","Two dungeon tiers: normal and hard — harder enemies, better rewards","Hub upgrade station: spend loot to upgrade gear between runs","Complete loop: Hub, Dungeon, Boss, Loot, Hub, Upgrade, Repeat"],
    note:"Largest milestone before V1.0. The WaveManager architectural shift is significant — plan a full dedicated session for it."},
 
-  {version:"V0.65",title:"World Dressing Pass",status:"planned",quarter:"Q1 2027",date:"Est. Feb – Mar 2027",phase:"p3",loop:null,
+  {version:"V0.8",title:"World Dressing Pass",status:"planned",quarter:"Q1 2027",date:"Est. Feb – Mar 2027",phase:"p3",loop:null,
    bullets:["Replace blockout geometry with real terrain & props","Biome dressing for dungeon and hub","NavMesh final bake after layout is locked"],
    details:["Swap placeholder cubes and flat terrain for detailed terrain, rocks, trees, and dungeon props","Dungeon: stone walls, torches, rubble — consistent visual identity per biome","Hub: environment dressing around the forge, vendor, and dungeon entrance","Final NavMesh bake once all static geometry is placed — enemies path correctly around real obstacles","Lighting pass per scene: ambient, point lights on props, fog settings","Asset packs: use existing placeholder packs from the project; assess gaps and source additional if needed","Do NOT dress until dungeon layout is fully locked — avoids rework"],
    note:"Blockout first, dress last. This pass happens after V0.6 confirms the dungeon layout and room structure — so no geometry moves after bake. The NavMesh dependency is the hard blocker."},
 
-  {version:"V0.75",title:"Audio Pass",status:"planned",quarter:"Q2 2027",date:"Est. Mar – Apr 2027",phase:"p3",loop:null,
+  {version:"V0.9",title:"Audio Pass",status:"planned",quarter:"Q2 2027",date:"Est. Mar – Apr 2027",phase:"p3",loop:null,
    bullets:["SFX for all player actions and enemies","Ambient loops per scene","Music tracks for hub, dungeon, and boss — final mix"],
    details:["Player SFX: footsteps, jump land, melee swing, melee hit, spell cast, dodge, death","Enemy SFX: alert, attack, hit, death — per enemy type","UI SFX: button click, level up, item equip, inventory open/close","Ambient: dungeon drip and rumble loop, hub outdoor ambience","Music: hub theme (calm, looping), dungeon theme (tense, layered), boss theme (high energy, distinct)","Final mix pass: volume balance across all categories — master, SFX, music, ambient sliders in settings","Unity AudioMixer with exposed groups; settings save to PlayerPrefs","Placeholder SFX added earlier during development are replaced here"],
    note:"A rough audio pass during earlier development makes playtesting feel real. This final pass balances, replaces placeholders, and adds music. Tied to V1.0 polish — do not spend time on final mix while mechanics are still changing."},
