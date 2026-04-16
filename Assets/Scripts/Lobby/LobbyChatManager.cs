@@ -61,7 +61,7 @@ public class LobbyChatManager : NetworkBehaviour
         }
     }
 
-    void OnDestroy()
+    public override void OnDestroy()
     {
         if (Instance == this) Instance = null;
     }
@@ -98,7 +98,7 @@ string senderName = GetLocalPlayerName();
 
     // ─── RPCs ─────────────────────────────────────────────────────────────────
 
-    [ServerRpc(RequireOwnership = false)]
+    [Rpc(SendTo.Server)]
     void SendMessageServerRpc(FixedString64Bytes senderName, FixedString128Bytes message)
     {
         ReceiveMessageClientRpc(senderName, message);
