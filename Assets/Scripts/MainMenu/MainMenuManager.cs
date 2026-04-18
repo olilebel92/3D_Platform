@@ -1,133 +1,149 @@
 using UnityEngine;
+using UnityEngine.Audio;
+using UnityEngine.UIElements;
 using UnityEngine.SceneManagement;
-using UnityEngine.UI;
-using TMPro;
 using Unity.Netcode;
 using Unity.Netcode.Transports.UTP;
-using UnityEngine.Serialization;
 
-/// <summary>
-/// Main menu controller — handles solo Play, Host, Spectate, Settings, and Quit.
-/// Attach this to a MainMenu GameObject in your menu scene.
-/// </summary>
 public class MainMenuManager : MonoBehaviour
 {
-    // ─── Scene ────────────────────────────────────────────────────────────────
+    // ─── Inspector ────────────────────────────────────────────────────────────
 
-    [Header("Scene")]
-    [Tooltip("Exact name of your gameplay scene as it appears in Build Settings.")]
-    public string gameSceneName = "GameScene";
+    [Header("Scene Names")]
+    [SerializeField] string gameSceneName  = "GameScene";
+    [SerializeField] string lobbySceneName = "LobbyScene";
 
-    [Tooltip("Exact name of the lobby scene as it appears in Build Settings.")]
-    public string lobbySceneName = "LobbyScene";
+    [Header("Network")]
+    [SerializeField] ushort port = 7777;
 
-    // ─── Panels ───────────────────────────────────────────────────────────────
+    [Header("Audio Mixer")]
+    [SerializeField] AudioMixer mixer;
 
-    [Header("Panels")]
-    [Tooltip("Root panel of the main menu buttons.")]
-    public GameObject mainPanel;
+    [Header("UI")]
+    [SerializeField] UIDocument document;
+    [SerializeField] string gameTitleString = "HACKNSLASH";
+    [SerializeField] DevLog devLog;
 
-    [Tooltip("Root panel of the settings screen.")]
-    public GameObject settingsPanel;
+    [Header("UI Sounds")]
+    [SerializeField] AudioClip uiClickClip;
+    [SerializeField] AudioClip uiBackClip;
 
-    [FormerlySerializedAs("spectatePanel")]
-    [Tooltip("Panel shown when entering a host IP to join.")]
-    public GameObject joinPanel;
+    [Header("Test Sounds")]
+    [SerializeField] AudioClip sfxTestClip;
+    [SerializeField] AudioClip uiTestClip;
 
-    [Tooltip("Panel shown while connecting or waiting for the host to load the scene.")]
-    public GameObject waitingPanel;
+    // ─── Cached Elements ──────────────────────────────────────────────────────
 
-    // ─── Main Panel Buttons ───────────────────────────────────────────────────
+    VisualElement mainPanel, joinPanel, waitingPanel, settingsPanel, devlogPanel;
+    VisualElement scrim, dialogWrap;
+    Label         waitingLabel;
+    TextField     ipField;
 
-    [Header("Main Buttons")]
-    public Button playButton;
-    public Button hostButton;
-    [FormerlySerializedAs("spectateButton")]
-    public Button joinButton;
-    public Button settingsButton;
-    public Button settingsBackButton;
-    public Button quitButton;
-
-    // ─── Join Panel ───────────────────────────────────────────────────────────
-
-    [Header("Join Panel")]
-    [Tooltip("Input field where the player types the host IP address.")]
-    public TMP_InputField ipInputField;
-
-    [Tooltip("Port to use. Must match the host. Default: 7777.")]
-    public ushort port = 7777;
-
-    public Button connectButton;
-    [FormerlySerializedAs("spectateBackButton")]
-    public Button joinBackButton;
-
-    // ─── Waiting Panel ────────────────────────────────────────────────────────
-
-    [Header("Waiting Panel")]
-    [Tooltip("Status label shown while connecting (e.g. 'Connecting...').")]
-    public TextMeshProUGUI waitingText;
-
-    public Button cancelButton;
-
-    // ─── Title ────────────────────────────────────────────────────────────────
-
-    [Header("Title")]
-    [Tooltip("TMP label showing your game title.")]
-    public TextMeshProUGUI titleText;
-
-    [Tooltip("Text to display as the game title.")]
-    public string gameTitleString = "YOUR GAME";
+    // Settings sliders / labels
+    Slider masterSlider, musicSlider, sfxSlider, uiSlider;
+    Label  masterLabel,  musicLabel,  sfxLabel,  uiLabel;
 
     // ─── Unity Lifecycle ──────────────────────────────────────────────────────
 
     void Awake()
     {
-        // Reset timeScale in case we came back from a paused state
         Time.timeScale = 1f;
-
-        // Shut down any active NGO session when returning to the main menu
         ShutdownNetwork();
     }
 
     void Start()
     {
-        if (titleText != null)
-            titleText.text = gameTitleString;
+        if (document == null) document = GetComponent<UIDocument>();
 
-        // ── Wire all buttons ──
-        if (playButton != null)         playButton.onClick.AddListener(OnPlay);
-        if (hostButton != null)         hostButton.onClick.AddListener(OnHost);
-        if (joinButton != null)         joinButton.onClick.AddListener(OnJoin);
-        if (settingsButton != null)     settingsButton.onClick.AddListener(OnSettings);
-        if (settingsBackButton != null) settingsBackButton.onClick.AddListener(OnSettingsBack);
-        if (quitButton != null)         quitButton.onClick.AddListener(OnQuit);
-        if (connectButton != null)      connectButton.onClick.AddListener(OnConnect);
-        if (joinBackButton != null)     joinBackButton.onClick.AddListener(OnJoinBack);
-        if (cancelButton != null)       cancelButton.onClick.AddListener(OnCancel);
+        if (mixer != null)
+        {
+            SettingsManager.Mixer = mixer;
+            SettingsManager.Apply();
+        }
+
+        var root = document.rootVisualElement;
+
+        // ── Panels ──
+        mainPanel     = root.Q("main-panel");
+        joinPanel     = root.Q("join-panel");
+        waitingPanel  = root.Q("waiting-panel");
+        settingsPanel = root.Q("settings-panel");
+        devlogPanel   = root.Q("devlog-panel");
+        scrim         = root.Q("scrim");
+        dialogWrap    = root.Q("dialog-wrap");
+
+        root.Q<Label>("title-label").text = gameTitleString;
+        waitingLabel = root.Q<Label>("waiting-label");
+        ipField      = root.Q<TextField>("ip-field");
+
+        // ── Settings elements ──
+        masterSlider = root.Q<Slider>("master-slider");
+        musicSlider  = root.Q<Slider>("music-slider");
+        sfxSlider    = root.Q<Slider>("sfx-slider");
+        uiSlider     = root.Q<Slider>("ui-slider");
+        masterLabel  = root.Q<Label>("master-label");
+        musicLabel   = root.Q<Label>("music-label");
+        sfxLabel     = root.Q<Label>("sfx-label");
+        uiLabel      = root.Q<Label>("ui-label");
+
+        // ── Slider callbacks ──
+        masterSlider?.RegisterValueChangedCallback(e => { SettingsManager.MasterVolume = e.newValue; UpdateVolumeLabel(masterLabel, e.newValue); });
+        musicSlider?.RegisterValueChangedCallback(e  => { SettingsManager.MusicVolume  = e.newValue; UpdateVolumeLabel(musicLabel,  e.newValue); });
+        sfxSlider?.RegisterValueChangedCallback(e    => { SettingsManager.SfxVolume    = e.newValue; UpdateVolumeLabel(sfxLabel,    e.newValue); });
+        uiSlider?.RegisterValueChangedCallback(e     => { SettingsManager.UiVolume     = e.newValue; UpdateVolumeLabel(uiLabel,     e.newValue); });
+
+        // ── Button callbacks ──
+        root.Q<Button>("play-button")?.RegisterCallback<ClickEvent>(_     => { PlayClick(); OnPlay(); });
+        root.Q<Button>("host-button")?.RegisterCallback<ClickEvent>(_     => { PlayClick(); OnHost(); });
+        root.Q<Button>("join-button")?.RegisterCallback<ClickEvent>(_     => { PlayClick(); ShowJoin(); });
+        root.Q<Button>("settings-button")?.RegisterCallback<ClickEvent>(_ => { PlayClick(); ShowSettings(); });
+        root.Q<Button>("devlog-button")?.RegisterCallback<ClickEvent>(_   => { PlayClick(); ShowDevLog(); });
+        root.Q<Button>("quit-button")?.RegisterCallback<ClickEvent>(_     => { PlayClick(); OnQuit(); });
+
+        root.Q<Button>("connect-button")?.RegisterCallback<ClickEvent>(_       => { PlayClick(); OnConnect(); });
+        root.Q<Button>("join-back-button")?.RegisterCallback<ClickEvent>(_     => { PlayBack();  ShowMain(); });
+        root.Q<Button>("cancel-button")?.RegisterCallback<ClickEvent>(_        => { PlayBack();  OnCancel(); });
+        root.Q<Button>("settings-back-button")?.RegisterCallback<ClickEvent>(_ => { PlayBack();  ShowMain(); });
+        root.Q<Button>("devlog-back-button")?.RegisterCallback<ClickEvent>(_   => { PlayBack();  ShowMain(); });
+        root.Q<Button>("sfx-test-button")?.RegisterCallback<ClickEvent>(_ => SoundManager.Instance?.PlaySFX(sfxTestClip));
+        root.Q<Button>("ui-test-button")?.RegisterCallback<ClickEvent>(_  => SoundManager.Instance?.PlayUI(uiTestClip));
 
         ShowMain();
     }
 
-    // ─── Main Panel Handlers ──────────────────────────────────────────────────
+    // ─── Navigation ───────────────────────────────────────────────────────────
 
-    /// <summary>Solo play — no networking, loads the scene directly.</summary>
+    void ShowMain()     => SetActivePanel(mainPanel);
+    void ShowJoin()     => SetActivePanel(joinPanel);
+    void ShowDevLog()
+    {
+        devLog?.Populate(document.rootVisualElement.Q<ScrollView>("devlog-scroll"));
+        SetActivePanel(devlogPanel);
+    }
+
+    void ShowSettings()
+    {
+        // Sync sliders to saved values before showing
+        masterSlider?.SetValueWithoutNotify(SettingsManager.MasterVolume); UpdateVolumeLabel(masterLabel, SettingsManager.MasterVolume);
+        musicSlider?.SetValueWithoutNotify(SettingsManager.MusicVolume);   UpdateVolumeLabel(musicLabel,  SettingsManager.MusicVolume);
+        sfxSlider?.SetValueWithoutNotify(SettingsManager.SfxVolume);       UpdateVolumeLabel(sfxLabel,    SettingsManager.SfxVolume);
+        uiSlider?.SetValueWithoutNotify(SettingsManager.UiVolume);         UpdateVolumeLabel(uiLabel,     SettingsManager.UiVolume);
+
+        SetActivePanel(settingsPanel);
+    }
+
+    // ─── Actions ──────────────────────────────────────────────────────────────
+
     void OnPlay()
     {
         Debug.Log("[MainMenu] Solo play — loading: " + gameSceneName);
-
         ShutdownNetwork();
-
         if (SceneTransitionManager.Instance != null)
             SceneTransitionManager.Instance.LoadScene(gameSceneName);
         else
             SceneManager.LoadScene(gameSceneName);
     }
 
-    /// <summary>
-    /// Starts as Host then immediately loads the game scene.
-    /// NGO's scene manager ensures the spectator client is also moved to the game scene
-    /// once they connect.
-    /// </summary>
     void OnHost()
     {
         if (!ValidateNetworkManager()) return;
@@ -138,24 +154,40 @@ public class MainMenuManager : MonoBehaviour
 
         Debug.Log("[MainMenu] Starting as Host — loading lobby...");
         NetworkManager.Singleton.StartHost();
-
-        // Load the lobby. Any spectator who connects will be moved there automatically.
         NetworkManager.Singleton.SceneManager.LoadScene(lobbySceneName, LoadSceneMode.Single);
     }
 
-    void OnJoin()
+    void OnConnect()
     {
-        ShowJoin();
+        if (!ValidateNetworkManager()) return;
+
+        string ip = ipField != null ? ipField.value.Trim() : "127.0.0.1";
+        if (string.IsNullOrEmpty(ip)) ip = "127.0.0.1";
+
+        var transport = NetworkManager.Singleton.GetComponent<UnityTransport>();
+        if (transport == null)
+        {
+            Debug.LogError("[MainMenu] UnityTransport not found on NetworkManager!");
+            return;
+        }
+
+        transport.SetConnectionData(ip, port);
+        NetworkManager.Singleton.OnClientConnectedCallback  += OnClientConnected;
+        NetworkManager.Singleton.OnClientDisconnectCallback += OnClientDisconnected;
+        NetworkManager.Singleton.StartClient();
+
+        Debug.Log($"[MainMenu] Connecting to {ip}:{port}...");
+        ShowWaiting("Connecting...");
     }
 
-    void OnSettings()
+    void OnCancel()
     {
-        if (mainPanel != null)   mainPanel.SetActive(false);
-        if (settingsPanel != null) settingsPanel.SetActive(true);
-    }
-
-    void OnSettingsBack()
-    {
+        if (NetworkManager.Singleton != null)
+        {
+            NetworkManager.Singleton.OnClientConnectedCallback  -= OnClientConnected;
+            NetworkManager.Singleton.OnClientDisconnectCallback -= OnClientDisconnected;
+            NetworkManager.Singleton.Shutdown();
+        }
         ShowMain();
     }
 
@@ -169,54 +201,6 @@ public class MainMenuManager : MonoBehaviour
 #endif
     }
 
-    // ─── Join Panel Handlers ──────────────────────────────────────────────────
-
-    /// <summary>Reads the IP field, connects as a client, then waits for the host to load the scene.</summary>
-    void OnConnect()
-    {
-        if (!ValidateNetworkManager()) return;
-
-        string ip = ipInputField != null ? ipInputField.text.Trim() : "127.0.0.1";
-        if (string.IsNullOrEmpty(ip))
-            ip = "127.0.0.1";
-
-        var transport = NetworkManager.Singleton.GetComponent<UnityTransport>();
-        if (transport == null)
-        {
-            Debug.LogError("[MainMenu] UnityTransport not found on NetworkManager!");
-            return;
-        }
-
-        transport.SetConnectionData(ip, port);
-
-        NetworkManager.Singleton.OnClientConnectedCallback   += OnClientConnected;
-        NetworkManager.Singleton.OnClientDisconnectCallback  += OnClientDisconnected;
-
-        NetworkManager.Singleton.StartClient();
-        Debug.Log($"[MainMenu] Connecting to {ip}:{port}...");
-
-        ShowWaiting("Connecting...");
-    }
-
-    void OnJoinBack()
-    {
-        ShowMain();
-    }
-
-    // ─── Waiting Panel Handlers ───────────────────────────────────────────────
-
-    void OnCancel()
-    {
-        if (NetworkManager.Singleton != null)
-        {
-            NetworkManager.Singleton.OnClientConnectedCallback  -= OnClientConnected;
-            NetworkManager.Singleton.OnClientDisconnectCallback -= OnClientDisconnected;
-            NetworkManager.Singleton.Shutdown();
-        }
-
-        ShowMain();
-    }
-
     // ─── Network Callbacks ────────────────────────────────────────────────────
 
     void OnClientConnected(ulong clientId)
@@ -224,10 +208,9 @@ public class MainMenuManager : MonoBehaviour
         if (NetworkManager.Singleton == null) return;
         if (clientId != NetworkManager.Singleton.LocalClientId) return;
 
-        Debug.Log("[MainMenu] Connected to host! Waiting for scene load...");
+        Debug.Log("[MainMenu] Connected! Waiting for scene load...");
         ShowWaiting("Connected! Loading game...");
 
-        // Unsubscribe — NGO's scene manager takes over from here.
         NetworkManager.Singleton.OnClientConnectedCallback  -= OnClientConnected;
         NetworkManager.Singleton.OnClientDisconnectCallback -= OnClientDisconnected;
     }
@@ -238,56 +221,68 @@ public class MainMenuManager : MonoBehaviour
         if (clientId != NetworkManager.Singleton.LocalClientId) return;
 
         Debug.LogWarning("[MainMenu] Connection failed or host disconnected.");
-
         NetworkManager.Singleton.OnClientConnectedCallback  -= OnClientConnected;
         NetworkManager.Singleton.OnClientDisconnectCallback -= OnClientDisconnected;
         NetworkManager.Singleton.Shutdown();
 
         ShowWaiting("Could not connect.\nCheck the IP address and try again.");
-        // The Cancel button on the waiting panel lets them go back to the main menu.
     }
 
-    // ─── Panel Helpers ────────────────────────────────────────────────────────
-
-    void ShowMain()
-    {
-        if (mainPanel != null)    mainPanel.SetActive(true);
-        if (settingsPanel != null) settingsPanel.SetActive(false);
-        if (joinPanel != null) joinPanel.SetActive(false);
-        if (waitingPanel != null)  waitingPanel.SetActive(false);
-    }
-
-    void ShowJoin()
-    {
-        if (mainPanel != null)    mainPanel.SetActive(false);
-        if (settingsPanel != null) settingsPanel.SetActive(false);
-        if (joinPanel != null)    joinPanel.SetActive(true);
-        if (waitingPanel != null)  waitingPanel.SetActive(false);
-    }
+    // ─── Helpers ─────────────────────────────────────────────────────────────
 
     void ShowWaiting(string message)
     {
-        if (mainPanel != null)    mainPanel.SetActive(false);
-        if (joinPanel != null) joinPanel.SetActive(false);
-        if (waitingPanel != null)  waitingPanel.SetActive(true);
-        if (waitingText != null)   waitingText.text = message;
+        if (waitingLabel != null) waitingLabel.text = message;
+        SetActivePanel(waitingPanel);
     }
 
-    // ─── Utility ─────────────────────────────────────────────────────────────
+    void SetActivePanel(VisualElement panel)
+    {
+        // Hide all dialog panels
+        joinPanel?.AddToClassList("is-hidden");
+        waitingPanel?.AddToClassList("is-hidden");
+        settingsPanel?.AddToClassList("is-hidden");
+        devlogPanel?.AddToClassList("is-hidden");
+
+        if (panel == mainPanel)
+        {
+            scrim?.RemoveFromClassList("on");
+            dialogWrap?.RemoveFromClassList("on");
+        }
+        else
+        {
+            scrim?.AddToClassList("on");
+            dialogWrap?.AddToClassList("on");
+            panel?.RemoveFromClassList("is-hidden");
+        }
+    }
+
+    void PlayClick() => SoundManager.Instance?.PlayUI(uiClickClip);
+    void PlayBack()  => SoundManager.Instance?.PlayUI(uiBackClip);
+
+    static void UpdateVolumeLabel(Label label, float value)
+    {
+        if (label != null) label.text = Mathf.RoundToInt(value * 100f) + "%";
+    }
 
     bool ValidateNetworkManager()
     {
         if (NetworkManager.Singleton != null) return true;
-        Debug.LogError("[MainMenu] NetworkManager not found in scene! Add a NetworkManager GameObject.");
+        Debug.LogError("[MainMenu] NetworkManager not found in scene!");
         return false;
     }
 
     static void ShutdownNetwork()
     {
-        if (NetworkManager.Singleton != null && NetworkManager.Singleton.IsListening)
+        if (NetworkManager.Singleton == null || !NetworkManager.Singleton.IsListening) return;
+        try
         {
             Debug.Log("[MainMenu] Shutting down NGO session.");
             NetworkManager.Singleton.Shutdown();
+        }
+        catch (System.Exception e)
+        {
+            Debug.LogWarning($"[MainMenu] NGO shutdown exception (safe to ignore): {e.Message}");
         }
     }
 }

@@ -32,6 +32,10 @@ public class SpellSlot : MonoBehaviour,
     [Tooltip("Optional label showing the slot number (TextMeshPro).")]
     public TextMeshProUGUI slotNumberText;  // TextMeshPro instead of legacy Text
 
+    [Header("Cooldown")]
+    [Tooltip("Grey radial overlay that drains counterclockwise during cooldown. Set Image type to Filled/Radial360 in the Inspector.")]
+    [SerializeField] private Image cooldownOverlay;
+
     // ─── State ───────────────────────────────────────────────────────────────
 
     /// <summary>The spell currently held in this slot. Null = empty.</summary>
@@ -40,10 +44,62 @@ public class SpellSlot : MonoBehaviour,
     /// <summary>This slot's index in the bar (0-based, set by SpellBarManager).</summary>
     public int SlotIndex { get; private set; }
 
+    // ─── Cooldown state ──────────────────────────────────────────────────────
+
+    private SpellCaster _spellCaster;
+
     // ─── Drag-and-drop helpers ───────────────────────────────────────────────
 
     private static SpellSlot s_dragSource = null;
     private static GameObject s_dragGhost = null;
+
+    // ─── Unity Lifecycle ─────────────────────────────────────────────────────
+
+    private void Start()
+    {
+        if (cooldownOverlay == null)
+            cooldownOverlay = transform.Find("CooldownOverlay")?.GetComponent<Image>();
+
+        if (cooldownOverlay != null)
+        {
+            cooldownOverlay.type          = Image.Type.Filled;
+            cooldownOverlay.fillMethod    = Image.FillMethod.Radial360;
+            cooldownOverlay.fillOrigin    = (int)Image.Origin360.Top;
+            cooldownOverlay.fillClockwise = false;
+            cooldownOverlay.color         = new Color(0f, 0f, 0f, 0.6f);
+            cooldownOverlay.fillAmount    = 1f;
+            cooldownOverlay.enabled       = false;
+        }
+    }
+
+    private void Update()
+    {
+        // Lazy-cache the local SpellCaster — player may spawn after this UI Start().
+        if (_spellCaster == null)
+        {
+            GameObject player = GameObject.FindGameObjectWithTag("Player");
+            if (player != null)
+                _spellCaster = player.GetComponent<SpellCaster>();
+        }
+
+        if (cooldownOverlay == null || CurrentSpell == null || _spellCaster == null)
+        {
+            if (cooldownOverlay != null) cooldownOverlay.fillAmount = 0f;
+            return;
+        }
+
+        float remaining = _spellCaster.GetCooldownRemaining(CurrentSpell);
+        if (remaining <= 0f)
+        {
+            cooldownOverlay.enabled = false;
+            return;
+        }
+
+        cooldownOverlay.enabled    = true;
+        cooldownOverlay.fillAmount = CurrentSpell.cooldown > 0f
+            ? remaining / CurrentSpell.cooldown
+            : 0f;
+    }
 
     // ─── Setup ───────────────────────────────────────────────────────────────
 

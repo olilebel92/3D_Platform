@@ -1,0 +1,119 @@
+/* =====================================================================
+   GameTheme.uss  —  DOLDI Main Menu
+   Palette tokens + global type. Import this BEFORE GameUI.uss.
+   ===================================================================== */
+
+:root {
+    /* Panel tones */
+    --panel-navy:          rgb(43, 58, 85);        /* #2B3A55 */
+    --panel-navy-edge:     rgb(26, 35, 54);        /* #1A2336 */
+    --panel-navy-hi:       rgb(62, 84, 122);       /* #3E547A */
+    --panel-brown:         rgb(65, 57, 43);        /* #41392B */
+
+    /* Gold accent ramp */
+    --gold-deep:           rgb(138, 90, 20);       /* #8A5A14 */
+    --gold:                rgb(235, 156, 0);       /* #EB9C00 */
+    --gold-bright:         rgb(255, 210, 122);     /* #FFD27A */
+    --gold-glow:           rgb(255, 230, 168);     /* #FFE6A8 */
+
+    /* Steel-blue button ramp */
+    --steel:               rgb(43, 94, 171);       /* #2B5EAB */
+    --steel-hi:            rgb(75, 134, 216);      /* #4B86D8 */
+    --steel-lo:            rgb(20, 49, 94);        /* #14315E */
+    --steel-press:         rgb(29, 68, 128);       /* #1D4480 */
+
+    /* Danger (QUIT) */
+    --danger:              rgb(122, 26, 26);       /* #7A1A1A */
+    --danger-hi:           rgb(176, 56, 56);       /* #B03838 */
+    --danger-face:         rgb(59, 30, 30);        /* #3B1E1E */
+    --danger-edge-hi:      rgb(106, 42, 42);       /* #6A2A2A */
+    --danger-edge-lo:      rgb(32, 9, 9);          /* #200909 */
+    --danger-text:         rgb(217, 120, 120);     /* #D97878 */
+    --danger-text-hot:     rgb(255, 211, 204);     /* #FFD3CC */
+
+    /* Ghost (back/cancel) button */
+    --ghost-edge-hi:       rgb(58, 72, 102);       /* #3A4866 */
+    --ghost-edge-lo:       rgb(15, 23, 41);        /* #0F1729 */
+    --ghost-hover:         rgba(235, 156, 0, 0.08);
+
+    /* Text */
+    --cream:               rgb(240, 230, 204);     /* #F0E6CC */
+    --cream-dim:           rgb(201, 191, 165);     /* #C9BFA5 */
+    --muted:               rgb(154, 170, 187);     /* #9AAABB */
+
+    /* Input field */
+    --field-bg:            rgb(22, 29, 45);        /* #161D2D */
+    --field-bg-focus:      rgb(26, 35, 56);        /* #1A2338 */
+    --field-edge-hi:       rgb(10, 15, 26);        /* #0A0F1A -- top/left (inset look) */
+    --field-edge-lo:       rgb(42, 58, 88);        /* #2A3A58 -- bottom/right */
+
+    /* Scene backdrop */
+    --bg-sky-top:          rgb(106, 133, 174);     /* #6A85AE */
+    --bg-sky-mid:          rgb(201, 212, 226);     /* #C9D4E2 */
+    --bg-ground-hi:        rgb(137, 120, 102);     /* #897866 */
+    --bg-ground-lo:        rgb(75, 66, 54);        /* #4B4236 */
+
+    /* Network pill */
+    --net-red:             rgb(199, 68, 58);       /* #C7443A */
+    --net-red-dim:         rgba(199, 68, 58, 0.45);
+    --net-bg:              rgba(20, 10, 10, 0.35);
+
+    /* Dev log tags */
+    --tag-new-fg:          rgb(142, 224, 167);
+    --tag-new-edge:        rgb(58, 107, 72);
+    --tag-new-bg:          rgb(15, 36, 25);
+    --tag-fix-fg:          rgb(235, 156, 0);
+    --tag-fix-edge:        rgb(106, 74, 18);
+    --tag-fix-bg:          rgb(36, 26, 10);
+    --tag-bal-fg:          rgb(154, 170, 187);
+    --tag-bal-edge:        rgb(58, 72, 102);
+    --tag-bal-bg:          rgb(20, 25, 42);
+
+    /* Dividers / rules */
+    --divider-soft:        rgba(235, 156, 0, 0.12);
+
+    /* Type */
+    --font-display:        resource("Fonts/Cinzel-Black SDF");
+    --font-display-bold:   resource("Fonts/Cinzel-Bold SDF");
+    --font-display-semi:   resource("Fonts/Cinzel-SemiBold SDF");
+    --font-mono:           resource("Fonts/JetBrainsMono-Regular SDF");
+    --font-mono-bold:      resource("Fonts/JetBrainsMono-Bold SDF");
+
+    /* Sprite references — set once PNG assets are ready in Assets/Resources/UI/Textures/ */
+    /* --sprite-stone:    resource("UI/Textures/panel_stone_noise_256"); */
+    /* --sprite-corner:   resource("UI/Textures/corner_rune_26"); */
+    /* --sprite-rune-row: resource("UI/Textures/rune_row_24x12"); */
+
+    /* ── Legacy tokens (kept for GameUI.uss game-HUD compatibility) ── */
+    --color-panel:         rgb(43, 58, 85);
+    --color-panel-dark:    rgb(65, 57, 43);
+    --color-panel-header:  rgb(32, 52, 80);
+    --color-input-bg:      rgb(22, 29, 45);
+    --color-track-bg:      rgb(22, 29, 45);
+    --color-accent:        rgb(235, 156, 0);
+    --color-accent-bright: rgb(255, 215, 0);
+    --color-accent-dim:    rgb(138, 90, 20);
+    --color-btn:           rgb(43, 94, 171);
+    --color-btn-hover:     rgb(53, 109, 194);
+    --color-btn-pressed:   rgb(29, 68, 128);
+    --color-btn-disabled:  rgb(42, 42, 58);
+    --color-btn-primary-text: rgb(26, 26, 42);
+    --color-btn-danger:    rgb(122, 26, 26);
+    --color-btn-danger-hover: rgb(170, 34, 34);
+    --color-text:          rgb(240, 230, 204);
+    --color-text-muted:    rgb(154, 170, 187);
+    --color-text-accent:   rgb(235, 156, 0);
+    --color-text-danger:   rgb(204, 51, 51);
+    --color-text-success:  rgb(58, 154, 58);
+    --color-bar-health:    rgb(204, 51, 51);
+    --color-bar-xp:        rgb(43, 94, 171);
+    --color-bar-mana:      rgb(119, 68, 204);
+    --color-bar-stamina:   rgb(58, 154, 58);
+}
+
+.root {
+    flex-grow: 1;
+    -unity-font-definition: var(--font-display);
+    color: var(--cream);
+    -unity-text-align: middle-left;
+}

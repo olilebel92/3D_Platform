@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(dir \"C:\\\\Users\\\\oli_l\\\\OneDrive\\\\Bureau\\\\Code\\\\HackNSLASH\\\\Assets\\\\Scripts\\\\Character*\")",
+      "mcp__Claude_Preview__preview_start",
+      "Bash(dir \"C:\\\\Users\\\\oli_l\\\\OneDrive\\\\Bureau\\\\Code\\\\HackNSLASH\\\\Roadmap\" /s /b)",
+      "Bash(git mv:*)"
+    ]
+  }
+}

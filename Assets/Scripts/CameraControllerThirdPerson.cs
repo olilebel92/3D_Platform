@@ -84,12 +84,6 @@ public class CameraControllerThirdPerson : MonoBehaviour
         _input.Enable();
         _lookAction = _input.Player.Look;
 
-        if (lockCursor)
-        {
-            Cursor.lockState = CursorLockMode.Locked;
-            Cursor.visible = false;
-        }
-
         if (target != null)
         {
             // Seed pivot at the actual player position so the first frame has no lerp jump.
@@ -104,8 +98,6 @@ public class CameraControllerThirdPerson : MonoBehaviour
     {
         _input.Disable();
 
-        Cursor.lockState = CursorLockMode.None;
-        Cursor.visible = true;
     }
 
     void LateUpdate()

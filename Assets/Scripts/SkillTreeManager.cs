@@ -86,6 +86,12 @@ public class SkillTreeManager : MonoBehaviour
     /// <summary>Sum of all percent heal bonuses from learned nodes (0.10 = +10%).</summary>
     public float TotalHealPctBonus { get; private set; } = 0f;
 
+    /// <summary>Sum of all flat lightning damage bonuses from learned nodes.</summary>
+    public float TotalLightningDamageBonus { get; private set; } = 0f;
+
+    /// <summary>Sum of all percent lightning damage bonuses from learned nodes (0.10 = +10%).</summary>
+    public float TotalLightningDamagePctBonus { get; private set; } = 0f;
+
     // ─── Events ───────────────────────────────────────────────────────────────
 
     /// <summary>Fired after any node is learned or a skill point is added.</summary>
@@ -152,6 +158,15 @@ public class SkillTreeManager : MonoBehaviour
     public int GetNodeLevel(SkillTreeNode node) =>
         node != null && _nodeLevels.TryGetValue(node, out int lvl) ? lvl : 0;
 
+    /// <summary>Returns the skill tree rank (level) of the node that unlocks this spell (0 = not learned).</summary>
+    public int GetSpellRank(SpellData spell)
+    {
+        if (spell == null) return 0;
+        foreach (var kv in _nodeLevels)
+            if (kv.Key.unlocksSpell == spell) return kv.Value;
+        return 0;
+    }
+
     /// <summary>Returns true if the player meets the prerequisites and can gain another level.</summary>
     public bool CanLearn(SkillTreeNode node)
     {
@@ -160,7 +175,7 @@ public class SkillTreeManager : MonoBehaviour
         if (SkillPoints < node.cost) return false;
 
         foreach (var req in node.prerequisites)
-            if (GetNodeLevel(req) < 1) return false;
+            if (req.node == null || GetNodeLevel(req.node) < req.requiredLevel) return false;
 
         return true;
     }
@@ -194,8 +209,10 @@ public class SkillTreeManager : MonoBehaviour
         TotalFireDamageBonus      += node.fireDamageBonus     * node.scalingFactor;
         TotalSpellDamagePctBonus  += node.spellDamagePctBonus * node.scalingFactor;
         TotalFireDamagePctBonus   += node.fireDamagePctBonus  * node.scalingFactor;
-        TotalHealBonus            += node.healBonus           * node.scalingFactor;
-        TotalHealPctBonus         += node.healPctBonus        * node.scalingFactor;
+        TotalHealBonus               += node.healBonus              * node.scalingFactor;
+        TotalHealPctBonus            += node.healPctBonus           * node.scalingFactor;
+        TotalLightningDamageBonus    += node.lightningDamageBonus    * node.scalingFactor;
+        TotalLightningDamagePctBonus += node.lightningDamagePctBonus * node.scalingFactor;
 
         Debug.Log($"[SkillTree] '{node.nodeName}' leveled to {newLevel}/{node.maxLevel}. " +
                   $"Points left: {SkillPoints}. Spell bonus total: +{TotalSpellDamageBonus}");
@@ -217,10 +234,7 @@ public class SkillTreeManager : MonoBehaviour
         _hoveredNode = node;
         tooltipPanel.SetActive(true);
 
-        if (tooltipName != null)
-            tooltipName.text = node.nodeName;
-
-        if (tooltipDesc != null)
+        if (tooltipName != null || tooltipDesc != null)
         {
             int lvl    = GetNodeLevel(node);
             bool maxed = lvl >= node.maxLevel;
@@ -229,12 +243,16 @@ public class SkillTreeManager : MonoBehaviour
                 ? $" <color=#AAAAFF>[Lv {lvl}/{node.maxLevel}]</color>"
                 : "";
 
-            string status = maxed          ? $" <color=#00FF88>[Maxed]</color>"
-                          : CanLearn(node) ? $" <color=#FFD700>[Cost: {node.cost} pt]</color>"
-                          : lvl > 0        ? $" <color=#FFD700>[Cost: {node.cost} pt — Locked]</color>"
-                          :                  $" <color=#FF6666>[Locked]</color>";
+            string cost = maxed          ? $" <color=#00FF88>(Maxed)</color>"
+                        : CanLearn(node) ? $" <color=#FFD700>(Cost {node.cost} SP)</color>"
+                        : lvl > 0        ? $" <color=#FFD700>(Cost {node.cost} SP — Locked)</color>"
+                        :                  $" <color=#FF6666>(Locked)</color>";
 
-            tooltipDesc.text = node.description + levelInfo + status;
+            if (tooltipName != null)
+                tooltipName.text = node.nodeName + cost + levelInfo;
+
+            if (tooltipDesc != null)
+                tooltipDesc.text = node.GetDescription(lvl);
         }
     }
 
@@ -284,9 +302,6 @@ public class SkillTreeManager : MonoBehaviour
 
         // Lock / unlock camera rotation
         CameraControllerThirdPerson.IsLocked = open;
-
-        Cursor.lockState = open ? CursorLockMode.None  : CursorLockMode.Locked;
-        Cursor.visible   = open;
 
         if (!open) HideTooltip();
 

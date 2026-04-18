@@ -136,8 +136,8 @@ public class PauseMenuController : MonoBehaviour
         if (pauseMenuPanel != null)
             pauseMenuPanel.SetActive(paused);
 
-        Cursor.lockState = paused ? CursorLockMode.None : CursorLockMode.Locked;
-        Cursor.visible   = paused;
+        if (paused) CursorManager.Instance?.OpenMenu();
+        else        CursorManager.Instance?.CloseMenu();
 
         Debug.Log("[PauseMenuController] " + (paused ? "Paused." : "Resumed."));
     }

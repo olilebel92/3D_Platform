@@ -158,9 +158,7 @@ public class SpectatorFreeCam : MonoBehaviour
 
     void LockCursor(bool locked)
     {
-        _cursorLocked    = locked;
-        Cursor.lockState = locked ? CursorLockMode.Locked : CursorLockMode.None;
-        Cursor.visible   = !locked;
+        _cursorLocked = locked;
     }
 
     // ─── Movement ─────────────────────────────────────────────────────────────

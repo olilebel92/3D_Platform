@@ -1,0 +1,178 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements" editor-extension-mode="False">
+    <Style src="project://database/Assets/UI/GameTheme.uss?fileID=7433441132597879392&amp;guid=5c9ec8a0d813eae46a8edc5b83156aa2&amp;type=3#GameTheme"/>
+    <Style src="project://database/Assets/UI/GameUI.uss?fileID=7433441132597879392&amp;guid=57f408b2b2125a7449c531a0ebe76048&amp;type=3#GameUI"/>
+    <ui:VisualElement name="menu-root" class="menu-root" style="scale: 1.3 1.3 1.3;">
+        <ui:VisualElement name="vignette" picking-mode="Ignore" class="vignette"/>
+        <ui:VisualElement name="network-pill" picking-mode="Ignore" class="network-pill" style="background-color: rgb(20, 10, 10);">
+            <ui:VisualElement class="network-pill__dot"/>
+            <ui:Label text="NETWORK OFFLINE"/>
+        </ui:VisualElement>
+        <ui:VisualElement name="main-panel" class="panel panel--main">
+            <ui:VisualElement picking-mode="Ignore" class="panel__stone"/>
+            <ui:VisualElement picking-mode="Ignore" class="panel__ring-inner"/>
+            <ui:VisualElement picking-mode="Ignore" name="VisualElement" class="panel__ring-shadow"/>
+            <ui:VisualElement picking-mode="Ignore" class="corner corner--tl"/>
+            <ui:VisualElement picking-mode="Ignore" class="corner corner--tr"/>
+            <ui:VisualElement picking-mode="Ignore" class="corner corner--bl"/>
+            <ui:VisualElement picking-mode="Ignore" class="corner corner--br"/>
+            <ui:Label name="title-label" text="Doldi" class="title"/>
+            <ui:Label text="Test" class="subtitle"/>
+            <ui:VisualElement class="rune-divider">
+                <ui:VisualElement class="rune-divider__line"/>
+                <ui:VisualElement class="rune-divider__glyph">
+                    <ui:VisualElement class="rune-divider__glyph-inner"/>
+                </ui:VisualElement>
+                <ui:VisualElement class="rune-divider__line"/>
+            </ui:VisualElement>
+            <ui:VisualElement name="main-buttons">
+                <ui:Button name="play-button" text="PLAY" class="btn btn--primary"/>
+                <ui:Button name="host-button" text="HOST" class="btn"/>
+                <ui:Button name="join-button" text="JOIN" class="btn"/>
+                <ui:Button name="settings-button" text="SETTINGS" class="btn"/>
+                <ui:Button name="devlog-button" text="DEV LOG" class="btn"/>
+                <ui:Button name="quit-button" text="QUIT" class="btn btn--danger"/>
+            </ui:VisualElement>
+            <ui:VisualElement class="rune-divider">
+                <ui:VisualElement class="rune-divider__line"/>
+                <ui:VisualElement class="rune-divider__glyph">
+                    <ui:VisualElement class="rune-divider__glyph-inner"/>
+                </ui:VisualElement>
+                <ui:VisualElement class="rune-divider__line"/>
+            </ui:VisualElement>
+            <ui:Label text="V0.1 - Prototype" class="version-stamp"/>
+        </ui:VisualElement>
+        <ui:VisualElement name="scrim" class="scrim"/>
+        <ui:VisualElement name="dialog-wrap" class="dialog-wrap">
+            <ui:VisualElement name="join-panel" class="panel panel--dialog is-hidden">
+                <ui:VisualElement picking-mode="Ignore" class="panel__stone"/>
+                <ui:VisualElement picking-mode="Ignore" class="panel__ring-inner"/>
+                <ui:VisualElement picking-mode="Ignore" class="panel__ring-shadow"/>
+                <ui:VisualElement picking-mode="Ignore" class="corner corner--tl"/>
+                <ui:VisualElement picking-mode="Ignore" class="corner corner--tr"/>
+                <ui:VisualElement picking-mode="Ignore" class="corner corner--bl"/>
+                <ui:VisualElement picking-mode="Ignore" class="corner corner--br"/>
+                <ui:Label text="JOIN GAME" class="dialog-title"/>
+                <ui:VisualElement class="rune-divider">
+                    <ui:VisualElement class="rune-divider__line"/>
+                    <ui:VisualElement class="rune-divider__glyph">
+                        <ui:VisualElement class="rune-divider__glyph-inner"/>
+                    </ui:VisualElement>
+                    <ui:VisualElement class="rune-divider__line"/>
+                </ui:VisualElement>
+                <ui:VisualElement class="field">
+                    <ui:Label text="HOST IP ADDRESS" class="field__label"/>
+                    <ui:TextField name="ip-field" class="field__input"/>
+                </ui:VisualElement>
+                <ui:Label text="ENTER THE SUMMONING ADDRESS OF YOUR ALLY." class="muted"/>
+                <ui:VisualElement class="btn-row">
+                    <ui:Button name="join-back-button" text="BACK" class="btn btn--ghost"/>
+                    <ui:Button name="connect-button" text="CONNECT" class="btn btn--primary"/>
+                </ui:VisualElement>
+            </ui:VisualElement>
+            <ui:VisualElement name="waiting-panel" class="panel panel--waiting is-hidden">
+                <ui:VisualElement picking-mode="Ignore" class="panel__stone"/>
+                <ui:VisualElement picking-mode="Ignore" class="panel__ring-inner"/>
+                <ui:VisualElement picking-mode="Ignore" class="panel__ring-shadow"/>
+                <ui:VisualElement picking-mode="Ignore" class="corner corner--tl"/>
+                <ui:VisualElement picking-mode="Ignore" class="corner corner--tr"/>
+                <ui:VisualElement picking-mode="Ignore" class="corner corner--bl"/>
+                <ui:VisualElement picking-mode="Ignore" class="corner corner--br"/>
+                <ui:Label text="CONNECTING" class="dialog-title"/>
+                <ui:VisualElement class="rune-divider">
+                    <ui:VisualElement class="rune-divider__line"/>
+                    <ui:VisualElement class="rune-divider__glyph">
+                        <ui:VisualElement class="rune-divider__glyph-inner"/>
+                    </ui:VisualElement>
+                    <ui:VisualElement class="rune-divider__line"/>
+                </ui:VisualElement>
+                <ui:VisualElement class="loader">
+                    <ui:VisualElement class="loader__pip"/>
+                    <ui:VisualElement class="loader__pip"/>
+                    <ui:VisualElement class="loader__pip"/>
+                    <ui:VisualElement class="loader__pip"/>
+                    <ui:VisualElement class="loader__pip"/>
+                </ui:VisualElement>
+                <ui:Label name="waiting-label" text="Reaching out to the host..." class="status-text"/>
+                <ui:VisualElement class="btn-row" style="justify-content: center;">
+                    <ui:Button name="cancel-button" text="CANCEL" class="btn btn--ghost" style="flex-grow: 0; max-width: 140px;"/>
+                </ui:VisualElement>
+            </ui:VisualElement>
+            <ui:VisualElement name="settings-panel" class="panel panel--settings is-hidden">
+                <ui:VisualElement picking-mode="Ignore" class="panel__stone"/>
+                <ui:VisualElement picking-mode="Ignore" class="panel__ring-inner"/>
+                <ui:VisualElement picking-mode="Ignore" class="panel__ring-shadow"/>
+                <ui:VisualElement picking-mode="Ignore" class="corner corner--tl"/>
+                <ui:VisualElement picking-mode="Ignore" class="corner corner--tr"/>
+                <ui:VisualElement picking-mode="Ignore" class="corner corner--bl"/>
+                <ui:VisualElement picking-mode="Ignore" class="corner corner--br"/>
+                <ui:Label text="SETTINGS" class="dialog-title"/>
+                <ui:VisualElement class="rune-divider">
+                    <ui:VisualElement class="rune-divider__line"/>
+                    <ui:VisualElement class="rune-divider__glyph">
+                        <ui:VisualElement class="rune-divider__glyph-inner"/>
+                    </ui:VisualElement>
+                    <ui:VisualElement class="rune-divider__line"/>
+                </ui:VisualElement>
+                <ui:ScrollView class="settings-scroll">
+                    <ui:VisualElement class="section-header">
+                        <ui:VisualElement class="section-header__rule"/>
+                        <ui:Label text="AUDIO"/>
+                        <ui:VisualElement class="section-header__rule"/>
+                    </ui:VisualElement>
+                    <ui:VisualElement class="slider-row">
+                        <ui:Label text="MASTER" class="slider-row__label"/>
+                        <ui:Slider name="master-slider" low-value="0" high-value="1" value="1" class="slider-row__slider"/>
+                        <ui:Label name="master-label" text="100%" class="slider-row__value"/>
+                        <ui:VisualElement class="slider-row__test-slot"/>
+                    </ui:VisualElement>
+                    <ui:VisualElement class="slider-row">
+                        <ui:Label text="MUSIC" class="slider-row__label"/>
+                        <ui:Slider name="music-slider" low-value="0" high-value="1" value="1" class="slider-row__slider"/>
+                        <ui:Label name="music-label" text="100%" class="slider-row__value"/>
+                        <ui:VisualElement class="slider-row__test-slot"/>
+                    </ui:VisualElement>
+                    <ui:VisualElement class="slider-row">
+                        <ui:Label text="SFX" class="slider-row__label"/>
+                        <ui:Slider name="sfx-slider" low-value="0" high-value="1" value="1" class="slider-row__slider"/>
+                        <ui:Label name="sfx-label" text="100%" class="slider-row__value"/>
+                        <ui:VisualElement class="slider-row__test-slot">
+                            <ui:Button name="sfx-test-button" text="TEST" class="btn btn--ghost btn--small"/>
+                        </ui:VisualElement>
+                    </ui:VisualElement>
+                    <ui:VisualElement class="slider-row">
+                        <ui:Label text="UI" class="slider-row__label"/>
+                        <ui:Slider name="ui-slider" low-value="0" high-value="1" value="1" class="slider-row__slider"/>
+                        <ui:Label name="ui-label" text="100%" class="slider-row__value"/>
+                        <ui:VisualElement class="slider-row__test-slot">
+                            <ui:Button name="ui-test-button" text="TEST" class="btn btn--ghost btn--small"/>
+                        </ui:VisualElement>
+                    </ui:VisualElement>
+                </ui:ScrollView>
+                <ui:VisualElement class="btn-row" style="justify-content: center;">
+                    <ui:Button name="settings-back-button" text="BACK" class="btn btn--ghost" style="flex-grow: 0; max-width: 140px;"/>
+                </ui:VisualElement>
+            </ui:VisualElement>
+            <ui:VisualElement name="devlog-panel" class="panel panel--devlog is-hidden">
+                <ui:VisualElement picking-mode="Ignore" class="panel__stone"/>
+                <ui:VisualElement picking-mode="Ignore" class="panel__ring-inner"/>
+                <ui:VisualElement picking-mode="Ignore" class="panel__ring-shadow"/>
+                <ui:VisualElement picking-mode="Ignore" class="corner corner--tl"/>
+                <ui:VisualElement picking-mode="Ignore" class="corner corner--tr"/>
+                <ui:VisualElement picking-mode="Ignore" class="corner corner--bl"/>
+                <ui:VisualElement picking-mode="Ignore" class="corner corner--br"/>
+                <ui:Label text="DEV LOG" class="dialog-title"/>
+                <ui:VisualElement class="rune-divider">
+                    <ui:VisualElement class="rune-divider__line"/>
+                    <ui:VisualElement class="rune-divider__glyph">
+                        <ui:VisualElement class="rune-divider__glyph-inner"/>
+                    </ui:VisualElement>
+                    <ui:VisualElement class="rune-divider__line"/>
+                </ui:VisualElement>
+                <ui:ScrollView name="devlog-scroll" class="devlog-scroll"/>
+                <ui:VisualElement class="btn-row" style="justify-content: center;">
+                    <ui:Button name="devlog-back-button" text="BACK" class="btn btn--ghost" style="flex-grow: 0; max-width: 140px;"/>
+                </ui:VisualElement>
+            </ui:VisualElement>
+        </ui:VisualElement>
+    </ui:VisualElement>
+</ui:UXML>

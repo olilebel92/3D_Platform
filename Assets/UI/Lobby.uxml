@@ -1,0 +1,80 @@
+<ui:UXML xmlns:ui="UnityEngine.UIElements" editor-extension-mode="False">
+    <Style src="project://database/Assets/UI/GameTheme.uss?fileID=7433441132597879392&amp;guid=5c9ec8a0d813eae46a8edc5b83156aa2&amp;type=3#GameTheme"/>
+    <Style src="project://database/Assets/UI/GameUI.uss?fileID=7433441132597879392&amp;guid=57f408b2b2125a7449c531a0ebe76048&amp;type=3#GameUI"/>
+    <ui:VisualElement name="lobby-root" class="lobby-root">
+        <ui:VisualElement name="network-pill" class="network-pill" style="background-color: rgb(20, 10, 10);">
+            <ui:VisualElement name="network-pill-dot" class="network-pill__dot"/>
+            <ui:Label name="network-pill-label" text="OFFLINE"/>
+        </ui:VisualElement>
+        <ui:VisualElement class="lobby-header">
+            <ui:Label text="LOBBY" class="lobby-title"/>
+            <ui:Label name="session-mode" text="Single Player Session" class="lobby-session-mode"/>
+        </ui:VisualElement>
+        <ui:VisualElement class="rune-divider" style="margin: 4px 28px 0 28px;">
+            <ui:VisualElement class="rune-divider__line"/>
+            <ui:VisualElement class="rune-divider__glyph">
+                <ui:VisualElement class="rune-divider__glyph-inner"/>
+            </ui:VisualElement>
+            <ui:VisualElement class="rune-divider__line"/>
+        </ui:VisualElement>
+        <ui:VisualElement name="lobby-body" class="lobby-body" style="max-width: 1000px; align-self: center; width: 1056px;">
+            <ui:VisualElement class="lobby-right" style="height: 891px;">
+                <ui:VisualElement class="panel lobby-controls">
+                    <ui:VisualElement picking-mode="Ignore" class="panel__ring-inner"/>
+                    <ui:Label text="PLAYER NAME" class="field__label"/>
+                    <ui:TextField name="name-field" max-length="32" placeholder-text="Enter your name..." class="field__input"/>
+                    <ui:Label text="CLASS" class="field__label" style="margin-top: 14px;"/>
+                    <ui:VisualElement class="class-buttons">
+                        <ui:Button name="class-random" text="?" class="btn class-btn"/>
+                        <ui:Button name="class-warrior" text="W" class="btn class-btn"/>
+                        <ui:Button name="class-mage" text="M" class="btn class-btn"/>
+                        <ui:Button name="class-rogue" text="R" class="btn class-btn"/>
+                        <ui:Button name="class-spectator" text="SPECTATE" class="btn class-btn class-btn--wide"/>
+                    </ui:VisualElement>
+                    <ui:VisualElement class="rune-divider" style="margin-top: 16px; margin-bottom: 10px;">
+                        <ui:VisualElement class="rune-divider__line"/>
+                        <ui:VisualElement class="rune-divider__glyph">
+                            <ui:VisualElement class="rune-divider__glyph-inner"/>
+                        </ui:VisualElement>
+                        <ui:VisualElement class="rune-divider__line"/>
+                    </ui:VisualElement>
+                    <ui:Button name="ready-button" text="READY" class="btn"/>
+                    <ui:Button name="start-button" text="START GAME" class="btn btn--primary"/>
+                    <ui:Button name="force-start-button" text="FORCE START" class="btn"/>
+                    <ui:VisualElement style="flex-grow: 1;"/>
+                    <ui:Button name="disconnect-button" text="DISCONNECT" class="btn btn--danger"/>
+                </ui:VisualElement>
+            </ui:VisualElement>
+            <ui:VisualElement class="lobby-left">
+                <ui:VisualElement class="panel lobby-panel">
+                    <ui:VisualElement picking-mode="Ignore" class="panel__ring-inner"/>
+                    <ui:Label text="ADVENTURERS" class="lobby-section-title"/>
+                    <ui:VisualElement class="rune-divider" style="margin-top: 6px; margin-bottom: 6px;">
+                        <ui:VisualElement class="rune-divider__line"/>
+                        <ui:VisualElement class="rune-divider__glyph">
+                            <ui:VisualElement class="rune-divider__glyph-inner"/>
+                        </ui:VisualElement>
+                        <ui:VisualElement class="rune-divider__line"/>
+                    </ui:VisualElement>
+                    <ui:ScrollView name="player-list" mode="Vertical" class="lobby-scroll"/>
+                </ui:VisualElement>
+                <ui:VisualElement class="panel lobby-panel lobby-chat-panel" style="height: 563px;">
+                    <ui:VisualElement picking-mode="Ignore" class="panel__ring-inner"/>
+                    <ui:Label text="PARTY CHAT" class="lobby-section-title"/>
+                    <ui:VisualElement class="rune-divider" style="margin-top: 6px; margin-bottom: 6px;">
+                        <ui:VisualElement class="rune-divider__line"/>
+                        <ui:VisualElement class="rune-divider__glyph">
+                            <ui:VisualElement class="rune-divider__glyph-inner"/>
+                        </ui:VisualElement>
+                        <ui:VisualElement class="rune-divider__line"/>
+                    </ui:VisualElement>
+                    <ui:ScrollView name="chat-scroll" mode="Vertical" class="lobby-scroll"/>
+                    <ui:VisualElement class="chat-input-row">
+                        <ui:TextField name="chat-input" max-length="50" placeholder-text="Enter text..." class="field__input chat-field"/>
+                        <ui:Button name="send-button" text="SEND" class="btn btn--ghost btn--small"/>
+                    </ui:VisualElement>
+                </ui:VisualElement>
+            </ui:VisualElement>
+        </ui:VisualElement>
+    </ui:VisualElement>
+</ui:UXML>

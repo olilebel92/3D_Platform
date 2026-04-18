@@ -1,5 +1,16 @@
 using UnityEngine;
 
+[System.Serializable]
+public class NodePrerequisite
+{
+    [Tooltip("The prerequisite node.")]
+    public SkillTreeNode node;
+
+    [Tooltip("Minimum level the prerequisite node must have reached.")]
+    [Min(1)]
+    public int requiredLevel = 1;
+}
+
 /// <summary>
 /// ScriptableObject that defines a single node in the skill tree.
 ///
@@ -13,7 +24,8 @@ public class SkillTreeNode : ScriptableObject
     public string nodeName = "New Skill";
 
     [TextArea(2, 4)]
-    [Tooltip("Short description shown in the tooltip panel.")]
+    [Tooltip("Short description shown in the tooltip panel. " +
+             "Tokens (resolved from unlocksSpell if set): {rankBonus} {bonus} {cooldown} {rank} {maxRank}")]
     public string description = "Describe what this skill does.";
 
     [Tooltip("Icon displayed on the node button. Leave empty to automatically use the unlocked spell's icon.")]
@@ -23,8 +35,8 @@ public class SkillTreeNode : ScriptableObject
     [Tooltip("How many skill points it costs to learn this node.")]
     public int cost = 1;
 
-    [Tooltip("All of these nodes must be learned before this one can be purchased.")]
-    public SkillTreeNode[] prerequisites;
+    [Tooltip("All of these nodes must reach their required level before this one can be purchased.")]
+    public NodePrerequisite[] prerequisites;
 
     [Header("Levels")]
     [Tooltip("Maximum number of times this node can be leveled up.")]
@@ -63,6 +75,42 @@ public class SkillTreeNode : ScriptableObject
 
     [Tooltip("Percent bonus per level added specifically to healing spells. (0.10 = +10%)")]
     public float healPctBonus = 0f;
+
+    [Tooltip("Flat bonus per level added specifically to lightning spell damage.")]
+    public float lightningDamageBonus = 0f;
+
+    [Tooltip("Percent bonus per level added specifically to lightning spell damage. (0.10 = +10%)")]
+    public float lightningDamagePctBonus = 0f;
+
+    // ─── Description Resolution ───────────────────────────────────────────────
+
+    /// <summary>
+    /// Returns the description with tokens replaced by live values.
+    /// Tokens: {rank} {maxRank} {base} {rankBonus} {bonus} {total} {cooldown}
+    /// </summary>
+    public string GetDescription(int rank = 1)
+    {
+        string desc = description
+            .Replace("{rank}",    Gold(rank.ToString()))
+            .Replace("{maxRank}", Gold(maxLevel.ToString()));
+
+        if (unlocksSpell != null)
+        {
+            float baseDmg = unlocksSpell.BaseDamage;
+            float bonus   = (rank - 1) * unlocksSpell.damagePerSkillRank;
+            float total   = baseDmg + bonus;
+            desc = desc
+                .Replace("{base}",      Gold(baseDmg.ToString("0")))
+                .Replace("{rankBonus}", Gold(unlocksSpell.damagePerSkillRank.ToString("0")))
+                .Replace("{bonus}",     Gold(bonus.ToString("0")))
+                .Replace("{total}",     Gold(total.ToString("0")))
+                .Replace("{cooldown}",  Gold(unlocksSpell.cooldown.ToString("0.#")));
+        }
+
+        return desc;
+    }
+
+    static string Gold(string value) => $"<color=#FFD700>{value}</color>";
 
     [Header("Spell Unlock")]
     [Tooltip("If assigned, this spell is added to the first empty spell bar slot when learned.")]

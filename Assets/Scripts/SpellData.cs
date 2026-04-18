@@ -1,5 +1,14 @@
 using UnityEngine;
 
+/// <summary>How the telegraph fill colour is resolved at runtime.</summary>
+public enum TelegraphColorMode
+{
+    /// <summary>Green for Healing spells, red for all others.</summary>
+    Auto,
+    /// <summary>Use the custom colour set on the SpellData asset.</summary>
+    Custom,
+}
+
 /// <summary>Ground shape drawn as a telegraph before a spell fires.</summary>
 public enum TelegraphShape
 {
@@ -22,6 +31,8 @@ public enum SpellSchool
     Fire,
     /// <summary>Healing — benefits from spell damage bonuses as heal power; fire bonuses are ignored.</summary>
     Healing,
+    /// <summary>Lightning magic — benefits from spell damage AND lightning damage bonuses.</summary>
+    Lightning,
 }
 
 /// <summary>Where the spell prefab is spawned.</summary>
@@ -57,6 +68,8 @@ public enum SpellType
     Aura,
     /// <summary>Fires repeatedly while the cast button is held.</summary>
     Channel,
+    /// <summary>Fires at a locked enemy target. Requires target selected via TargetSelector (right-click enemy).</summary>
+    TargetLocked,
 }
 
 [CreateAssetMenu(fileName = "NewSpell", menuName = "Spells/New Spell")]
@@ -66,10 +79,22 @@ public class SpellData : ScriptableObject
     [Tooltip("Fire: applies fire damage bonuses. Healing: treated as a heal. Arcane: base spell bonuses only.")]
     public SpellSchool school = SpellSchool.Arcane;
 
+    [Header("Combat")]
+    [Tooltip("Base damage (or heal) this spell deals. Drives the skill tree tooltip and the damage formula.")]
+    public float baseDamage = 0f;
+
+    [Tooltip("Extra damage (or heal) added per skill tree rank above 1. Rank 1 uses baseDamage only.")]
+    public float damagePerSkillRank = 0f;
+
+    [Tooltip("Seconds before this spell can be cast again after firing.")]
+    public float cooldown = 1f;
+
     [Header("Basic Info")]
     public string spellName = "Unnamed Spell";
 
     [TextArea(2, 4)]
+    [Tooltip("Supports tokens: {base} base damage, {bonus} rank bonus damage, {total} combined, " +
+             "{cooldown} cooldown in seconds, {rankBonus} damagePerSkillRank value.")]
     public string description = "A mysterious spell.";
 
     [Header("Visuals")]
@@ -138,6 +163,9 @@ public class SpellData : ScriptableObject
     [Tooltip("Sound played locally when the player initiates this spell's cast.")]
     public AudioClip castSound;
 
+    [Tooltip("Sound played on impact or when the spell effect lands.")]
+    public AudioClip hitSound;
+
     // ─── Telegraph ────────────────────────────────────────────────────────────
 
     [Header("Telegraph")]
@@ -156,8 +184,87 @@ public class SpellData : ScriptableObject
     [Tooltip("Width of the line telegraph in world units (TelegraphShape.Line only).")]
     public float telegraphWidth = 1.5f;
 
-    [Tooltip("Fill colour of the telegraph decal (alpha controls opacity).")]
+    [Tooltip("Auto: green for Healing, red for damage spells. Custom: use the colour below.")]
+    public TelegraphColorMode telegraphColorMode = TelegraphColorMode.Auto;
+
+    [Tooltip("Fill colour used only when Telegraph Color Mode is set to Custom (alpha controls opacity).")]
     public Color telegraphColor = new Color(1f, 0.5f, 0f, 0.45f);
+
+    // ─── Chain / Target-Locked ────────────────────────────────────────────────
+
+    [Header("Chain / Target-Locked")]
+    [Tooltip("Number of targets hit, including the primary target. Only used when spellType = TargetLocked.")]
+    public int chainCount = 3;
+
+    [Tooltip("Max world-unit distance between chain jumps. Only used when spellType = TargetLocked.")]
+    public float chainRadius = 6f;
+
+    [Tooltip("Damage multiplier per chain jump after the first (0.6 = 60% of previous). Only used when spellType = TargetLocked.")]
+    [Range(0.1f, 1f)]
+    public float chainDamageFalloff = 0.6f;
+
+    [Tooltip("Seconds the bolt takes to travel from its current position to the next target. Only used when spellType = TargetLocked.")]
+    public float chainTravelTime = 0.2f;
+
+    [Tooltip("Seconds to wait at a target after hitting it before jumping to the next one. Only used when spellType = TargetLocked.")]
+    public float chainJumpDelay = 0.3f;
+
+    /// <summary>
+    /// Returns the base damage for this spell.
+    /// Prefers the SpellData baseDamage field if set (> 0).
+    /// Falls back to reading the prefab component for legacy Fireball / HealingWave assets
+    /// that have not yet had their base damage migrated to SpellData.
+    /// </summary>
+    public float BaseDamage
+    {
+        get
+        {
+            if (baseDamage > 0f) return baseDamage;
+            if (prefab == null) return 0f;
+            if (prefab.TryGetComponent<Fireball>(out var fb))        return fb.baseDamage;
+            if (prefab.TryGetComponent<HealingWave>(out var hw))     return hw.baseHeal;
+            if (prefab.TryGetComponent<ChainLightning>(out var cl))  return cl.baseDamage;
+            return 0f;
+        }
+    }
+
+    /// <summary>
+    /// Returns the description with tokens replaced by live values.
+    /// <para>Available tokens: {base} {bonus} {total} {cooldown} {rankBonus}</para>
+    /// </summary>
+    /// <param name="baseDamage">The spell prefab's base damage (pass 0 if unknown).</param>
+    /// <param name="skillRank">Current skill tree rank of this spell (1 = no bonus).</param>
+    public string GetDescription(float baseDamage = 0f, int skillRank = 1)
+    {
+        float bonus = (skillRank - 1) * damagePerSkillRank;
+        float total = baseDamage + bonus;
+        return description
+            .Replace("{base}",      Gold(baseDamage.ToString("0")))
+            .Replace("{bonus}",     Gold(bonus.ToString("0")))
+            .Replace("{total}",     Gold(total.ToString("0")))
+            .Replace("{cooldown}",  Gold(cooldown.ToString("0.#")))
+            .Replace("{rankBonus}", Gold(damagePerSkillRank.ToString("0")));
+    }
+
+    static string Gold(string value) => $"<color=#FFD700>{value}</color>";
+
+    /// <summary>
+    /// Resolved telegraph fill colour. Auto mode: green for Healing, red for all other schools.
+    /// Custom mode: returns <see cref="telegraphColor"/> as-is.
+    /// </summary>
+    public Color ResolvedTelegraphColor
+    {
+        get
+        {
+            if (telegraphColorMode == TelegraphColorMode.Custom) return telegraphColor;
+            return school switch
+            {
+                SpellSchool.Healing   => new Color(0.2f, 0.9f, 0.2f, 0.45f),  // green
+                SpellSchool.Lightning => new Color(0.9f, 0.9f, 0.1f, 0.45f),  // yellow
+                _                     => new Color(0.9f, 0.1f, 0.1f, 0.45f),  // red
+            };
+        }
+    }
 
     [Tooltip("When true, Circle telegraphs follow the cursor (targeted AOE). " +
              "When false, the shape stays centred on the caster (self-cast AOE).")]

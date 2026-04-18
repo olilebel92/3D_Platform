@@ -247,11 +247,6 @@ public class InventoryUI : MonoBehaviour
         bool anyPanelOpen = _isOpen || (_characterWindow != null && _characterWindow.IsOpen);
         CameraControllerThirdPerson.IsLocked = anyPanelOpen;
 
-        if (unlockCursorWhileOpen)
-        {
-            Cursor.lockState = anyPanelOpen ? CursorLockMode.None : CursorLockMode.Locked;
-            Cursor.visible   = anyPanelOpen;
-        }
 
         Debug.Log("[InventoryUI] Inventory " + (_isOpen ? "opened." : "closed."));
     }

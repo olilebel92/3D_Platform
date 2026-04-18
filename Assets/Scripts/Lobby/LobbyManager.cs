@@ -1,15 +1,15 @@
 using UnityEngine;
 using UnityEngine.SceneManagement;
-using UnityEngine.UI;
-using TMPro;
+using UnityEngine.UIElements;
 using Unity.Netcode;
+using Unity.Netcode.Transports.UTP;
 
 /// <summary>
-/// Manages the Lobby scene: player list, name input, class selection,
+/// Manages the Lobby scene via UI Toolkit: player list, name input, class selection,
 /// ready system, and scene transition to the game.
 ///
 /// Attach to a persistent GameObject in LobbyScene.
-/// Wire all Inspector references.
+/// Assign the UIDocument that owns Lobby.uxml in the Inspector.
 /// </summary>
 public class LobbyManager : MonoBehaviour
 {
@@ -19,54 +19,27 @@ public class LobbyManager : MonoBehaviour
 
     // ─── Inspector ────────────────────────────────────────────────────────────
 
-    [Header("Player List")]
-    [Tooltip("Vertical Layout Group container where player rows are spawned.")]
-    public Transform playerListContainer;
-
-    [Tooltip("Prefab for one row. Must contain a TMP_Text somewhere in its hierarchy.")]
-    public GameObject playerEntryPrefab;
-
-    [Header("Name")]
-    public TMP_InputField nameInputField;
-
-    [Header("Class Buttons")]
-    [Tooltip("Assign in order: Random, Warrior, Mage, Rogue.")]
-    public Button[] classButtons;
-
-    [Tooltip("Color applied to the currently selected class button.")]
-    public Color selectedClassColor = new Color(0.3f, 0.8f, 0.3f);
-
-    [Tooltip("Default color for unselected class buttons.")]
-    public Color defaultClassColor = Color.white;
-
-    [Header("Ready")]
-    [Tooltip("Toggles the local player's ready state.")]
-    public Button readyButton;
-
-    [Tooltip("Label on the ready button.")]
-    public TMP_Text readyButtonText;
-
-    [Header("Host Buttons")]
-    [Tooltip("Enabled only when ALL players are ready. Host-only.")]
-    public Button startGameButton;
-
-    [Tooltip("Lets the host start even if not everyone is ready. Host-only.")]
-    public Button forceStartButton;
-
-    [Header("Session Mode")]
-    [Tooltip("Label that shows 'Single Player Session' or 'Multiplayer Mode' based on connected player count.")]
-    public TMP_Text sessionModeText;
-
-    [Header("Other")]
-    public Button disconnectButton;
+    [SerializeField] private UIDocument _doc;
 
     [Header("Scenes")]
     public string gameSceneName     = "GameScene";
     public string mainMenuSceneName = "MainMenu";
 
-    // ─── Private State ────────────────────────────────────────────────────────
+    // ─── UIElements refs ──────────────────────────────────────────────────────
 
-    private bool _localReady = false;
+    private ScrollView    _playerList;
+    private TextField     _nameField;
+    private Label         _sessionModeLabel;
+    private Button        _readyBtn;
+    private Button        _startBtn;
+    private Button        _forceStartBtn;
+    private Button[]      _classBtns;
+    private VisualElement _netPillDot;
+    private Label         _netPillLabel;
+
+    // ─── State ────────────────────────────────────────────────────────────────
+
+    private bool _localReady;
 
     // ─── Unity Lifecycle ──────────────────────────────────────────────────────
 
@@ -78,53 +51,70 @@ public class LobbyManager : MonoBehaviour
 
     void Start()
     {
+        var root = _doc.rootVisualElement;
+
+        _playerList       = root.Q<ScrollView>("player-list");
+        _nameField        = root.Q<TextField>("name-field");
+        _sessionModeLabel = root.Q<Label>("session-mode");
+        _readyBtn         = root.Q<Button>("ready-button");
+        _startBtn         = root.Q<Button>("start-button");
+        _forceStartBtn    = root.Q<Button>("force-start-button");
+        _netPillDot       = root.Q<VisualElement>("network-pill-dot");
+        _netPillLabel     = root.Q<Label>("network-pill-label");
+
+        _classBtns = new[]
+        {
+            root.Q<Button>("class-random"),
+            root.Q<Button>("class-warrior"),
+            root.Q<Button>("class-mage"),
+            root.Q<Button>("class-rogue"),
+            root.Q<Button>("class-spectator"),
+        };
+
         bool networkReady = NetworkManager.Singleton != null && NetworkManager.Singleton.IsListening;
         bool isHost       = networkReady && NetworkManager.Singleton.IsHost;
 
         // Host-only buttons
-        if (startGameButton != null)
+        if (_startBtn != null)
         {
-            startGameButton.gameObject.SetActive(isHost);
-            startGameButton.onClick.AddListener(OnStartGame);
+            _startBtn.style.display = isHost ? DisplayStyle.Flex : DisplayStyle.None;
+            _startBtn.RegisterCallback<ClickEvent>(_ => OnStartGame());
+        }
+        if (_forceStartBtn != null)
+        {
+            _forceStartBtn.style.display = isHost ? DisplayStyle.Flex : DisplayStyle.None;
+            _forceStartBtn.RegisterCallback<ClickEvent>(_ => OnForceStart());
         }
 
-        if (forceStartButton != null)
+        // Class buttons — order matches PlayerClass enum (Random=0 … Spectator=4)
+        for (int i = 0; i < _classBtns.Length; i++)
         {
-            forceStartButton.gameObject.SetActive(isHost);
-            forceStartButton.onClick.AddListener(OnForceStart);
+            int idx = i;
+            _classBtns[i]?.RegisterCallback<ClickEvent>(_ => OnClassSelected(idx));
         }
 
-        // Class buttons — one per PlayerClass value (Random=0, Warrior=1, Mage=2, Rogue=3, Spectator=4)
-        for (int i = 0; i < classButtons.Length; i++)
-        {
-            int index = i; // capture for lambda
-            if (classButtons[i] != null)
-                classButtons[i].onClick.AddListener(() => OnClassSelected(index));
-        }
+        _readyBtn?.RegisterCallback<ClickEvent>(_ => OnReadyToggle());
+        root.Q<Button>("disconnect-button")?.RegisterCallback<ClickEvent>(_ => OnDisconnect());
 
-        if (readyButton != null)
-            readyButton.onClick.AddListener(OnReadyToggle);
+        if (_nameField != null)
+            _nameField.RegisterCallback<FocusOutEvent>(_ => OnNameSubmitted(_nameField.value));
 
-        if (disconnectButton != null)
-            disconnectButton.onClick.AddListener(OnDisconnect);
-
-        if (nameInputField != null)
-            nameInputField.onEndEdit.AddListener(OnNameSubmitted);
-
-        // Network events
         if (networkReady)
         {
             NetworkManager.Singleton.OnClientConnectedCallback  += OnClientConnected;
             NetworkManager.Singleton.OnClientDisconnectCallback += OnClientDisconnected;
         }
 
-        // Pre-fill name field
         SetNameFieldFromPlayer();
-
         RefreshPlayerList();
         RefreshClassButtons();
         RefreshStartButton();
         RefreshSessionModeText();
+        RefreshNetworkPill();
+
+        // Deferred refresh — catches LobbyPlayers whose OnNetworkSpawn fired
+        // before this Start() ran (e.g. objects that survived a scene transition).
+        root.schedule.Execute(RefreshPlayerList).StartingIn(0);
     }
 
     void OnDestroy()
@@ -144,72 +134,96 @@ public class LobbyManager : MonoBehaviour
     {
         RefreshPlayerList();
         RefreshStartButton();
+        RefreshNetworkPill();
     }
 
     void OnClientDisconnected(ulong clientId)
     {
         RefreshPlayerList();
         RefreshStartButton();
+        RefreshNetworkPill();
     }
 
     // ─── Player List ──────────────────────────────────────────────────────────
 
-    // All player slot tags are yellow. Host tag is red.
-    private static readonly string[] PlayerColors = { "#FFCC00", "#FFCC00", "#FFCC00", "#FFCC00" };
-
-    /// <summary>Rebuilds the player list rows from all active LobbyPlayers.</summary>
     public void RefreshPlayerList()
     {
+        // Lazy-init in case this is called before Start() (e.g. from OnNetworkSpawn).
+        if (_playerList == null && _doc != null)
+            _playerList = _doc.rootVisualElement?.Q<ScrollView>("player-list");
+
         RefreshSessionModeText();
-        if (playerListContainer == null || playerEntryPrefab == null) return;
+        if (_playerList == null) return;
 
-        foreach (Transform child in playerListContainer)
-            Destroy(child.gameObject);
+        _playerList.contentContainer.Clear();
 
-        // Sort by client ID so the order is always consistent.
         var players = FindObjectsByType<LobbyPlayer>(FindObjectsSortMode.None);
         System.Array.Sort(players, (a, b) => a.OwnerClientId.CompareTo(b.OwnerClientId));
 
-        int playerNumber = 1;
+        int n = 1;
         foreach (LobbyPlayer player in players)
         {
-            GameObject entry = Instantiate(playerEntryPrefab, playerListContainer);
-            TMP_Text   label = entry.GetComponentInChildren<TMP_Text>();
-            if (label == null) { playerNumber++; continue; }
+            var row = new VisualElement();
+            row.AddToClassList("player-row");
 
-            string color     = PlayerColors[Mathf.Clamp(playerNumber - 1, 0, PlayerColors.Length - 1)];
-            string pTag      = $"<color={color}>[P{playerNumber}]</color>";
-            string hostTag   = player.OwnerClientId == 0 ? " <color=#FF4444>[Host]</color>" : "";
-            string name      = player.PlayerName.Value.ToString();
-            string className = ((LobbyPlayer.PlayerClass)player.SelectedClass.Value).ToString();
-            string ready     = player.IsReady.Value ? "<color=#44FF44>[Ready]</color>" : "<color=#FF4444>[Not Ready]</color>";
+            var tagLabel = new Label($"[P{n}]");
+            tagLabel.AddToClassList("player-tag");
+            row.Add(tagLabel);
 
-            label.text = $"{pTag}{hostTag} {name}  —  {className}  —  {ready}";
-            playerNumber++;
+            if (player.OwnerClientId == 0)
+            {
+                var hostLabel = new Label("[Host]");
+                hostLabel.AddToClassList("host-tag");
+                row.Add(hostLabel);
+            }
+
+            var nameLabel = new Label(player.PlayerName.Value.ToString());
+            nameLabel.AddToClassList("player-name");
+            row.Add(nameLabel);
+
+            var sep1 = new Label("—");
+            sep1.AddToClassList("player-separator");
+            row.Add(sep1);
+
+            var classLabel = new Label(((LobbyPlayer.PlayerClass)player.SelectedClass.Value).ToString());
+            classLabel.AddToClassList("player-class");
+            row.Add(classLabel);
+
+            var sep2 = new Label("—");
+            sep2.AddToClassList("player-separator");
+            row.Add(sep2);
+
+            bool ready = player.IsReady.Value;
+            var readyLabel = new Label(ready ? "[Ready]" : "[Not Ready]");
+            readyLabel.AddToClassList(ready ? "ready-yes" : "ready-no");
+            row.Add(readyLabel);
+
+            _playerList.Add(row);
+            n++;
         }
     }
 
     // ─── Session Mode Label ───────────────────────────────────────────────────
 
-    /// <summary>Updates the session mode label based on how many players are connected.</summary>
     void RefreshSessionModeText()
     {
-        if (sessionModeText == null) return;
-
-        bool networkActive = NetworkManager.Singleton != null && NetworkManager.Singleton.IsListening;
-        int  playerCount   = networkActive ? NetworkManager.Singleton.ConnectedClientsIds.Count : 1;
-
-        sessionModeText.text = playerCount > 1 ? "Multiplayer Mode" : "Single Player Session";
+        if (_sessionModeLabel == null && _doc != null)
+            _sessionModeLabel = _doc.rootVisualElement?.Q<Label>("session-mode");
+        if (_sessionModeLabel == null) return;
+        bool active = NetworkManager.Singleton != null && NetworkManager.Singleton.IsListening;
+        int  count  = active ? NetworkManager.Singleton.ConnectedClientsIds.Count : 1;
+        _sessionModeLabel.text = count > 1 ? "MULTIPLAYER MODE" : "SINGLE PLAYER SESSION";
     }
 
     // ─── Start Button ─────────────────────────────────────────────────────────
 
-    /// <summary>Enables Start Game only when every connected player is ready.</summary>
     public void RefreshStartButton()
     {
         RefreshSessionModeText();
-        if (startGameButton == null) return;
-        startGameButton.interactable = AllPlayersReady();
+        if (_startBtn == null && _doc != null)
+            _startBtn = _doc.rootVisualElement?.Q<Button>("start-button");
+        if (_startBtn == null) return;
+        _startBtn.SetEnabled(AllPlayersReady());
     }
 
     bool AllPlayersReady()
@@ -227,28 +241,19 @@ public class LobbyManager : MonoBehaviour
     {
         LobbyPlayer mine = GetMyPlayer();
         if (mine == null) return;
-
         mine.SetClass((LobbyPlayer.PlayerClass)classIndex);
         RefreshClassButtons();
-
-        // Reset local ready toggle to match the new IsReady=false from SetClass.
         _localReady = false;
         UpdateReadyButtonLabel();
     }
 
-    /// <summary>Highlights the button matching the local player's current class.</summary>
     void RefreshClassButtons()
     {
-        LobbyPlayer mine = GetMyPlayer();
-        int current = mine != null ? mine.SelectedClass.Value : 0;
+        LobbyPlayer mine    = GetMyPlayer();
+        int         current = mine != null ? mine.SelectedClass.Value : 0;
 
-        for (int i = 0; i < classButtons.Length; i++)
-        {
-            if (classButtons[i] == null) continue;
-            var colors = classButtons[i].colors;
-            colors.normalColor = (i == current) ? selectedClassColor : defaultClassColor;
-            classButtons[i].colors = colors;
-        }
+        for (int i = 0; i < _classBtns.Length; i++)
+            _classBtns[i]?.EnableInClassList("class-btn--selected", i == current);
     }
 
     // ─── Ready ────────────────────────────────────────────────────────────────
@@ -256,15 +261,14 @@ public class LobbyManager : MonoBehaviour
     void OnReadyToggle()
     {
         _localReady = !_localReady;
-        LobbyPlayer mine = GetMyPlayer();
-        mine?.SetReady(_localReady);
+        GetMyPlayer()?.SetReady(_localReady);
         UpdateReadyButtonLabel();
     }
 
     void UpdateReadyButtonLabel()
     {
-        if (readyButtonText != null)
-            readyButtonText.text = _localReady ? "Cancel Ready" : "Ready";
+        if (_readyBtn != null)
+            _readyBtn.text = _localReady ? "CANCEL READY" : "READY";
     }
 
     // ─── Name ─────────────────────────────────────────────────────────────────
@@ -278,12 +282,12 @@ public class LobbyManager : MonoBehaviour
 
     public void SetNameFieldFromPlayer()
     {
-        if (nameInputField == null) return;
+        if (_nameField == null) return;
         LobbyPlayer mine = GetMyPlayer();
         if (mine != null)
-            nameInputField.text = mine.PlayerName.Value.ToString();
+            _nameField.SetValueWithoutNotify(mine.PlayerName.Value.ToString());
         else if (PlayerPrefs.HasKey("PlayerName"))
-            nameInputField.text = PlayerPrefs.GetString("PlayerName");
+            _nameField.SetValueWithoutNotify(PlayerPrefs.GetString("PlayerName"));
     }
 
     // ─── Host Actions ─────────────────────────────────────────────────────────
@@ -305,8 +309,6 @@ public class LobbyManager : MonoBehaviour
     {
         Debug.Log("[LobbyManager] Loading: " + gameSceneName);
 
-        // Solo host (no other players) — shut down NGO and load directly so the
-        // game scene runs in singleplayer mode (PlayerSpawner's SpawnSolo path).
         if (NetworkManager.Singleton.ConnectedClientsIds.Count == 1)
         {
             Debug.Log("[LobbyManager] Only one player — switching to singleplayer mode.");
@@ -324,6 +326,37 @@ public class LobbyManager : MonoBehaviour
     {
         NetworkManager.Singleton.Shutdown();
         SceneManager.LoadScene(mainMenuSceneName);
+    }
+
+    // ─── Network Pill ─────────────────────────────────────────────────────────
+
+    void RefreshNetworkPill()
+    {
+        if (_netPillLabel == null) return;
+
+        NetworkManager nm = NetworkManager.Singleton;
+
+        if (nm == null || !nm.IsListening)
+        {
+            SetPillColor(new Color(0.78f, 0.27f, 0.23f));
+            _netPillLabel.text = "OFFLINE";
+            return;
+        }
+
+        UnityTransport transport = nm.GetComponent<UnityTransport>();
+        string ip   = transport != null ? transport.ConnectionData.Address : "?";
+        ushort port = transport != null ? transport.ConnectionData.Port     : (ushort)0;
+
+        SetPillColor(new Color(0.27f, 0.78f, 0.35f));
+        _netPillLabel.text = nm.IsHost
+            ? $"HOST  \u2014  {ip}:{port}"
+            : $"CLIENT  \u2014  {ip}:{port}";
+    }
+
+    void SetPillColor(Color color)
+    {
+        if (_netPillDot   != null) _netPillDot.style.backgroundColor = new StyleColor(color);
+        if (_netPillLabel != null) _netPillLabel.style.color          = new StyleColor(color);
     }
 
     // ─── Helpers ─────────────────────────────────────────────────────────────

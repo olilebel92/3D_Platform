@@ -1,16 +1,15 @@
 using UnityEngine;
-using UnityEngine.UI;
-using TMPro;
+using UnityEngine.UIElements;
 using Unity.Netcode;
 using Unity.Collections;
 
 /// <summary>
-/// Handles lobby chat — sends messages via ServerRpc and broadcasts them
-/// back to every client via ClientRpc.
-/// In singleplayer (NetworkManager not listening) messages are displayed locally.
+/// Handles lobby chat via UI Toolkit — sends messages through ServerRpc and broadcasts
+/// them to every client. In singleplayer (NetworkManager not listening) messages are
+/// displayed locally.
 ///
 /// Attach to a persistent GameObject in LobbyScene.
-/// Wire all Inspector references.
+/// Assign the same UIDocument used by LobbyManager in the Inspector.
 /// </summary>
 public class LobbyChatManager : NetworkBehaviour
 {
@@ -20,25 +19,16 @@ public class LobbyChatManager : NetworkBehaviour
 
     // ─── Inspector ────────────────────────────────────────────────────────────
 
-    [Header("UI")]
-    [Tooltip("ScrollRect that wraps the message list.")]
-    [SerializeField] private ScrollRect chatScrollRect;
-
-    [Tooltip("Content transform inside the ScrollRect — messages are parented here.")]
-    [SerializeField] private Transform messageContainer;
-
-    [Tooltip("Prefab for one chat line. Must contain a TMP_Text in its hierarchy.")]
-    [SerializeField] private GameObject messagePrefab;
-
-    [Tooltip("Input field where the player types.")]
-    [SerializeField] private TMP_InputField chatInput;
-
-    [Tooltip("Button that submits the message.")]
-    [SerializeField] private Button sendButton;
+    [SerializeField] private UIDocument _doc;
 
     [Header("Settings")]
     [Tooltip("Oldest messages are removed once this limit is reached.")]
     [SerializeField] private int maxMessages = 50;
+
+    // ─── UIElements refs ──────────────────────────────────────────────────────
+
+    private ScrollView _chatScroll;
+    private TextField  _chatField;
 
     // ─── Unity Lifecycle ──────────────────────────────────────────────────────
 
@@ -50,14 +40,20 @@ public class LobbyChatManager : NetworkBehaviour
 
     void Start()
     {
-        if (sendButton != null)
-            sendButton.onClick.AddListener(OnSendClicked);
+        var root = _doc.rootVisualElement;
 
-        // Allow pressing Enter to send; hard cap at 50 chars
-        if (chatInput != null)
+        _chatScroll = root.Q<ScrollView>("chat-scroll");
+        _chatField  = root.Q<TextField>("chat-input");
+
+        root.Q<Button>("send-button")?.RegisterCallback<ClickEvent>(_ => OnSendClicked());
+
+        if (_chatField != null)
         {
-            chatInput.characterLimit = 50;
-            chatInput.onSubmit.AddListener(_ => OnSendClicked());
+            _chatField.RegisterCallback<KeyDownEvent>(evt =>
+            {
+                if (evt.keyCode == KeyCode.Return || evt.keyCode == KeyCode.KeypadEnter)
+                    OnSendClicked();
+            });
         }
     }
 
@@ -70,17 +66,16 @@ public class LobbyChatManager : NetworkBehaviour
 
     void OnSendClicked()
     {
-        if (chatInput == null) return;
+        if (_chatField == null) return;
 
-        string message = chatInput.text.Trim();
+        string message = _chatField.value.Trim();
         if (string.IsNullOrEmpty(message)) return;
 
-        chatInput.text = string.Empty;
-        chatInput.ActivateInputField();
+        _chatField.SetValueWithoutNotify(string.Empty);
+        _chatField.schedule.Execute(() => _chatField.Focus()).StartingIn(0);
 
-string senderName = GetLocalPlayerName();
-
-        bool networkActive = NetworkManager.Singleton != null && NetworkManager.Singleton.IsListening;
+        string senderName   = GetLocalPlayerName();
+        bool   networkActive = NetworkManager.Singleton != null && NetworkManager.Singleton.IsListening;
 
         if (networkActive)
         {
@@ -91,7 +86,6 @@ string senderName = GetLocalPlayerName();
         }
         else
         {
-            // Singleplayer — display directly without any RPCs
             DisplayMessage(senderName, message);
         }
     }
@@ -114,26 +108,35 @@ string senderName = GetLocalPlayerName();
 
     void DisplayMessage(string senderName, string message)
     {
-        if (messageContainer == null || messagePrefab == null) return;
+        if (_chatScroll == null) return;
 
-        // Drop the oldest entry if the list is full
-        if (messageContainer.childCount >= maxMessages)
-            Destroy(messageContainer.GetChild(0).gameObject);
+        // Drop oldest entry if full
+        if (_chatScroll.contentContainer.childCount >= maxMessages)
+            _chatScroll.contentContainer.RemoveAt(0);
 
-        GameObject entry = Instantiate(messagePrefab, messageContainer);
-        TMP_Text label = entry.GetComponentInChildren<TMP_Text>();
-        if (label != null)
-            label.text = $"<color=#FFCC00><b>{senderName}</b></color>: {message}";
+        var row = new VisualElement();
+        row.AddToClassList("chat-message");
 
-        // Auto-scroll to the latest message
-        if (chatScrollRect != null)
-        {
-            Canvas.ForceUpdateCanvases();
-            chatScrollRect.verticalNormalizedPosition = 0f;
-        }
+        var senderLabel = new Label(senderName);
+        senderLabel.AddToClassList("chat-sender");
+        row.Add(senderLabel);
+
+        var colonLabel = new Label(": ");
+        colonLabel.AddToClassList("chat-colon");
+        row.Add(colonLabel);
+
+        var textLabel = new Label(message);
+        textLabel.AddToClassList("chat-text");
+        row.Add(textLabel);
+
+        _chatScroll.Add(row);
+
+        // Scroll to bottom after layout updates
+        _chatScroll.schedule.Execute(() =>
+            _chatScroll.scrollOffset = new Vector2(0, float.MaxValue));
     }
 
-    // ─── Helpers ──────────────────────────────────────────────────────────────
+    // ─── Helpers ─────────────────────────────────────────────────────────────
 
     string GetLocalPlayerName()
     {

@@ -1,4 +1,5 @@
 using UnityEngine;
+using UnityEngine.Audio;
 
 /// <summary>
 /// Static settings store — reads/writes PlayerPrefs and applies audio settings.
@@ -10,6 +11,13 @@ public static class SettingsManager
 
     const string KeyMaster = "vol_master";
     const string KeyMusic  = "vol_music";
+    const string KeySfx    = "vol_sfx";
+    const string KeyUi     = "vol_ui";
+
+    // ─── Mixer Reference ──────────────────────────────────────────────────────
+
+    /// <summary>Assigned by SettingsUI on Start. Required for SFX and UI volume control.</summary>
+    public static AudioMixer Mixer;
 
     // ─── Master Volume ────────────────────────────────────────────────────────
 
@@ -38,6 +46,32 @@ public static class SettingsManager
         }
     }
 
+    // ─── SFX Volume ───────────────────────────────────────────────────────────
+
+    /// <summary>Sound effects volume (0–1). Applied through the SFX mixer group.</summary>
+    public static float SfxVolume
+    {
+        get => PlayerPrefs.GetFloat(KeySfx, 1f);
+        set
+        {
+            PlayerPrefs.SetFloat(KeySfx, Mathf.Clamp01(value));
+            SetMixerVolume("SFXVolume", Mathf.Clamp01(value));
+        }
+    }
+
+    // ─── UI Volume ────────────────────────────────────────────────────────────
+
+    /// <summary>UI sounds volume (0–1). Applied through the UI mixer group.</summary>
+    public static float UiVolume
+    {
+        get => PlayerPrefs.GetFloat(KeyUi, 1f);
+        set
+        {
+            PlayerPrefs.SetFloat(KeyUi, Mathf.Clamp01(value));
+            SetMixerVolume("UIVolume", Mathf.Clamp01(value));
+        }
+    }
+
     // ─── Apply ────────────────────────────────────────────────────────────────
 
     /// <summary>
@@ -50,5 +84,17 @@ public static class SettingsManager
 
         if (MusicManager.Instance != null)
             MusicManager.Instance.SetVolume(MusicVolume);
+
+        SetMixerVolume("SFXVolume", SfxVolume);
+        SetMixerVolume("UIVolume",  UiVolume);
+    }
+
+    // ─── Helpers ──────────────────────────────────────────────────────────────
+
+    static void SetMixerVolume(string param, float linear)
+    {
+        if (Mixer == null) return;
+        float db = linear > 0f ? Mathf.Log10(linear) * 20f : -80f;
+        Mixer.SetFloat(param, db);
     }
 }

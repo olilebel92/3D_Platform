@@ -243,11 +243,6 @@ public class CharacterWindow : MonoBehaviour
         bool anyPanelOpen = _isOpen || (_inventoryUI != null && _inventoryUI.IsOpen);
         CameraControllerThirdPerson.IsLocked = anyPanelOpen;
 
-        if (unlockCursorWhileOpen)
-        {
-            Cursor.lockState = anyPanelOpen ? CursorLockMode.None : CursorLockMode.Locked;
-            Cursor.visible   = anyPanelOpen;
-        }
 
         Debug.Log("[CharacterWindow] Window " + (_isOpen ? "opened." : "closed."));
     }
@@ -291,11 +286,6 @@ public class CharacterWindow : MonoBehaviour
         bool anyPanelOpen = _inventoryUI != null && _inventoryUI.IsOpen;
         CameraControllerThirdPerson.IsLocked = anyPanelOpen;
 
-        if (unlockCursorWhileOpen)
-        {
-            Cursor.lockState = anyPanelOpen ? CursorLockMode.None : CursorLockMode.Locked;
-            Cursor.visible   = anyPanelOpen;
-        }
 
         Debug.Log("[CharacterWindow] Window closed externally.");
     }

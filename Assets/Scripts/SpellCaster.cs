@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.InputSystem;
 using Unity.Netcode;
@@ -25,7 +26,7 @@ public class SpellCaster : NetworkBehaviour
 
     // ─── Cast State ───────────────────────────────────────────────────────────
 
-    private enum CastState { Idle, PreCast, Pending, Channeling }
+    private enum CastState { Idle, AwaitingTarget, PreCast, Pending, Channeling }
     private CastState _state             = CastState.Idle;
     private float     _timer             = 0f;
     private SpellData _active            = null;
@@ -44,11 +45,29 @@ public class SpellCaster : NetworkBehaviour
     /// <summary>Solo-mode reference to the active channel HealingWave instance.</summary>
     private HealingWave  _activeSoloChannelHW  = null;
 
+    // ─── Cooldowns ────────────────────────────────────────────────────────────
+    // Cooldown starts when BeginCast is called, not when the spell fires.
+    // This means castTime = cooldown → zero downtime between casts.
+    // Cancelled casts do NOT trigger a cooldown.
+
+    private readonly Dictionary<SpellData, float> _cooldownEndTimes = new();
+
+    /// <summary>Seconds remaining on this spell's cooldown. 0 if ready.</summary>
+    public float GetCooldownRemaining(SpellData spell)
+    {
+        if (spell == null || !_cooldownEndTimes.TryGetValue(spell, out float endTime)) return 0f;
+        return Mathf.Max(0f, endTime - Time.time);
+    }
+
+    /// <summary>True if this spell cannot be cast yet due to cooldown.</summary>
+    public bool IsOnCooldown(SpellData spell) => GetCooldownRemaining(spell) > 0f;
+
     // ─── Dependencies ─────────────────────────────────────────────────────────
 
     private StatusEffectHandler _statusEffects;
     private PlayerController    _playerController;
     private AudioSource         _audioSource;
+    private TargetSelector      _targetSelector;
 
     // ─── Public Cast State API (for UI) ──────────────────────────────────────
 
@@ -109,7 +128,7 @@ public class SpellCaster : NetworkBehaviour
     /// </summary>
     public bool TryCancelByMovement()
     {
-        if (_state == CastState.Idle) return false;
+        if (_state == CastState.Idle || _state == CastState.AwaitingTarget) return false;
         if (_active != null && TimeSinceCastStart < _active.movementInterruptGrace) return false;
         if ((_state == CastState.PreCast || _state == CastState.Pending) && _active != null && !_active.lockMovementDuringCast) return false;
         if (_state == CastState.Channeling && _active != null && _active.lockMovementDuringChannel) return false;
@@ -145,8 +164,13 @@ public class SpellCaster : NetworkBehaviour
     {
         if (_state == CastState.Idle) return;
         _audioSource?.Stop();
+        if (_state == CastState.AwaitingTarget) _targetSelector?.CancelTargeting();
         StopChannel();
         _telegraphProjector?.Hide();
+
+        // Cancelled cast — remove the cooldown so the player isn't penalised.
+        if (_active != null) _cooldownEndTimes.Remove(_active);
+
         _state  = CastState.Idle;
         _timer  = 0f;
         _active = null;
@@ -192,7 +216,14 @@ public class SpellCaster : NetworkBehaviour
     void Start()
     {
         _statusEffects    = GetComponent<StatusEffectHandler>();
+        _targetSelector   = GetComponent<TargetSelector>();
         _cameraTransform  = Camera.main?.transform;
+
+        if (_targetSelector != null)
+        {
+            _targetSelector.OnTargetSelected    += OnTargetConfirmed;
+            _targetSelector.OnTargetingCancelled += CancelCast;
+        }
         _audioSource      = GetComponent<AudioSource>();
         if (_audioSource == null)
         {
@@ -220,6 +251,11 @@ public class SpellCaster : NetworkBehaviour
         base.OnDestroy();
         if (_ownsInputActions && _inputActions != null)
             _inputActions.Player.Disable();
+        if (_targetSelector != null)
+        {
+            _targetSelector.OnTargetSelected     -= OnTargetConfirmed;
+            _targetSelector.OnTargetingCancelled -= CancelCast;
+        }
     }
 
     // ─── NGO Lifecycle ────────────────────────────────────────────────────────
@@ -269,6 +305,10 @@ public class SpellCaster : NetworkBehaviour
     {
         switch (_state)
         {
+            case CastState.AwaitingTarget:
+                // TargetSelector handles click detection; OnTargetConfirmed() advances the state.
+                break;
+
             case CastState.PreCast:
                 _timer -= Time.deltaTime;
                 if (_timer <= 0f)
@@ -390,6 +430,37 @@ public class SpellCaster : NetworkBehaviour
             return;
         }
 
+        if (IsOnCooldown(spell))
+        {
+            Debug.Log($"[SpellCaster] {spell.spellName} on cooldown ({GetCooldownRemaining(spell):0.0}s left).");
+            return;
+        }
+
+        // Target-locked spells enter targeting mode — cooldown starts only after target is confirmed.
+        if (spell.spellType == SpellType.TargetLocked)
+        {
+            if (_targetSelector == null)
+            {
+                Debug.LogWarning("[SpellCaster] No TargetSelector component found — cannot cast target-locked spells.");
+                return;
+            }
+            if (_state == CastState.AwaitingTarget && _active == spell) return; // already targeting this spell
+            if (_state == CastState.AwaitingTarget) _targetSelector.CancelTargeting(); // switch spell
+
+            _active          = spell;
+            _castStartTime   = Time.time;
+            _throwEventFired = false;
+            _state           = CastState.AwaitingTarget;
+            _targetSelector.BeginTargeting();
+            Debug.Log($"[SpellCaster] {spell.spellName} — left-click an enemy to cast.");
+            return;
+        }
+
+        // Cooldown starts now — runs concurrently with the cast.
+        // If castTime == cooldown the spell is ready again the moment it fires.
+        if (spell.cooldown > 0f)
+            _cooldownEndTimes[spell] = Time.time + spell.cooldown;
+
         // Sprinting → cancel sprint and proceed with the cast.
         if (_playerController != null && _playerController.IsSprinting)
             _playerController.CancelSprint();
@@ -457,23 +528,32 @@ public class SpellCaster : NetworkBehaviour
         // Isometric aim: point toward the cursor's world position (flat, no pitch).
         // Falls back to camera forward (flattened) if the cursor ray missed, then to
         // the fire-point rotation for dedicated-server contexts with no camera.
+        // Mirror the same fallback logic as TelegraphProjector.GetAimDirection():
+        // HasHit → aim toward cursor/stick world point.
+        // No hit  → use the player's facing (movement direction), not camera forward,
+        //           so the spell fires exactly where the telegraph is pointing.
         Quaternion aimRot;
         if (IsoAim.HasHit)
         {
             Vector3 aimDir = IsoAim.AimDirectionFrom(origin.position);
             aimRot = Quaternion.LookRotation(aimDir);
         }
-        else if (_cameraTransform != null)
-        {
-            Vector3 camFwd = _cameraTransform.forward;
-            camFwd.y = 0f;
-            aimRot = camFwd.sqrMagnitude > 0.001f
-                ? Quaternion.LookRotation(camFwd.normalized)
-                : origin.rotation;
-        }
         else
         {
-            aimRot = origin.rotation;
+            Vector3 fwd = transform.forward;
+            fwd.y = 0f;
+            aimRot = fwd.sqrMagnitude > 0.001f
+                ? Quaternion.LookRotation(fwd.normalized)
+                : origin.rotation;
+        }
+
+        // For target-locked spells, aim toward the locked target instead of the cursor.
+        if (_active.spellType == SpellType.TargetLocked && _targetSelector?.SelectedTarget != null)
+        {
+            Vector3 toTarget = _targetSelector.SelectedTarget.position - origin.position;
+            toTarget.y = 0f;
+            if (toTarget.sqrMagnitude > 0.001f)
+                aimRot = Quaternion.LookRotation(toTarget.normalized);
         }
 
         Vector3 firePos = _active.spawnOrigin == SpellSpawnOrigin.Caster
@@ -490,7 +570,7 @@ public class SpellCaster : NetworkBehaviour
         bool networkActive = NetworkManager.Singleton != null
                           && NetworkManager.Singleton.IsListening;
 
-        float rawDamage = ComputeRawDamage(_active);
+        float rawDamage = ComputeRawDamage(_active, SkillTreeManager.Instance?.GetSpellRank(_active) ?? 0);
 
         // ── Channel spells: spawn once, tick on existing instance ─────────────
         if (_active.spellType == SpellType.Channel)
@@ -517,6 +597,14 @@ public class SpellCaster : NetworkBehaviour
                 _activeSoloChannelHW?.ChannelTick(rawDamage);
             }
             DebugLogger.Log(DebugLogger.Category.SpellCast, $"Channel tick — {_active.spellName}");
+            return;
+        }
+
+        // ── Target-locked spells (e.g. Chain Lightning) ───────────────────────
+        if (_active.spellType == SpellType.TargetLocked)
+        {
+            FireTargetLockedSpell(firePos, fireRot, rawDamage);
+            Debug.Log($"[SpellCaster] Fired target-locked {_active.spellName}");
             return;
         }
 
@@ -626,6 +714,118 @@ public class SpellCaster : NetworkBehaviour
         _activeChannelNetObj = null;
     }
 
+    // ─── Target Confirmation ──────────────────────────────────────────────────
+
+    /// <summary>Called by TargetSelector.OnTargetSelected when the player clicks a valid enemy.</summary>
+    void OnTargetConfirmed(Transform target)
+    {
+        if (_state != CastState.AwaitingTarget || _active == null) return;
+
+        // Cooldown starts now that a target has been confirmed.
+        if (_active.cooldown > 0f)
+            _cooldownEndTimes[_active] = Time.time + _active.cooldown;
+
+        _telegraphProjector?.Show(_active, transform);
+
+        if (_active.castStartDelay > 0f)
+        {
+            _state = CastState.PreCast;
+            _timer = _active.castStartDelay;
+            Debug.Log($"[SpellCaster] Pre-cast {_active.spellName} ({_active.castStartDelay}s windup)");
+            return;
+        }
+
+        if (_active.castTime > 0f)
+        {
+            _state = CastState.Pending;
+            _timer = _active.castTime;
+            if (_active.castSound != null && _audioSource != null)
+                _audioSource.PlayOneShot(_active.castSound);
+            OnCastBegin?.Invoke(_active, _active.castTime);
+            DebugLogger.Log(DebugLogger.Category.SpellCast,
+                $"Casting {_active.spellName}... ({_active.castTime}s)");
+            return;
+        }
+
+        // Instant cast — fire immediately.
+        FireSpell();
+        _telegraphProjector?.Hide();
+        _state  = CastState.Idle;
+        _active = null;
+        _timer  = 0f;
+    }
+
+    // ─── Target-Locked Fire ───────────────────────────────────────────────────
+
+    void FireTargetLockedSpell(Vector3 firePos, Quaternion fireRot, float rawDamage)
+    {
+        if (_active == null || _active.prefab == null) return;
+
+        string hitEffectName = _active.hitEffect != null ? _active.hitEffect.name : "";
+        bool networkActive   = NetworkManager.Singleton != null && NetworkManager.Singleton.IsListening;
+
+        if (networkActive)
+        {
+            if (!_active.prefab.TryGetComponent<NetworkObject>(out NetworkObject _))
+            {
+                Debug.LogWarning($"[SpellCaster] '{_active.spellName}' prefab has no NetworkObject — register it in NetworkManager's prefab list.");
+                return;
+            }
+
+            ulong targetId = _targetSelector?.SelectedNetworkObject != null
+                ? _targetSelector.SelectedNetworkObject.NetworkObjectId
+                : ulong.MaxValue;
+
+            SpawnTargetLockedServerRpc(firePos, fireRot, rawDamage, _active.prefab.name,
+                hitEffectName, targetId, _active.chainCount, _active.chainRadius,
+                _active.chainDamageFalloff, _active.chainTravelTime, _active.chainJumpDelay);
+        }
+        else
+        {
+            GameObject go = Instantiate(_active.prefab, firePos, fireRot);
+            if (go.TryGetComponent<ChainLightning>(out ChainLightning cl))
+            {
+                cl.precomputedDamage  = rawDamage;
+                cl.hitEffect          = _active.hitEffect;
+                cl.soloTarget         = _targetSelector?.SelectedTarget;
+                cl.chainCount         = _active.chainCount;
+                cl.chainRadius        = _active.chainRadius;
+                cl.chainDamageFalloff = _active.chainDamageFalloff;
+                cl.travelTime         = _active.chainTravelTime;
+                cl.jumpDelay          = _active.chainJumpDelay;
+            }
+        }
+    }
+
+    [Rpc(SendTo.Server)]
+    private void SpawnTargetLockedServerRpc(Vector3 pos, Quaternion rot, float rawDamage,
+        string prefabName, string hitEffectName, ulong targetNetObjId,
+        int chainCount, float chainRadius, float chainDamageFalloff, float chainTravelTime, float chainJumpDelay)
+    {
+        NetworkObject prefab = FindRegisteredPrefab(prefabName);
+        if (prefab == null)
+        {
+            Debug.LogWarning($"[SpellCaster] No registered NetworkObject prefab named '{prefabName}'.");
+            return;
+        }
+
+        NetworkObject instance = Instantiate(prefab, pos, rot);
+        if (instance.TryGetComponent<ChainLightning>(out ChainLightning cl))
+        {
+            cl.precomputedDamage     = rawDamage;
+            cl.targetNetworkObjectId = targetNetObjId;
+            cl.chainCount            = chainCount;
+            cl.chainRadius           = chainRadius;
+            cl.chainDamageFalloff    = chainDamageFalloff;
+            cl.travelTime            = chainTravelTime;
+            cl.jumpDelay             = chainJumpDelay;
+            if (!string.IsNullOrEmpty(hitEffectName))
+                cl.hitEffect = FindRegisteredGameObject(hitEffectName);
+        }
+
+        instance.Spawn(true);
+    }
+
     // ─── Helpers ──────────────────────────────────────────────────────────────
 
     static GameObject FindRegisteredGameObject(string prefabName)
@@ -661,31 +861,30 @@ public class SpellCaster : NetworkBehaviour
         return rots;
     }
 
-    float ComputeRawDamage(SpellData spell)
+    float ComputeRawDamage(SpellData spell, int spellRank = 0)
     {
-        float baseDmg = 0f;
-        if (spell.prefab.TryGetComponent<Fireball>(out Fireball fb))
-            baseDmg = fb.baseDamage;
-        else if (spell.prefab.TryGetComponent<HealingWave>(out HealingWave hw))
-            baseDmg = hw.baseHeal;
+        float baseDmg = spell.BaseDamage + Mathf.Max(0, spellRank - 1) * spell.damagePerSkillRank;
 
-        bool isFire  = spell.school == SpellSchool.Fire;
-        bool isHeal  = spell.school == SpellSchool.Healing;
+        bool isFire      = spell.school == SpellSchool.Fire;
+        bool isHeal      = spell.school == SpellSchool.Healing;
+        bool isLightning = spell.school == SpellSchool.Lightning;
 
-        float spellBonus    = SkillTreeManager.Instance?.TotalSpellDamageBonus   ?? 0f;
-        float fireBonus     = isFire ? (SkillTreeManager.Instance?.TotalFireDamageBonus    ?? 0f) : 0f;
-        float firePctBonus  = isFire ? (SkillTreeManager.Instance?.TotalFireDamagePctBonus ?? 0f) : 0f;
-        float healBonus     = isHeal ? (SkillTreeManager.Instance?.TotalHealBonus          ?? 0f) : 0f;
-        float healPctBonus  = isHeal ? (SkillTreeManager.Instance?.TotalHealPctBonus       ?? 0f) : 0f;
-        float intMult       = ExperienceManager.Instance?.SpellDamageMultiplier ?? 1f;
+        float spellBonus       = SkillTreeManager.Instance?.TotalSpellDamageBonus      ?? 0f;
+        float fireBonus        = isFire      ? (SkillTreeManager.Instance?.TotalFireDamageBonus         ?? 0f) : 0f;
+        float firePctBonus     = isFire      ? (SkillTreeManager.Instance?.TotalFireDamagePctBonus      ?? 0f) : 0f;
+        float healBonus        = isHeal      ? (SkillTreeManager.Instance?.TotalHealBonus               ?? 0f) : 0f;
+        float healPctBonus     = isHeal      ? (SkillTreeManager.Instance?.TotalHealPctBonus            ?? 0f) : 0f;
+        float lightningBonus   = isLightning ? (SkillTreeManager.Instance?.TotalLightningDamageBonus    ?? 0f) : 0f;
+        float lightningPct     = isLightning ? (SkillTreeManager.Instance?.TotalLightningDamagePctBonus ?? 0f) : 0f;
+        float intMult          = ExperienceManager.Instance?.SpellDamageMultiplier ?? 1f;
 
         // Equipment bonuses — only valid on the owner's client (singleplayer or pre-server-RPC path)
-        float equipSpell    = PlayerInventory.Instance?.TotalBonusSpellPower ?? 0f;
-        float equipFire     = isFire ? (PlayerInventory.Instance?.TotalBonusFireDamage ?? 0f) : 0f;
+        float equipSpell = PlayerInventory.Instance?.TotalBonusSpellPower  ?? 0f;
+        float equipFire  = isFire ? (PlayerInventory.Instance?.TotalBonusFireDamage ?? 0f) : 0f;
 
-        // Formula: (Base + SpellPower + FireDamage) × INT multiplier × (1 + fire%)
-        return (baseDmg + spellBonus + equipSpell + fireBonus + equipFire + healBonus)
-               * intMult * (1f + firePctBonus + healPctBonus);
+        // Formula: (Base + flat bonuses) × INT multiplier × (1 + school%)
+        return (baseDmg + spellBonus + equipSpell + fireBonus + equipFire + healBonus + lightningBonus)
+               * intMult * (1f + firePctBonus + healPctBonus + lightningPct);
     }
 
     bool IsCastHeld()

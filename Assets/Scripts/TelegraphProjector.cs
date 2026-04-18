@@ -118,6 +118,21 @@ public class TelegraphProjector : MonoBehaviour
 
     // ─── Projector Transform ──────────────────────────────────────────────────
 
+    /// <summary>
+    /// Returns the flat aim direction. When IsoAim has no valid hit (gamepad right
+    /// stick neutral), falls back to the caster's forward so the telegraph tracks
+    /// movement direction instead of pointing toward world origin.
+    /// </summary>
+    private Vector3 GetAimDirection()
+    {
+        if (IsoAim.HasHit)
+            return IsoAim.AimDirectionFrom(_caster.position);
+
+        Vector3 fwd = _caster.forward;
+        fwd.y = 0f;
+        return fwd.sqrMagnitude > 0.001f ? fwd.normalized : Vector3.forward;
+    }
+
     private void UpdateProjectorTransform()
     {
         switch (_spell.telegraphShape)
@@ -140,7 +155,7 @@ public class TelegraphProjector : MonoBehaviour
 
     private void UpdateCone()
     {
-        Vector3 aimDir = IsoAim.AimDirectionFrom(_caster.position);
+        Vector3 aimDir = GetAimDirection();
         Vector3 origin = _caster.position + aimDir * _spell.telegraphOriginOffset;
         float   yaw    = Mathf.Atan2(aimDir.x, aimDir.z) * Mathf.Rad2Deg;
 
@@ -155,7 +170,7 @@ public class TelegraphProjector : MonoBehaviour
 
     private void UpdateLine()
     {
-        Vector3 aimDir = IsoAim.AimDirectionFrom(_caster.position);
+        Vector3 aimDir = GetAimDirection();
         Vector3 origin = _caster.position + aimDir * _spell.telegraphOriginOffset;
         float   yaw    = Mathf.Atan2(aimDir.x, aimDir.z) * Mathf.Rad2Deg;
 
@@ -175,7 +190,7 @@ public class TelegraphProjector : MonoBehaviour
 
         if (decalMaterial == null) return;
 
-        Color32 tint = _spell.telegraphColor;
+        Color32 tint = _spell.ResolvedTelegraphColor;
 
         _activeTexture = _spell.telegraphShape switch
         {
