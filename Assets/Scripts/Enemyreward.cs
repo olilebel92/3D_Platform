@@ -42,9 +42,20 @@ public class EnemyReward : NetworkBehaviour
 
     // ─── Unity Lifecycle ──────────────────────────────────────────────────────
 
+    // True from OnApplicationQuit until the next play session — prevents
+    // OnDestroy from instantiating drops during Editor stop-play teardown,
+    // where Application.isPlaying is still true when objects are destroyed.
+    private static bool _appIsQuitting;
+
+    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+    static void ResetQuitFlag() => _appIsQuitting = false;
+
+    void OnApplicationQuit() => _appIsQuitting = true;
+
     public override void OnDestroy()
     {
-        // Skip rewards when the scene is unloading or play mode is stopping
+        // Skip rewards when quitting, scene unloading, or play mode stopping
+        if (_appIsQuitting) return;
         if (!gameObject.scene.isLoaded) return;
         if (!Application.isPlaying) return;
 

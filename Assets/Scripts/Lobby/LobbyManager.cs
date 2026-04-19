@@ -25,6 +25,10 @@ public class LobbyManager : MonoBehaviour
     public string gameSceneName     = "GameScene";
     public string mainMenuSceneName = "MainMenu";
 
+    [Header("UI Sounds")]
+    [SerializeField] AudioClip uiClickClip;
+    [SerializeField] AudioClip uiBackClip;
+
     // ─── UIElements refs ──────────────────────────────────────────────────────
 
     private ScrollView    _playerList;
@@ -78,23 +82,23 @@ public class LobbyManager : MonoBehaviour
         if (_startBtn != null)
         {
             _startBtn.style.display = isHost ? DisplayStyle.Flex : DisplayStyle.None;
-            _startBtn.RegisterCallback<ClickEvent>(_ => OnStartGame());
+            _startBtn.RegisterCallback<ClickEvent>(_ => { PlayClick(); OnStartGame(); });
         }
         if (_forceStartBtn != null)
         {
             _forceStartBtn.style.display = isHost ? DisplayStyle.Flex : DisplayStyle.None;
-            _forceStartBtn.RegisterCallback<ClickEvent>(_ => OnForceStart());
+            _forceStartBtn.RegisterCallback<ClickEvent>(_ => { PlayClick(); OnForceStart(); });
         }
 
         // Class buttons — order matches PlayerClass enum (Random=0 … Spectator=4)
         for (int i = 0; i < _classBtns.Length; i++)
         {
             int idx = i;
-            _classBtns[i]?.RegisterCallback<ClickEvent>(_ => OnClassSelected(idx));
+            _classBtns[i]?.RegisterCallback<ClickEvent>(_ => { PlayClick(); OnClassSelected(idx); });
         }
 
-        _readyBtn?.RegisterCallback<ClickEvent>(_ => OnReadyToggle());
-        root.Q<Button>("disconnect-button")?.RegisterCallback<ClickEvent>(_ => OnDisconnect());
+        _readyBtn?.RegisterCallback<ClickEvent>(_ => { PlayClick(); OnReadyToggle(); });
+        root.Q<Button>("disconnect-button")?.RegisterCallback<ClickEvent>(_ => { PlayBack(); OnDisconnect(); });
 
         if (_nameField != null)
             _nameField.RegisterCallback<FocusOutEvent>(_ => OnNameSubmitted(_nameField.value));
@@ -312,20 +316,38 @@ public class LobbyManager : MonoBehaviour
         if (NetworkManager.Singleton.ConnectedClientsIds.Count == 1)
         {
             Debug.Log("[LobbyManager] Only one player — switching to singleplayer mode.");
-            NetworkManager.Singleton.Shutdown();
-            SceneManager.LoadScene(gameSceneName);
+            void GoSolo()
+            {
+                NetworkManager.Singleton.Shutdown();
+                SceneManager.LoadScene(gameSceneName);
+            }
+            if (SceneTransitionManager.Instance != null)
+                SceneTransitionManager.Instance.FadeOutThen(GoSolo);
+            else
+                GoSolo();
             return;
         }
 
-        NetworkManager.Singleton.SceneManager.LoadScene(gameSceneName, LoadSceneMode.Single);
+        void GoMulti() => NetworkManager.Singleton.SceneManager.LoadScene(gameSceneName, LoadSceneMode.Single);
+        if (SceneTransitionManager.Instance != null)
+            SceneTransitionManager.Instance.FadeOutThen(GoMulti);
+        else
+            GoMulti();
     }
 
     // ─── Disconnect ───────────────────────────────────────────────────────────
 
     void OnDisconnect()
     {
-        NetworkManager.Singleton.Shutdown();
-        SceneManager.LoadScene(mainMenuSceneName);
+        void GoMenu()
+        {
+            NetworkManager.Singleton.Shutdown();
+            SceneManager.LoadScene(mainMenuSceneName);
+        }
+        if (SceneTransitionManager.Instance != null)
+            SceneTransitionManager.Instance.FadeOutThen(GoMenu);
+        else
+            GoMenu();
     }
 
     // ─── Network Pill ─────────────────────────────────────────────────────────
@@ -367,4 +389,7 @@ public class LobbyManager : MonoBehaviour
             if (p.IsOwner) return p;
         return null;
     }
+
+    void PlayClick() => SoundManager.Instance?.PlayUI(uiClickClip);
+    void PlayBack()  => SoundManager.Instance?.PlayUI(uiBackClip);
 }

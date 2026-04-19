@@ -110,6 +110,6 @@ public class CursorManager : MonoBehaviour
     {
         Cursor.visible = true;
         Cursor.lockState = CursorLockMode.None;
-        Cursor.SetCursor(texture, hotspot, CursorMode.ForceSoftware);
+        Cursor.SetCursor(texture, hotspot, CursorMode.Auto);
     }
 }

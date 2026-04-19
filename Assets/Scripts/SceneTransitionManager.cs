@@ -2,16 +2,14 @@ using System.Collections;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 using UnityEngine.UI;
+using UnityEngine.UIElements;
 
 /// <summary>
 /// Handles smooth fade-to-black transitions between scenes.
 ///
-/// Setup (do this in EVERY scene):
-///   1. Create a Canvas (Sort Order 999, Screen Space - Overlay)
-///   2. Add a child Image that fills the whole canvas (black, Raycast Target OFF)
-///   3. Add a CanvasGroup component to that Image
-///   4. Attach this script to the Canvas root
-///   5. Drag the CanvasGroup into the fadeGroup slot in the Inspector
+/// uGUI setup: assign a CanvasGroup on a full-screen black Image (Canvas Sort Order 999).
+/// UI Toolkit setup: assign the scene's UIDocument — the overlay is injected automatically.
+/// Only one mode is needed per scene; uGUI takes priority if both are assigned.
 /// </summary>
 public class SceneTransitionManager : MonoBehaviour
 {
@@ -22,8 +20,8 @@ public class SceneTransitionManager : MonoBehaviour
     // ─── Inspector ────────────────────────────────────────────────────────────
 
     [Header("Fade Settings")]
-    [Tooltip("CanvasGroup on the full-screen black overlay Image.")]
-    public CanvasGroup fadeGroup;
+    [Tooltip("Seconds to hold black before the fade-in begins.")]
+    public float fadeInDelay = 0f;
 
     [Tooltip("Duration of the fade-in (black → clear) when a scene starts.")]
     public float fadeInDuration = 0.6f;
@@ -31,16 +29,24 @@ public class SceneTransitionManager : MonoBehaviour
     [Tooltip("Duration of the fade-out (clear → black) before a scene loads.")]
     public float fadeOutDuration = 0.4f;
 
+    [Header("uGUI Mode")]
+    [Tooltip("CanvasGroup on the full-screen black overlay Image.")]
+    public CanvasGroup fadeGroup;
+
+    [Header("UI Toolkit Mode")]
+    [Tooltip("The scene's UIDocument — a black overlay VisualElement is injected automatically.")]
+    [SerializeField] private UIDocument uiDocument;
+
+    // ─── State ────────────────────────────────────────────────────────────────
+
+    private VisualElement _tkOverlay;
+
     // ─── Unity Lifecycle ──────────────────────────────────────────────────────
 
     void Awake()
     {
-        // Always become the active instance — never destroy the Canvas.
-        // During NGO scene transitions the old scene's Instance may still be alive
-        // when this Awake fires; destroying gameObject would kill the new HUD Canvas.
         Instance = this;
 
-        // Start fully black so the fade-in plays immediately.
         if (fadeGroup != null)
         {
             fadeGroup.alpha = 1f;
@@ -50,75 +56,99 @@ public class SceneTransitionManager : MonoBehaviour
 
     void Start()
     {
+        if (fadeGroup == null && uiDocument != null)
+            InjectTKOverlay();
+
         StartCoroutine(DoFadeIn());
     }
 
     // ─── Public API ───────────────────────────────────────────────────────────
 
-    /// <summary>Fade to black then load the given scene by name.</summary>
-    public void LoadScene(string sceneName)
-    {
-        StartCoroutine(FadeOutAndLoad(sceneName));
-    }
+    public void LoadScene(string sceneName)  => StartCoroutine(FadeOutAndLoad(sceneName));
+    public void LoadScene(int sceneIndex)    => StartCoroutine(FadeOutAndLoad(sceneIndex));
+    public void FadeOutThen(System.Action onComplete) => StartCoroutine(FadeOutAndCallback(onComplete));
+    public void FadeIn() => StartCoroutine(DoFadeIn());
 
-    /// <summary>Fade to black then load the given scene by build index.</summary>
-    public void LoadScene(int sceneIndex)
-    {
-        StartCoroutine(FadeOutAndLoad(sceneIndex));
-    }
-
-    /// <summary>Fade to black then invoke a callback (used by DeathScreenManager).</summary>
-    public void FadeOutThen(System.Action onComplete)
-    {
-        StartCoroutine(FadeOutAndCallback(onComplete));
-    }
-
-    /// <summary>Load a scene immediately while keeping the screen black — use when already faded out.</summary>
     public void LoadSceneAlreadyFaded(int sceneIndex)
+    {
+        SetAlpha(1f);
+        SetBlocking(true);
+        SceneManager.LoadScene(sceneIndex);
+    }
+
+    // ─── Internal ─────────────────────────────────────────────────────────────
+
+    private void InjectTKOverlay()
+    {
+        _tkOverlay = new VisualElement();
+        _tkOverlay.style.position = Position.Absolute;
+        _tkOverlay.style.width    = new Length(100, LengthUnit.Percent);
+        _tkOverlay.style.height   = new Length(100, LengthUnit.Percent);
+        _tkOverlay.pickingMode    = PickingMode.Position;
+        SetAlpha(1f);
+        uiDocument.rootVisualElement.Add(_tkOverlay);
+    }
+
+    private void SetAlpha(float a)
     {
         if (fadeGroup != null)
         {
-            fadeGroup.alpha = 1f;
-            fadeGroup.blocksRaycasts = true;
+            fadeGroup.alpha = a;
         }
-        SceneManager.LoadScene(sceneIndex);
+        else if (_tkOverlay != null)
+        {
+            _tkOverlay.style.backgroundColor = new Color(0f, 0f, 0f, a);
+        }
+    }
+
+    private void SetBlocking(bool block)
+    {
+        if (fadeGroup != null)
+            fadeGroup.blocksRaycasts = block;
+        else if (_tkOverlay != null)
+            _tkOverlay.pickingMode = block ? PickingMode.Position : PickingMode.Ignore;
     }
 
     // ─── Coroutines ───────────────────────────────────────────────────────────
 
-    /// <summary>Fades the screen from black to clear. Safe to call after a respawn.</summary>
-    public void FadeIn() => StartCoroutine(DoFadeIn());
-
     private IEnumerator DoFadeIn()
     {
-        if (fadeGroup == null) yield break;
+        if (fadeGroup == null && _tkOverlay == null) yield break;
 
-        fadeGroup.blocksRaycasts = true;
+        SetBlocking(true);
+        SetAlpha(1f);
+
+        if (fadeInDelay > 0f)
+            yield return new WaitForSecondsRealtime(fadeInDelay);
+
         float elapsed = 0f;
-
         while (elapsed < fadeInDuration)
         {
-            // Use unscaledDeltaTime so the fade works even if Time.timeScale is 0
-            // (e.g. a panel paused the game before the scene finished loading).
             elapsed += Time.unscaledDeltaTime;
-            fadeGroup.alpha = Mathf.Lerp(1f, 0f, elapsed / fadeInDuration);
+            SetAlpha(Mathf.Lerp(1f, 0f, elapsed / fadeInDuration));
             yield return null;
         }
 
-        fadeGroup.alpha = 0f;
-        fadeGroup.blocksRaycasts = false;
-
+        SetAlpha(0f);
+        SetBlocking(false);
         Debug.Log("[SceneTransitionManager] Fade in complete.");
     }
 
-    private IEnumerator FadeOutAndCallback(System.Action onComplete)
+    private IEnumerator FadeOut()
     {
-        yield return StartCoroutine(FadeOut());
-        onComplete?.Invoke();
+        if (fadeGroup == null && _tkOverlay == null) yield break;
 
-        // Release the raycast block so UI elements above the overlay (e.g. death screen) are clickable
-        if (fadeGroup != null)
-            fadeGroup.blocksRaycasts = false;
+        SetBlocking(true);
+        float elapsed = 0f;
+        while (elapsed < fadeOutDuration)
+        {
+            elapsed += Time.unscaledDeltaTime;
+            SetAlpha(Mathf.Lerp(0f, 1f, elapsed / fadeOutDuration));
+            yield return null;
+        }
+
+        SetAlpha(1f);
+        Debug.Log("[SceneTransitionManager] Fade out complete.");
     }
 
     private IEnumerator FadeOutAndLoad(string sceneName)
@@ -133,22 +163,10 @@ public class SceneTransitionManager : MonoBehaviour
         SceneManager.LoadScene(sceneIndex);
     }
 
-    private IEnumerator FadeOut()
+    private IEnumerator FadeOutAndCallback(System.Action onComplete)
     {
-        if (fadeGroup == null) yield break;
-
-        fadeGroup.blocksRaycasts = true;
-        float elapsed = 0f;
-
-        while (elapsed < fadeOutDuration)
-        {
-            elapsed += Time.unscaledDeltaTime;
-            fadeGroup.alpha = Mathf.Lerp(0f, 1f, elapsed / fadeOutDuration);
-            yield return null;
-        }
-
-        fadeGroup.alpha = 1f;
-
-        Debug.Log("[SceneTransitionManager] Fade out complete.");
+        yield return StartCoroutine(FadeOut());
+        onComplete?.Invoke();
+        SetBlocking(false);
     }
 }

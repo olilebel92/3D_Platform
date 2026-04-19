@@ -1,7 +1,7 @@
 <ui:UXML xmlns:ui="UnityEngine.UIElements" editor-extension-mode="False">
     <Style src="project://database/Assets/UI/GameTheme.uss?fileID=7433441132597879392&amp;guid=5c9ec8a0d813eae46a8edc5b83156aa2&amp;type=3#GameTheme"/>
     <Style src="project://database/Assets/UI/GameUI.uss?fileID=7433441132597879392&amp;guid=57f408b2b2125a7449c531a0ebe76048&amp;type=3#GameUI"/>
-    <ui:VisualElement name="menu-root" class="menu-root" style="scale: 1.3 1.3 1.3;">
+    <ui:VisualElement name="menu-root" class="menu-root" style="scale: 1 1;">
         <ui:VisualElement name="vignette" picking-mode="Ignore" class="vignette"/>
         <ui:VisualElement name="network-pill" picking-mode="Ignore" class="network-pill" style="background-color: rgb(20, 10, 10);">
             <ui:VisualElement class="network-pill__dot"/>

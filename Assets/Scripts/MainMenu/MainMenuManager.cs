@@ -153,8 +153,17 @@ public class MainMenuManager : MonoBehaviour
             transport.SetConnectionData("0.0.0.0", port, "0.0.0.0");
 
         Debug.Log("[MainMenu] Starting as Host — loading lobby...");
-        NetworkManager.Singleton.StartHost();
-        NetworkManager.Singleton.SceneManager.LoadScene(lobbySceneName, LoadSceneMode.Single);
+
+        void StartHost()
+        {
+            NetworkManager.Singleton.StartHost();
+            NetworkManager.Singleton.SceneManager.LoadScene(lobbySceneName, LoadSceneMode.Single);
+        }
+
+        if (SceneTransitionManager.Instance != null)
+            SceneTransitionManager.Instance.FadeOutThen(StartHost);
+        else
+            StartHost();
     }
 
     void OnConnect()

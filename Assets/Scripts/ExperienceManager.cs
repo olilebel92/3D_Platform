@@ -229,7 +229,9 @@ public class ExperienceManager : MonoBehaviour
         if (_playerHealth == null) return;
         bool networkActive = NetworkManager.Singleton != null && NetworkManager.Singleton.IsListening;
         if (!networkActive) return;
-        GetComponent<PlayerController>()?.SyncMaxHealthServerRpc(_playerHealth.maxHealth);
+        PlayerController pc = GetComponent<PlayerController>();
+        if (pc == null || !pc.IsOwner) return;
+        pc.SyncMaxHealthServerRpc(_playerHealth.maxHealth);
     }
 
     // ─── Public XP API ───────────────────────────────────────────────────────
