@@ -25,6 +25,11 @@ public class EnemyAI : NetworkBehaviour
     public float attackCooldown = 1.5f;
     [Tooltip("Damage dealt per attack.")]
     public int attackDamage = 1;
+    [Tooltip("Chance (0–1) to stun the target on a successful attack.")]
+    [Range(0f, 1f)]
+    public float attackStunChance = 0.2f;
+    [Tooltip("Duration (seconds) of the stun applied on a successful stun roll.")]
+    public float attackStunDuration = 1f;
     private float attackTimer = 0f;
 
     [Header("Movement")]
@@ -203,10 +208,15 @@ public class EnemyAI : NetworkBehaviour
             bool networkActive = NetworkManager.Singleton != null
                               && NetworkManager.Singleton.IsListening;
 
+            float stunDuration = (Random.value < attackStunChance) ? attackStunDuration : 0f;
+
             if (!networkActive)
             {
                 if (_playerHealth != null)
                     _playerHealth.TakeDamage(attackDamage);
+
+                if (stunDuration > 0f && player != null)
+                    player.GetComponent<StatusEffectHandler>()?.ApplyStun(stunDuration);
             }
             else if (_targetNetObj != null)
             {
@@ -217,7 +227,7 @@ public class EnemyAI : NetworkBehaviour
                         TargetClientIds = new[] { _targetNetObj.OwnerClientId }
                     }
                 };
-                DealDamageClientRpc(attackDamage, ownerOnly);
+                DealDamageClientRpc(attackDamage, stunDuration, ownerOnly);
             }
         }
 
@@ -256,7 +266,7 @@ public class EnemyAI : NetworkBehaviour
     // After applying damage, syncs the new health back to the server so server-side
     // checks (e.g. HealingWave heal eligibility) see the real value.
     [ClientRpc]
-    private void DealDamageClientRpc(int damage, ClientRpcParams clientRpcParams = default)
+    private void DealDamageClientRpc(int damage, float stunDuration, ClientRpcParams clientRpcParams = default)
     {
         foreach (GameObject p in GameObject.FindGameObjectsWithTag("Player"))
         {
@@ -270,6 +280,10 @@ public class EnemyAI : NetworkBehaviour
                     PlayerController pc = p.GetComponent<PlayerController>();
                     pc?.SyncServerHealthServerRpc(health.currentHealth);
                 }
+
+                if (stunDuration > 0f)
+                    p.GetComponent<StatusEffectHandler>()?.ApplyStun(stunDuration);
+
                 return;
             }
         }

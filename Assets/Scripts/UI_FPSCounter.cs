@@ -44,10 +44,7 @@ public class UI_FPSCounter : MonoBehaviour
 
         if (time >= updateInterval)
         {
-            // ✅ Stable FPS calculation (no spikes)
             float fps = (time > 0f) ? (frames / time) : 0f;
-
-            // ✅ Smooth it
             smoothedFPS = Mathf.Lerp(smoothedFPS, fps, smoothFactor);
 
             UpdateDisplay(smoothedFPS);
@@ -59,20 +56,17 @@ public class UI_FPSCounter : MonoBehaviour
 
     void UpdateDisplay(float fps)
     {
-        //  Safety (prevents NaN / Infinity bugs)
         if (float.IsNaN(fps) || float.IsInfinity(fps) || fps < 0f)
             fps = 0f;
 
         float ms = (fps > 0f) ? (1000f / fps) : 0f;
         float memory = Profiler.GetTotalAllocatedMemoryLong() / (1024f * 1024f);
 
-        // 🧾 Text
         if (showMilliseconds)
             fpsText.text = $"{Mathf.RoundToInt(fps)} FPS\n{ms:0.0} ms\n{memory:0} MB";
         else
             fpsText.text = $"{Mathf.RoundToInt(fps)} FPS\n{memory:0} MB";
 
-        // 🎨 Color based on performance
         if (fps >= 55f)
             fpsText.color = Color.green;
         else if (fps >= 30f)

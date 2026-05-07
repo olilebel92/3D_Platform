@@ -193,6 +193,9 @@ public class SpellData : ScriptableObject
     // ─── Chain / Target-Locked ────────────────────────────────────────────────
 
     [Header("Chain / Target-Locked")]
+    [Tooltip("Maximum cast range for TargetLocked spells (world units). 0 = unlimited.")]
+    public float castRange = 0f;
+
     [Tooltip("Number of targets hit, including the primary target. Only used when spellType = TargetLocked.")]
     public int chainCount = 3;
 

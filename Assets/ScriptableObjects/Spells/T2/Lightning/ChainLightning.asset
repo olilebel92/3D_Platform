@@ -44,6 +44,7 @@ MonoBehaviour:
   telegraphWidth: 1.5
   telegraphColorMode: 0
   telegraphColor: {r: 1, g: 0.5, b: 0, a: 0.45}
+  castRange: 7
   chainCount: 6
   chainRadius: 6
   chainDamageFalloff: 0.8

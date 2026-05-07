@@ -75,11 +75,11 @@ public class SpellSlot : MonoBehaviour,
     private void Update()
     {
         // Lazy-cache the local SpellCaster — player may spawn after this UI Start().
-        if (_spellCaster == null)
+        // Use PlayerController.All instead of FindGameObjectWithTag so this remains
+        // an O(1) list lookup per frame when the cache isn't populated yet.
+        if (_spellCaster == null && PlayerController.All.Count > 0)
         {
-            GameObject player = GameObject.FindGameObjectWithTag("Player");
-            if (player != null)
-                _spellCaster = player.GetComponent<SpellCaster>();
+            _spellCaster = PlayerController.All[0].GetComponent<SpellCaster>();
         }
 
         if (cooldownOverlay == null || CurrentSpell == null || _spellCaster == null)

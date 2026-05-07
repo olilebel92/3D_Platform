@@ -9,6 +9,15 @@ using UnityEngine;
 /// </summary>
 public class StatusEffectHandler : MonoBehaviour
 {
+    // ─── VFX ──────────────────────────────────────────────────────────────────
+    [Header("VFX")]
+    [Tooltip("Prefab spawned as a child while stunned (e.g. stars over head). Destroyed on stun end.")]
+    [SerializeField] private GameObject stunVfxPrefab;
+    [Tooltip("Local offset from this transform where the stun VFX is spawned.")]
+    [SerializeField] private Vector3 stunVfxOffset = new Vector3(0f, 2f, 0f);
+
+    private GameObject _activeStunVfx;
+
     // ─── State ────────────────────────────────────────────────────────────────
 
     private float _stunRemaining = 0f;
@@ -35,6 +44,7 @@ public class StatusEffectHandler : MonoBehaviour
         if (_stunRemaining <= 0f)
         {
             _stunRemaining = 0f;
+            ClearStunVfx();
             Debug.Log("[StatusEffectHandler] Stun expired.");
         }
     }
@@ -55,7 +65,10 @@ public class StatusEffectHandler : MonoBehaviour
         _stunRemaining  = Mathf.Max(_stunRemaining, duration);
 
         if (!wasStunned)
+        {
+            SpawnStunVfx();
             Debug.Log($"[StatusEffectHandler] Stunned for {duration:F2}s.");
+        }
 
         // Stun always interrupts a cast regardless of any grace period.
         _spellCaster?.CancelByStun();
@@ -66,6 +79,28 @@ public class StatusEffectHandler : MonoBehaviour
     {
         if (_stunRemaining <= 0f) return;
         _stunRemaining = 0f;
+        ClearStunVfx();
         Debug.Log("[StatusEffectHandler] Stun cleared.");
+    }
+
+    // ─── VFX Helpers ──────────────────────────────────────────────────────────
+
+    private void SpawnStunVfx()
+    {
+        if (stunVfxPrefab == null || _activeStunVfx != null) return;
+        _activeStunVfx = Instantiate(stunVfxPrefab, transform);
+        _activeStunVfx.transform.localPosition = stunVfxOffset;
+    }
+
+    private void ClearStunVfx()
+    {
+        if (_activeStunVfx == null) return;
+        Destroy(_activeStunVfx);
+        _activeStunVfx = null;
+    }
+
+    void OnDisable()
+    {
+        ClearStunVfx();
     }
 }

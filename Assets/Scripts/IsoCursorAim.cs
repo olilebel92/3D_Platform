@@ -30,6 +30,10 @@ public class IsoCursorAim : MonoBehaviour
     private Camera _cam;
     private float  _lastHitY; // self-calibrates to actual floor height on first hit
 
+    // Cached hit buffer reused every frame by RaycastNonAlloc — avoids the per-frame
+    // RaycastAll + Array.Sort allocations that used to cost ~120 GC allocs/sec at 60Hz.
+    private static readonly RaycastHit[] s_hitBuffer = new RaycastHit[32];
+
     // ─── Unity Lifecycle ──────────────────────────────────────────────────────
 
     void Awake()
@@ -96,14 +100,25 @@ public class IsoCursorAim : MonoBehaviour
 
     bool TryHit(Ray ray, LayerMask mask, out Vector3 point)
     {
-        RaycastHit[] hits = Physics.RaycastAll(ray, 1000f, mask);
-        System.Array.Sort(hits, (a, b) => a.distance.CompareTo(b.distance));
+        int hitCount = Physics.RaycastNonAlloc(ray, s_hitBuffer, 1000f, mask);
 
-        foreach (RaycastHit h in hits)
+        // Scan for the closest non-Player hit without sorting — O(n) single pass.
+        float bestDist = float.MaxValue;
+        int   bestIdx  = -1;
+        for (int i = 0; i < hitCount; i++)
         {
-            if (h.collider.CompareTag("Player")) continue;
-            point     = h.point;
-            _lastHitY = h.point.y;
+            if (s_hitBuffer[i].collider.CompareTag("Player")) continue;
+            if (s_hitBuffer[i].distance < bestDist)
+            {
+                bestDist = s_hitBuffer[i].distance;
+                bestIdx  = i;
+            }
+        }
+
+        if (bestIdx >= 0)
+        {
+            point     = s_hitBuffer[bestIdx].point;
+            _lastHitY = point.y;
             return true;
         }
 

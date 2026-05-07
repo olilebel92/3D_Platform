@@ -197,7 +197,7 @@ public class WaveManager : NetworkBehaviour
             {
                 if (!IsNetworkActive())
                 {
-                    foreach (GameObject p in GameObject.FindGameObjectsWithTag("Player"))
+                    foreach (GameObject p in PlayerController.All)
                     {
                         HealthSystem h = p.GetComponent<HealthSystem>();
                         if (h != null) h.Heal(h.maxHealth);
@@ -359,7 +359,7 @@ public class WaveManager : NetworkBehaviour
                 return;
             }
             ItemData reward = ItemGenerator.Instance.GenerateItemForWave(wave);
-            foreach (GameObject p in GameObject.FindGameObjectsWithTag("Player"))
+            foreach (GameObject p in PlayerController.All)
             {
                 PlayerInventory inv = p.GetComponent<PlayerInventory>();
                 if (inv != null) inv.AddItem(reward);
@@ -380,7 +380,7 @@ public class WaveManager : NetworkBehaviour
         foreach (ItemData item in entry.items)
         {
             if (item == null) continue;
-            foreach (GameObject p in GameObject.FindGameObjectsWithTag("Player"))
+            foreach (GameObject p in PlayerController.All)
             {
                 PlayerInventory inv = p.GetComponent<PlayerInventory>();
                 if (inv != null)
@@ -402,13 +402,13 @@ public class WaveManager : NetworkBehaviour
         if (customRewards == null || entryIndex >= customRewards.Length) return;
         WaveRewardEntry entry = customRewards[entryIndex];
 
-        foreach (GameObject p in GameObject.FindGameObjectsWithTag("Player"))
+        foreach (GameObject p in PlayerController.All)
         {
             NetworkObject net = p.GetComponent<NetworkObject>();
             if (net == null || !net.IsOwner) continue;
 
             PlayerInventory inv = p.GetComponent<PlayerInventory>();
-            if (inv == null) return;
+            if (inv == null) continue;
 
             foreach (ItemData item in entry.items)
             {
@@ -416,7 +416,7 @@ public class WaveManager : NetworkBehaviour
                 inv.AddItem(item);
                 Debug.Log($"[WaveManager] Wave {entry.wave} custom reward: {item.itemName}");
             }
-            return;
+            return; // only the local-owned player receives rewards — stop scanning
         }
     }
 
@@ -433,7 +433,7 @@ public class WaveManager : NetworkBehaviour
             return;
         }
 
-        foreach (GameObject p in GameObject.FindGameObjectsWithTag("Player"))
+        foreach (GameObject p in PlayerController.All)
         {
             NetworkObject net = p.GetComponent<NetworkObject>();
             if (net != null && net.IsOwner)
@@ -462,7 +462,7 @@ public class WaveManager : NetworkBehaviour
         if (!IsNetworkActive())
         {
             // Solo — apply directly
-            foreach (GameObject p in GameObject.FindGameObjectsWithTag("Player"))
+            foreach (GameObject p in PlayerController.All)
             {
                 ExperienceManager xpManager = p.GetComponent<ExperienceManager>();
                 if (xpManager != null) xpManager.GainXP(xp);
@@ -473,7 +473,7 @@ public class WaveManager : NetworkBehaviour
             // MP — send XP to each player's owning client.
             // ExperienceManager has no NetworkVariable so server-side GainXP()
             // would not update the client's XP bar or trigger level-up events.
-            foreach (GameObject p in GameObject.FindGameObjectsWithTag("Player"))
+            foreach (GameObject p in PlayerController.All)
             {
                 NetworkObject net = p.GetComponent<NetworkObject>();
                 if (net == null) continue;
@@ -525,7 +525,7 @@ public class WaveManager : NetworkBehaviour
     [ClientRpc]
     private void GrantXPClientRpc(int xp, ClientRpcParams clientRpcParams = default)
     {
-        foreach (GameObject p in GameObject.FindGameObjectsWithTag("Player"))
+        foreach (GameObject p in PlayerController.All)
         {
             NetworkObject net = p.GetComponent<NetworkObject>();
             if (net != null && net.IsOwner)
@@ -543,7 +543,7 @@ public class WaveManager : NetworkBehaviour
     [ClientRpc]
     private void HealAllPlayersClientRpc()
     {
-        foreach (GameObject p in GameObject.FindGameObjectsWithTag("Player"))
+        foreach (GameObject p in PlayerController.All)
         {
             NetworkObject net = p.GetComponent<NetworkObject>();
             if (net != null && net.IsOwner)

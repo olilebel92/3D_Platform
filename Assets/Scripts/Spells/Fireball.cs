@@ -63,8 +63,9 @@ public class Fireball : NetworkBehaviour
 
     /// <summary>
     /// Pre-computed raw damage passed in by SpellCaster.SpawnProjectileServerRpc.
-    /// When > 0 it bypasses ComputeRawDamage() (which reads per-player singletons
-    /// that are not valid on the server).
+    /// When &gt; 0 it is used as-is. When 0 (e.g. a directly-placed prefab in a test
+    /// scene) the explosion falls back to baseDamage — never to per-player singletons,
+    /// which are host-local in MP and would leak host stats into every caster's damage.
     /// </summary>
     [HideInInspector] public float precomputedDamage = 0f;
 
@@ -133,7 +134,12 @@ public class Fireball : NetworkBehaviour
 
     void Explode(Vector3 origin)
     {
-        float raw = precomputedDamage > 0f ? precomputedDamage : ComputeRawDamage();
+        // precomputedDamage is set by SpellCaster before Spawn so the authoritative
+        // side never reads per-player singletons (ExperienceManager, SkillTreeManager)
+        // — those are host-local in MP and would leak host stats to every caster.
+        // If it's missing (direct-placed prefab, test scene), fall back to baseDamage
+        // only — never to singletons.
+        float raw = precomputedDamage > 0f ? precomputedDamage : baseDamage;
 
         bool networked = NetworkManager.Singleton != null && NetworkManager.Singleton.IsListening;
         Collider[] hits = Physics.OverlapSphere(origin, falloffRadius);
@@ -207,18 +213,6 @@ public class Fireball : NetworkBehaviour
         if (NetworkManager.Singleton == null || !NetworkManager.Singleton.IsListening)
             return true;   // solo / offline
         return IsServer;   // multiplayer — server only
-    }
-
-    float ComputeRawDamage()
-    {
-        float spellBonus   = SkillTreeManager.Instance != null ? SkillTreeManager.Instance.TotalSpellDamageBonus   : 0f;
-        float fireBonus    = SkillTreeManager.Instance != null ? SkillTreeManager.Instance.TotalFireDamageBonus    : 0f;
-        float firePctBonus = SkillTreeManager.Instance != null ? SkillTreeManager.Instance.TotalFireDamagePctBonus : 0f;
-
-        float intMultiplier = ExperienceManager.Instance != null
-            ? ExperienceManager.Instance.SpellDamageMultiplier : 1f;
-
-        return (baseDamage + spellBonus + fireBonus) * intMultiplier * (1f + firePctBonus);
     }
 
     float ComputeFalloffDamage(float rawDamage, float dist)

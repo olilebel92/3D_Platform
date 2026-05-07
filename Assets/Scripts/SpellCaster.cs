@@ -4,6 +4,42 @@ using UnityEngine.InputSystem;
 using Unity.Netcode;
 
 /// <summary>
+/// Payload for target-locked spell spawns (e.g. Chain Lightning).
+/// Wraps the 10+ fields the server needs to reconstruct the projectile so the
+/// ServerRpc signature stays readable and adding a new chain field is one line here
+/// instead of editing both sides of a parameter list.
+/// </summary>
+public struct ChainSpellPayload : INetworkSerializable
+{
+    public Vector3    pos;
+    public Quaternion rot;
+    public float      rawDamage;
+    public string     prefabName;
+    public string     hitEffectName;
+    public ulong      targetNetObjId;
+    public int        chainCount;
+    public float      chainRadius;
+    public float      chainDamageFalloff;
+    public float      chainTravelTime;
+    public float      chainJumpDelay;
+
+    public void NetworkSerialize<T>(BufferSerializer<T> serializer) where T : IReaderWriter
+    {
+        serializer.SerializeValue(ref pos);
+        serializer.SerializeValue(ref rot);
+        serializer.SerializeValue(ref rawDamage);
+        serializer.SerializeValue(ref prefabName);
+        serializer.SerializeValue(ref hitEffectName);
+        serializer.SerializeValue(ref targetNetObjId);
+        serializer.SerializeValue(ref chainCount);
+        serializer.SerializeValue(ref chainRadius);
+        serializer.SerializeValue(ref chainDamageFalloff);
+        serializer.SerializeValue(ref chainTravelTime);
+        serializer.SerializeValue(ref chainJumpDelay);
+    }
+}
+
+/// <summary>
 /// Handles casting any spell from the spell bar.
 /// All per-spell behaviour (spell type, cast timing, interrupt rules, channeling)
 /// lives on SpellData.
@@ -26,12 +62,13 @@ public class SpellCaster : NetworkBehaviour
 
     // ─── Cast State ───────────────────────────────────────────────────────────
 
-    private enum CastState { Idle, AwaitingTarget, PreCast, Pending, Channeling }
+    private enum CastState { Idle, AwaitingTarget, WalkingToTarget, PreCast, Pending, Channeling }
     private CastState _state             = CastState.Idle;
     private float     _timer             = 0f;
     private SpellData _active            = null;
-    private float     _castStartTime     = 0f;  // Time.time when cast was initiated (used for grace checks)
+    private float     _castStartTime     = 0f;
     private bool      _throwEventFired   = false;
+    private Transform _walkTarget        = null; // enemy being approached in WalkingToTarget
 
     // ─── Channel Object Tracking ─────────────────────────────────────────────
     // Channel spells spawn their VFX prefab once and keep it alive for the full
@@ -98,6 +135,8 @@ public class SpellCaster : NetworkBehaviour
             ? 1f - (_timer / _active.channelTickRate)
             : 0f;
 
+    /// <summary>True while the player is auto-walking toward an out-of-range target.</summary>
+    public bool IsAutoWalking => _state == CastState.WalkingToTarget;
     /// <summary>True while the cast bar is filling (after castStartDelay).</summary>
     public bool IsCasting    => _state == CastState.Pending;
     /// <summary>True while a Channel spell is being held.</summary>
@@ -165,6 +204,9 @@ public class SpellCaster : NetworkBehaviour
         if (_state == CastState.Idle) return;
         _audioSource?.Stop();
         if (_state == CastState.AwaitingTarget) _targetSelector?.CancelTargeting();
+        if (_state == CastState.WalkingToTarget && _playerController != null)
+            _playerController.AutoMoveTarget = null;
+        _walkTarget = null;
         StopChannel();
         _telegraphProjector?.Hide();
 
@@ -273,6 +315,13 @@ public class SpellCaster : NetworkBehaviour
 
     void Update()
     {
+        // Right-click cancels any active cast, channel, or target selection.
+        if (Mouse.current != null && Mouse.current.rightButton.wasPressedThisFrame && IsActive)
+        {
+            CancelCast();
+            return;
+        }
+
         // Hotkeys 1–0: select slot and begin cast
         if (Keyboard.current != null)
         {
@@ -307,6 +356,37 @@ public class SpellCaster : NetworkBehaviour
         {
             case CastState.AwaitingTarget:
                 // TargetSelector handles click detection; OnTargetConfirmed() advances the state.
+                break;
+
+            case CastState.WalkingToTarget:
+                if (_walkTarget == null) { CancelCast(); break; }
+
+                // Allow Escape to cancel while walking.
+                if (Keyboard.current != null && Keyboard.current.escapeKey.wasPressedThisFrame)
+                {
+                    CancelCast();
+                    break;
+                }
+
+                Vector3 toTarget = _walkTarget.position - transform.position;
+                toTarget.y = 0f;
+                if (toTarget.magnitude <= _active.castRange)
+                {
+                    // In range — stop auto-walk and fire.
+                    if (_playerController != null) _playerController.AutoMoveTarget = null;
+                    _walkTarget = null;
+                    FireSpell();
+                    _telegraphProjector?.Hide(); // hides range ring too
+                    _state  = CastState.Idle;
+                    _active = null;
+                    OnCastComplete?.Invoke();
+                }
+                else
+                {
+                    // Keep walking — update target position each frame for moving enemies.
+                    if (_playerController != null)
+                        _playerController.AutoMoveTarget = _walkTarget.position;
+                }
                 break;
 
             case CastState.PreCast:
@@ -436,6 +516,10 @@ public class SpellCaster : NetworkBehaviour
             return;
         }
 
+        // Any active state is cancelled before starting a new spell.
+        if (_state != CastState.Idle)
+            CancelCast();
+
         // Target-locked spells enter targeting mode — cooldown starts only after target is confirmed.
         if (spell.spellType == SpellType.TargetLocked)
         {
@@ -444,14 +528,18 @@ public class SpellCaster : NetworkBehaviour
                 Debug.LogWarning("[SpellCaster] No TargetSelector component found — cannot cast target-locked spells.");
                 return;
             }
-            if (_state == CastState.AwaitingTarget && _active == spell) return; // already targeting this spell
-            if (_state == CastState.AwaitingTarget) _targetSelector.CancelTargeting(); // switch spell
 
             _active          = spell;
             _castStartTime   = Time.time;
             _throwEventFired = false;
             _state           = CastState.AwaitingTarget;
             _targetSelector.BeginTargeting();
+
+            if (spell.castRange > 0f)
+                _telegraphProjector?.ShowRange(spell.castRange, transform);
+            else
+                _telegraphProjector?.HideRange();
+
             Debug.Log($"[SpellCaster] {spell.spellName} — left-click an enemy to cast.");
             return;
         }
@@ -464,9 +552,6 @@ public class SpellCaster : NetworkBehaviour
         // Sprinting → cancel sprint and proceed with the cast.
         if (_playerController != null && _playerController.IsSprinting)
             _playerController.CancelSprint();
-
-        // Already casting this exact spell — keep going, don't restart.
-        if (_state != CastState.Idle && _active == spell) return;
 
         _active            = spell;
         _castStartTime     = Time.time;
@@ -725,6 +810,21 @@ public class SpellCaster : NetworkBehaviour
         if (_active.cooldown > 0f)
             _cooldownEndTimes[_active] = Time.time + _active.cooldown;
 
+        // If the target is outside cast range, walk toward it first.
+        if (_active.castRange > 0f)
+        {
+            Vector3 flat = target.position - transform.position;
+            flat.y = 0f;
+            if (flat.magnitude > _active.castRange)
+            {
+                _walkTarget = target;
+                _state      = CastState.WalkingToTarget;
+                _telegraphProjector?.Show(_active, transform);
+                Debug.Log($"[SpellCaster] {_active.spellName} — target out of range, walking toward it.");
+                return;
+            }
+        }
+
         _telegraphProjector?.Show(_active, transform);
 
         if (_active.castStartDelay > 0f)
@@ -776,9 +876,20 @@ public class SpellCaster : NetworkBehaviour
                 ? _targetSelector.SelectedNetworkObject.NetworkObjectId
                 : ulong.MaxValue;
 
-            SpawnTargetLockedServerRpc(firePos, fireRot, rawDamage, _active.prefab.name,
-                hitEffectName, targetId, _active.chainCount, _active.chainRadius,
-                _active.chainDamageFalloff, _active.chainTravelTime, _active.chainJumpDelay);
+            SpawnTargetLockedServerRpc(new ChainSpellPayload
+            {
+                pos                = firePos,
+                rot                = fireRot,
+                rawDamage          = rawDamage,
+                prefabName         = _active.prefab.name,
+                hitEffectName      = hitEffectName,
+                targetNetObjId     = targetId,
+                chainCount         = _active.chainCount,
+                chainRadius        = _active.chainRadius,
+                chainDamageFalloff = _active.chainDamageFalloff,
+                chainTravelTime    = _active.chainTravelTime,
+                chainJumpDelay     = _active.chainJumpDelay,
+            });
         }
         else
         {
@@ -798,29 +909,27 @@ public class SpellCaster : NetworkBehaviour
     }
 
     [Rpc(SendTo.Server)]
-    private void SpawnTargetLockedServerRpc(Vector3 pos, Quaternion rot, float rawDamage,
-        string prefabName, string hitEffectName, ulong targetNetObjId,
-        int chainCount, float chainRadius, float chainDamageFalloff, float chainTravelTime, float chainJumpDelay)
+    private void SpawnTargetLockedServerRpc(ChainSpellPayload payload)
     {
-        NetworkObject prefab = FindRegisteredPrefab(prefabName);
+        NetworkObject prefab = FindRegisteredPrefab(payload.prefabName);
         if (prefab == null)
         {
-            Debug.LogWarning($"[SpellCaster] No registered NetworkObject prefab named '{prefabName}'.");
+            Debug.LogWarning($"[SpellCaster] No registered NetworkObject prefab named '{payload.prefabName}'.");
             return;
         }
 
-        NetworkObject instance = Instantiate(prefab, pos, rot);
+        NetworkObject instance = Instantiate(prefab, payload.pos, payload.rot);
         if (instance.TryGetComponent<ChainLightning>(out ChainLightning cl))
         {
-            cl.precomputedDamage     = rawDamage;
-            cl.targetNetworkObjectId = targetNetObjId;
-            cl.chainCount            = chainCount;
-            cl.chainRadius           = chainRadius;
-            cl.chainDamageFalloff    = chainDamageFalloff;
-            cl.travelTime            = chainTravelTime;
-            cl.jumpDelay             = chainJumpDelay;
-            if (!string.IsNullOrEmpty(hitEffectName))
-                cl.hitEffect = FindRegisteredGameObject(hitEffectName);
+            cl.precomputedDamage     = payload.rawDamage;
+            cl.targetNetworkObjectId = payload.targetNetObjId;
+            cl.chainCount            = payload.chainCount;
+            cl.chainRadius           = payload.chainRadius;
+            cl.chainDamageFalloff    = payload.chainDamageFalloff;
+            cl.travelTime            = payload.chainTravelTime;
+            cl.jumpDelay             = payload.chainJumpDelay;
+            if (!string.IsNullOrEmpty(payload.hitEffectName))
+                cl.hitEffect = FindRegisteredGameObject(payload.hitEffectName);
         }
 
         instance.Spawn(true);

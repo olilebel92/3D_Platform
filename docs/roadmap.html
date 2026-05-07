@@ -204,6 +204,32 @@
 
     <div class="cl-entry">
       <div class="cl-header">
+        <div class="cl-version">V0.15</div>
+        <div><div class="cl-title">UI Toolkit Transitions &amp; Polish</div><span class="status-badge badge-completed">Completed</span></div>
+        <div class="cl-date">April 19, 2026</div>
+      </div>
+      <div class="cl-section-title">Scene Transitions</div>
+      <ul class="cl-list">
+        <li>SceneTransitionManager — full refactor supporting both uGUI and UI Toolkit; new FadeOutThen / FadeIn / LoadSceneAlreadyFaded API with configurable fadeInDelay</li>
+        <li>MainMenuManager — host startup wrapped in FadeOutThen callback for smooth host-to-lobby transition</li>
+        <li>LobbyManager — scene loads use FadeOutThen for smooth play / back transitions</li>
+      </ul>
+      <div class="cl-section-title">Lobby &amp; Audio</div>
+      <ul class="cl-list">
+        <li>SoundManager.PlayUI() wired on all Lobby button callbacks (Ready, Force Start, class select, Back)</li>
+      </ul>
+      <div class="cl-section-title">Networking &amp; Fixes</div>
+      <ul class="cl-list">
+        <li>ExperienceManager — guard SyncMaxHealthServerRpc with IsOwner check to prevent non-owner RPCs</li>
+        <li>EnemyReward — fix drop spawning during Editor stop-play teardown via _appIsQuitting flag</li>
+        <li>CursorManager — switch to CursorMode.Auto</li>
+        <li>PlayMode — replace placeholder scenario with 2-Players test scenario</li>
+        <li>Regenerated Cinzel + JetBrains Mono SDF font atlases</li>
+      </ul>
+    </div>
+
+    <div class="cl-entry">
+      <div class="cl-header">
         <div class="cl-version">V0.2</div>
         <div><div class="cl-title">Spells, Skill Tree &amp; Polish</div><span class="status-badge badge-active">In Progress</span></div>
         <div class="cl-date">April 2026 — In Progress</div>
@@ -368,6 +394,11 @@ const VERSIONS = [
    bullets:["Core player, enemy AI, waves, XP, inventory","NGO networking — Host/Join, lobby, co-op player prefab","Networked enemies, LootPickup, NGO optimizations","SpellCaster state machine + SpellCastBarUI"],
    details:["Player movement, sprint, stamina, melee, fireball; Enemy AI via NavMesh; wave manager","XP/leveling STR/AGI/INT; spell bar (10 slots); character window; inventory; damage popups","NGO integrated: Host/Join, lobby (class select, ready system), spectator free-cam","Player as spawnable NetworkObject with OwnerNetworkTransform — per-player ExperienceManager & PlayerInventory","PlayerUILinker wires HP/XP/Stamina bars after NGO spawn; ServerRpc death/respawn","EnemyAI & EnemyReward as NetworkBehaviour; server-authoritative AI; nearest-player targeting","LootPickup replaces CoinPickup & ItemPickup — CollectServerRpc prevents double-collect","EnemyColorRandomizer; LobbyChatManager; NGO optimization; PlayerAttack promoted to NetworkBehaviour","SpellCaster state machine (PreCast, Pending, Channeling, Idle); SpellCastBarUI event-driven; HP regen; URP finalized"],
    note:"Covers v0.01 through v0.05 + spell system framework. All assets are placeholders."},
+
+  {version:"V0.15",title:"UI Toolkit Transitions & Polish",status:"completed",quarter:"Q2 2026",date:"April 19, 2026",phase:"p1",loop:null,
+   bullets:["SceneTransitionManager — UI Toolkit + uGUI, FadeOutThen / FadeIn API","Lobby audio — SoundManager.PlayUI() on all button callbacks","Cursor, network & font polish"],
+   details:["SceneTransitionManager: full refactor supporting both uGUI and UI Toolkit; new FadeOutThen / FadeIn / LoadSceneAlreadyFaded API with configurable fadeInDelay","LobbyManager: wired SoundManager.PlayUI() on all button callbacks; scene loads now use FadeOutThen for smooth transitions","MainMenuManager: host startup wrapped in FadeOutThen callback","ExperienceManager: guard SyncMaxHealthServerRpc with IsOwner check to prevent non-owner RPCs","EnemyReward: fix drop spawning during Editor stop-play teardown via _appIsQuitting flag","CursorManager: switch to CursorMode.Auto","PlayMode: replace placeholder scenario with 2-Players test scenario","Regenerated Cinzel + JetBrains Mono SDF font atlases"],
+   note:null},
 
     {
         version: "V0.2", title: "Spells, Skill Tree & Polish", status:"active",quarter:"Q2 2026",date:"In Progress — April 2026",phase:"p1",loop:null,

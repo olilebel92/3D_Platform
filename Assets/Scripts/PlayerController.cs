@@ -59,8 +59,10 @@ public class PlayerController : NetworkBehaviour
     /// All active player GameObjects in the scene. Populated in Start(), cleared in
     /// OnDestroy(). Used by server-side systems (HealingWave, WaveManager) as a
     /// GC-free alternative to FindGameObjectsWithTag("Player") on every tick.
+    /// Exposed as IReadOnlyList so external callers can iterate but not mutate.
     /// </summary>
-    public static readonly List<GameObject> All = new();
+    public static IReadOnlyList<GameObject> All => _all;
+    private static readonly List<GameObject> _all = new();
 
     // ─── Private State ────────────────────────────────────────────────────────
 
@@ -75,6 +77,12 @@ public class PlayerController : NetworkBehaviour
 
     /// <summary>True while the player is actively sprinting (moving + sprint input + stamina).</summary>
     public bool IsSprinting { get; private set; }
+
+    /// <summary>
+    /// When set by SpellCaster, drives the player toward this world position automatically.
+    /// Overrides movement only when there is no manual input. Cleared when the cast fires or cancels.
+    /// </summary>
+    public Vector3? AutoMoveTarget { get; set; }
 
     /// <summary>
     /// Stops the current sprint immediately. Suppresses re-entry from held sprint input
@@ -191,7 +199,7 @@ public class PlayerController : NetworkBehaviour
 
     void Start()
     {
-        All.Add(gameObject);
+        _all.Add(gameObject);
         WaveManager.Instance?.RegisterPlayer(transform);
 
         controller     = GetComponent<CharacterController>();
@@ -259,7 +267,7 @@ public class PlayerController : NetworkBehaviour
     {
         // Safety cleanup — always unsubscribe to avoid stale callbacks.
         base.OnDestroy();
-        All.Remove(gameObject);
+        _all.Remove(gameObject);
         DisableInput();
         if (_spellCaster != null) _spellCaster.OnCastThrowStart -= OnCastThrow;
     }
@@ -617,6 +625,19 @@ public class PlayerController : NetworkBehaviour
 
         Vector3 move = (camForward * moveInput.y +
                         camRight * moveInput.x).normalized * currentSpeed;
+
+        // ── Auto Move (SpellCaster walk-to-cast) ──────────────────────────────
+        // Only activates when no manual input so the player can always override by moving.
+        if (AutoMoveTarget.HasValue && moveInput.magnitude < 0.1f)
+        {
+            Vector3 toAuto = AutoMoveTarget.Value - transform.position;
+            toAuto.y = 0f;
+            if (toAuto.sqrMagnitude > 0.01f)
+            {
+                move     = toAuto.normalized * currentSpeed;
+                isMoving = true; // drive walk animation
+            }
+        }
 
         // ── Cast Momentum ──────────────────────────────────────────────────────
         // When movement lock begins while airborne, carry the horizontal velocity

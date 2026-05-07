@@ -63,6 +63,7 @@ public class PlayerAttack : NetworkBehaviour
     // No local PlayerInputActions — we borrow PlayerController's shared instance.
     private PlayerInputActions _inputActions;
     private ExperienceManager _xp;
+    private SpellCaster _spellCaster;
     private float _cooldownTimer = 0f;
     private float _activeWindowTimer = 0f;
     private bool _isAttacking = false;
@@ -86,7 +87,8 @@ public class PlayerAttack : NetworkBehaviour
         }
 
         // Cache own ExperienceManager — each player has their own instance.
-        _xp = GetComponent<ExperienceManager>();
+        _xp          = GetComponent<ExperienceManager>();
+        _spellCaster = GetComponent<SpellCaster>();
 
         if (_inputActions == null)
         {
@@ -193,6 +195,7 @@ public class PlayerAttack : NetworkBehaviour
         if (_isAttacking) return;
         if (animator == null) return;
         if (Time.timeScale == 0f) return; // block attacks while any popup/menu is open
+        if (_spellCaster != null && _spellCaster.IsActive) return; // block during Target/Cast/Channel
 
         // ── Trigger animation ─────────────────────────────────────────────────
         // Activate the upper body layer so the attack clip overrides the arms.

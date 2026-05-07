@@ -29,9 +29,12 @@ public class CursorManager : MonoBehaviour
     {
         if (Instance != null) { Destroy(gameObject); return; }
         Instance = this;
+        DontDestroyOnLoad(gameObject);
+        RefreshVisibility();
+        ApplyDefault();
     }
 
-    void Start() => ApplyDefault();
+    void Start() { }
 
     void Update()
     {

@@ -10,7 +10,17 @@ public class DevLog : MonoBehaviour
     private const string LOG_TEXT =
 @"── HACKNSLASH DEVLOG ──
 
-v0.2 — Spells, Skill Tree & Polish   2026-04-12 – 13 — Latest
+<b><color=#3dba6e>v0.15 — UI Toolkit Transitions & Polish</color></b>  <color=#7a7a9a>2026-04-19 — Latest</color>
+• SceneTransitionManager — UI Toolkit + uGUI, FadeOutThen / FadeIn API
+• LobbyManager — SoundManager.PlayUI() wired on all button callbacks
+• MainMenuManager — host startup wrapped in fade-transition callback
+• ExperienceManager — IsOwner guard on SyncMaxHealthServerRpc
+• EnemyReward — fix drop spawn during Editor stop-play teardown
+• CursorManager — CursorMode.Auto
+• PlayMode — 2-Players test scenario
+• Regenerated Cinzel + JetBrains Mono SDF font atlases
+
+<b><color=#e8920a>v0.2 — Spells, Skill Tree & Polish — In Progress</color></b>  <color=#7a7a9a>2026-04-12 – 13</color>
 • HealingWave spell — AoE heal, server-authoritative
 • Stun system (StatusEffectHandler) — blocks casts & movement
 • PlayerNameTag — world-space billboard labels, NGO-synced
@@ -21,7 +31,7 @@ v0.2 — Spells, Skill Tree & Polish   2026-04-12 – 13 — Latest
 • Settings panel — master & music volume, saved via PlayerPrefs
 • FPS overlay (F3) — smoothed FPS, ms, memory usage
 
-v0.1 — Foundation   2026-04-03 – 11
+<b><color=#3dba6e>v0.1 — Foundation</color></b>  <color=#7a7a9a>2026-04-03 – 11</color>
 • Player movement, sprint, stamina, melee, fireball
 • Enemy AI + spawner, wave manager, XP / leveling (STR / AGI / INT)
 • Spell bar (10 slots), character window, inventory, damage popups

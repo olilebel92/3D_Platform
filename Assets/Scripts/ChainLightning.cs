@@ -34,6 +34,11 @@ public class ChainLightning : NetworkBehaviour
 
     private bool _executed;
 
+    // Cached overlap buffer reused by FindNearestEnemy — avoids GC pressure on every
+    // jump. 32 colliders is ample for the default chainRadius; if a hop returns 32
+    // we still pick the nearest, just from a bounded sample.
+    private static readonly Collider[] s_overlapBuffer = new Collider[32];
+
     // ─── NGO Lifecycle ────────────────────────────────────────────────────────
 
     public override void OnNetworkSpawn()
@@ -144,12 +149,13 @@ public class ChainLightning : NetworkBehaviour
 
     Transform FindNearestEnemy(Transform from, HashSet<Transform> excluded)
     {
-        Collider[] cols     = Physics.OverlapSphere(from.position, chainRadius);
-        Transform  best     = null;
-        float      bestSqDist = float.MaxValue;
+        int       count      = Physics.OverlapSphereNonAlloc(from.position, chainRadius, s_overlapBuffer);
+        Transform best       = null;
+        float     bestSqDist = float.MaxValue;
 
-        foreach (Collider col in cols)
+        for (int i = 0; i < count; i++)
         {
+            Collider col = s_overlapBuffer[i];
             if (!col.CompareTag("Enemy")) continue;
             if (excluded.Contains(col.transform)) continue;
             float sqDist = (col.transform.position - from.position).sqrMagnitude;
