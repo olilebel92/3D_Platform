@@ -17,7 +17,7 @@ MonoBehaviour:
   icon: {fileID: 21300000, guid: 45f7b97a09175d741b1c190bcf21c33b, type: 3}
   cost: 1
   prerequisites: []
-  maxLevel: 10
+  maxLevel: 25
   scalingFactor: 1
   strBonus: 0
   agiBonus: 0

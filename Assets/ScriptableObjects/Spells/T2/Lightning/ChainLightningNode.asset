@@ -15,11 +15,11 @@ MonoBehaviour:
   nodeName: New Skill
   description: Describe what this skill does.
   icon: {fileID: 21300000, guid: 31611c0d88c895744bfecf9f92354eed, type: 3}
-  cost: 1
+  cost: 2
   prerequisites:
   - node: {fileID: 11400000, guid: a58741de65d1fbb4da6d7077def810c8, type: 2}
-    requiredLevel: 1
-  maxLevel: 1
+    requiredLevel: 10
+  maxLevel: 5
   scalingFactor: 1
   strBonus: 0
   agiBonus: 0

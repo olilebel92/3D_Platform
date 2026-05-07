@@ -21,7 +21,7 @@ MonoBehaviour:
   cost: 2
   prerequisites:
   - node: {fileID: 11400000, guid: a58741de65d1fbb4da6d7077def810c8, type: 2}
-    requiredLevel: 1
+    requiredLevel: 15
   maxLevel: 5
   scalingFactor: 1
   strBonus: 0

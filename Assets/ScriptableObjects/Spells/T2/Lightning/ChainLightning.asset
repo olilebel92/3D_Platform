@@ -13,9 +13,9 @@ MonoBehaviour:
   m_Name: ChainLightning
   m_EditorClassIdentifier: Assembly-CSharp::SpellData
   school: 3
-  baseDamage: 0
+  baseDamage: 5
   damagePerSkillRank: 0
-  cooldown: 1
+  cooldown: 10
   spellName: Chain Lightning
   description: A mysterious spell.
   icon: {fileID: 21300000, guid: 31611c0d88c895744bfecf9f92354eed, type: 3}
@@ -45,7 +45,7 @@ MonoBehaviour:
   telegraphColorMode: 0
   telegraphColor: {r: 1, g: 0.5, b: 0, a: 0.45}
   castRange: 7
-  chainCount: 6
+  chainCount: 3
   chainRadius: 6
   chainDamageFalloff: 0.8
   chainTravelTime: 0.2
