@@ -66,12 +66,17 @@ public class HealthSystem : MonoBehaviour
 
     // ─── Public API ───────────────────────────────────────────────────────────
 
-    /// <summary>Base regen + any equipment bonus. Read by PlayerController's regen coroutine.</summary>
+    private float _skillTreeRegen = 0f;
+
+    /// <summary>Base regen + equipment bonus + skill tree bonus. Read by PlayerController's regen coroutine.</summary>
     public float TotalRegenPerSecond =>
-        regenPerSecond + (_inventory != null ? _inventory.TotalBonusRegen : 0f);
+        regenPerSecond + (_inventory != null ? _inventory.TotalBonusRegen : 0f) + _skillTreeRegen;
 
     /// <summary>Base regen only (no equipment). Used by CharacterWindow to split base vs bonus display.</summary>
     public float RegenPerSecond => regenPerSecond;
+
+    /// <summary>Called by ExperienceManager when the skill tree changes.</summary>
+    public void ApplySkillTreeRegen(float bonus) => _skillTreeRegen = bonus;
 
     public void TakeDamage(int amount, bool isCrit = false)
     {

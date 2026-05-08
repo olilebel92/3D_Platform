@@ -1,0 +1,5 @@
+AssetFileName,itemName,description,slot,rarity,STR,AGI,INT,FlatHP,RegenPerSecond,AllStats,CritRate,CritDamage,FireDamage,MovementSpeed,SpellPower
+Thor_Helm,Stormcrown of Thor,"Forged from a thunderbolt split at the heart of Asgard. The wearer hears the storm speak.",Helm,Godly,,, 30,,,, 15, 35,,,60
+Thor_Chest,Mjolnir's Aegis,"Etched with runes of lightning. No blade has ever pierced it twice.",Chest,Godly,,,20,400,3,,,,,,75
+Thor_Pants,Legs of the Thundergod,"Each step crackles with static. Enemies falter as lightning arcs from your heels.",Pants,Godly,15,15,,,, 15, 10, 25,,,
+Thor_Boots,Stormstriders,"Blessed by the Allfather. Those who wear them run as fast as lightning falls.",Boots,Godly,,25,,,,,12,,,20,35

@@ -92,6 +92,12 @@ public class SkillTreeManager : MonoBehaviour
     /// <summary>Sum of all percent lightning damage bonuses from learned nodes (0.10 = +10%).</summary>
     public float TotalLightningDamagePctBonus { get; private set; } = 0f;
 
+    /// <summary>Sum of all flat max HP bonuses from learned nodes.</summary>
+    public int TotalHpBonus { get; private set; } = 0;
+
+    /// <summary>Sum of all flat HP regen bonuses from learned nodes (HP per second).</summary>
+    public float TotalHpRegenBonus { get; private set; } = 0f;
+
     // ─── Events ───────────────────────────────────────────────────────────────
 
     /// <summary>Fired after any node is learned or a skill point is added.</summary>
@@ -213,6 +219,8 @@ public class SkillTreeManager : MonoBehaviour
         TotalHealPctBonus            += node.healPctBonus           * node.scalingFactor;
         TotalLightningDamageBonus    += node.lightningDamageBonus    * node.scalingFactor;
         TotalLightningDamagePctBonus += node.lightningDamagePctBonus * node.scalingFactor;
+        TotalHpBonus                 += Mathf.RoundToInt(node.hpBonus      * node.scalingFactor);
+        TotalHpRegenBonus            += node.hpRegenBonus * node.scalingFactor;
 
         Debug.Log($"[SkillTree] '{node.nodeName}' leveled to {newLevel}/{node.maxLevel}. " +
                   $"Points left: {SkillPoints}. Spell bonus total: +{TotalSpellDamageBonus}");

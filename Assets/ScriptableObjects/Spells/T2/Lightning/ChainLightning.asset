@@ -14,10 +14,17 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::SpellData
   school: 3
   baseDamage: 5
-  damagePerSkillRank: 0
+  damagePerSkillRank: 1
+  chainCountPerRank: 1
   cooldown: 10
   spellName: Chain Lightning
-  description: A mysterious spell.
+  description: 'Hurl a bolt of lightning at the target, dealing {total} damage and
+    chaining to {chains} enemies nearby. Each arc deals 90% of the previous hit.
+
+    
+
+    Rank
+    up: +{rankBonus} damage, +1 chain.'
   icon: {fileID: 21300000, guid: 31611c0d88c895744bfecf9f92354eed, type: 3}
   hitEffect: {fileID: 4958139051046021043, guid: 78e3b64488ce7974ab7e2283b3680c0a, type: 3}
   prefab: {fileID: 6773541678573288676, guid: 7d89ccbf37cf30f419186a259c490f12, type: 3}
@@ -47,8 +54,8 @@ MonoBehaviour:
   castRange: 7
   chainCount: 3
   chainRadius: 6
-  chainDamageFalloff: 0.8
-  chainTravelTime: 0.2
+  chainDamageFalloff: 0.9
+  chainTravelTime: 0.1
   chainJumpDelay: 0.05
   telegraphFollowsCursor: 1
   telegraphOriginOffset: 0

@@ -655,7 +655,8 @@ public class SpellCaster : NetworkBehaviour
         bool networkActive = NetworkManager.Singleton != null
                           && NetworkManager.Singleton.IsListening;
 
-        float rawDamage = ComputeRawDamage(_active, SkillTreeManager.Instance?.GetSpellRank(_active) ?? 0);
+        int   spellRank = SkillTreeManager.Instance?.GetSpellRank(_active) ?? 0;
+        float rawDamage = ComputeRawDamage(_active, spellRank);
 
         // ── Channel spells: spawn once, tick on existing instance ─────────────
         if (_active.spellType == SpellType.Channel)
@@ -688,7 +689,7 @@ public class SpellCaster : NetworkBehaviour
         // ── Target-locked spells (e.g. Chain Lightning) ───────────────────────
         if (_active.spellType == SpellType.TargetLocked)
         {
-            FireTargetLockedSpell(firePos, fireRot, rawDamage);
+            FireTargetLockedSpell(firePos, fireRot, rawDamage, spellRank);
             Debug.Log($"[SpellCaster] Fired target-locked {_active.spellName}");
             return;
         }
@@ -857,12 +858,13 @@ public class SpellCaster : NetworkBehaviour
 
     // ─── Target-Locked Fire ───────────────────────────────────────────────────
 
-    void FireTargetLockedSpell(Vector3 firePos, Quaternion fireRot, float rawDamage)
+    void FireTargetLockedSpell(Vector3 firePos, Quaternion fireRot, float rawDamage, int spellRank)
     {
         if (_active == null || _active.prefab == null) return;
 
-        string hitEffectName = _active.hitEffect != null ? _active.hitEffect.name : "";
-        bool networkActive   = NetworkManager.Singleton != null && NetworkManager.Singleton.IsListening;
+        string hitEffectName    = _active.hitEffect != null ? _active.hitEffect.name : "";
+        bool   networkActive    = NetworkManager.Singleton != null && NetworkManager.Singleton.IsListening;
+        int    effectiveChains  = _active.chainCount + Mathf.Max(0, spellRank - 1) * _active.chainCountPerRank;
 
         if (networkActive)
         {
@@ -884,7 +886,7 @@ public class SpellCaster : NetworkBehaviour
                 prefabName         = _active.prefab.name,
                 hitEffectName      = hitEffectName,
                 targetNetObjId     = targetId,
-                chainCount         = _active.chainCount,
+                chainCount         = effectiveChains,
                 chainRadius        = _active.chainRadius,
                 chainDamageFalloff = _active.chainDamageFalloff,
                 chainTravelTime    = _active.chainTravelTime,
@@ -899,7 +901,7 @@ public class SpellCaster : NetworkBehaviour
                 cl.precomputedDamage  = rawDamage;
                 cl.hitEffect          = _active.hitEffect;
                 cl.soloTarget         = _targetSelector?.SelectedTarget;
-                cl.chainCount         = _active.chainCount;
+                cl.chainCount         = effectiveChains;
                 cl.chainRadius        = _active.chainRadius;
                 cl.chainDamageFalloff = _active.chainDamageFalloff;
                 cl.travelTime         = _active.chainTravelTime;

@@ -25,7 +25,7 @@ public class SkillTreeNode : ScriptableObject
 
     [TextArea(2, 4)]
     [Tooltip("Short description shown in the tooltip panel. " +
-             "Tokens (resolved from unlocksSpell if set): {rankBonus} {bonus} {cooldown} {rank} {maxRank}")]
+             "Tokens (resolved from unlocksSpell if set): {rankBonus} {bonus} {cooldown} {rank} {maxRank} {chains}")]
     public string description = "Describe what this skill does.";
 
     [Tooltip("Icon displayed on the node button. Leave empty to automatically use the unlocked spell's icon.")]
@@ -56,6 +56,12 @@ public class SkillTreeNode : ScriptableObject
 
     [Tooltip("Flat INT added per level.")]
     public int intBonus = 0;
+
+    [Tooltip("Flat maximum HP added per level.")]
+    public int hpBonus = 0;
+
+    [Tooltip("Flat HP regenerated per second added per level.")]
+    public float hpRegenBonus = 0f;
 
     [Tooltip("Flat bonus per level added to all spell damage.")]
     public float spellDamageBonus = 0f;
@@ -90,21 +96,30 @@ public class SkillTreeNode : ScriptableObject
     /// </summary>
     public string GetDescription(int rank = 1)
     {
-        string desc = description
+        // If this node has no custom description, use the linked spell's description text.
+        bool hasOwnDesc = !string.IsNullOrWhiteSpace(description)
+                       && description != "Describe what this skill does.";
+        string baseText = (!hasOwnDesc && unlocksSpell != null)
+            ? unlocksSpell.description
+            : description;
+
+        string desc = baseText
             .Replace("{rank}",    Gold(rank.ToString()))
             .Replace("{maxRank}", Gold(maxLevel.ToString()));
 
         if (unlocksSpell != null)
         {
-            float baseDmg = unlocksSpell.BaseDamage;
-            float bonus   = (rank - 1) * unlocksSpell.damagePerSkillRank;
-            float total   = baseDmg + bonus;
+            float baseDmg        = unlocksSpell.BaseDamage;
+            float bonus          = (rank - 1) * unlocksSpell.damagePerSkillRank;
+            float total          = baseDmg + bonus;
+            int   effectiveChains = unlocksSpell.chainCount + Mathf.Max(0, rank - 1) * unlocksSpell.chainCountPerRank;
             desc = desc
                 .Replace("{base}",      Gold(baseDmg.ToString("0")))
                 .Replace("{rankBonus}", Gold(unlocksSpell.damagePerSkillRank.ToString("0")))
                 .Replace("{bonus}",     Gold(bonus.ToString("0")))
                 .Replace("{total}",     Gold(total.ToString("0")))
-                .Replace("{cooldown}",  Gold(unlocksSpell.cooldown.ToString("0.#")));
+                .Replace("{cooldown}",  Gold(unlocksSpell.cooldown.ToString("0.#")))
+                .Replace("{chains}",    Gold(effectiveChains.ToString()));
         }
 
         return desc;

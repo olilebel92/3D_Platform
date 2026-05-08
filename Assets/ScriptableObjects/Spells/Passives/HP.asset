@@ -1,0 +1,35 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c0b980580335b47449a56865ef1b9e07, type: 3}
+  m_Name: HP
+  m_EditorClassIdentifier: Assembly-CSharp::SkillTreeNode
+  nodeName: Regeneration
+  description: +5 HP/ +1 HP Regen
+  icon: {fileID: 21300000, guid: 01e9bb574d3c38d4b8110e0afdb341cf, type: 3}
+  cost: 1
+  prerequisites: []
+  maxLevel: 25
+  scalingFactor: 1
+  strBonus: 0
+  agiBonus: 0
+  intBonus: 0
+  hpBonus: 5
+  hpRegenBonus: 1
+  spellDamageBonus: 0
+  fireDamageBonus: 0
+  healBonus: 0
+  spellDamagePctBonus: 0
+  fireDamagePctBonus: 0
+  healPctBonus: 0
+  lightningDamageBonus: 0
+  lightningDamagePctBonus: 0
+  unlocksSpell: {fileID: 0}

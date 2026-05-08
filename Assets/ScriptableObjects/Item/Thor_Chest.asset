@@ -1,0 +1,28 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 9c5f8a9e4be4b6c42a10ba05afe871e9, type: 3}
+  m_Name: Thor_Chest
+  m_EditorClassIdentifier: Assembly-CSharp::ItemData
+  itemName: Mjolnir's Aegis
+  description: Etched with runes of lightning. No blade has ever pierced it twice.
+  icon: {fileID: 21300000, guid: 9aba920906123b14384e28b51cb3c688, type: 3}
+  slot: 3
+  rarity: 5
+  statLines:
+  - type: 2
+    value: 20
+  - type: 3
+    value: 400
+  - type: 4
+    value: 3
+  - type: 10
+    value: 75

@@ -159,6 +159,9 @@ public class ExperienceManager : MonoBehaviour
         if (_inventory != null)
             _inventory.OnInventoryChanged += OnEquipmentChanged;
 
+        if (SkillTreeManager.Instance != null)
+            SkillTreeManager.Instance.OnTreeChanged += OnSkillTreeChanged;
+
         if (currentLevel > 1)
             InitializeStartingLevel();
 
@@ -194,6 +197,9 @@ public class ExperienceManager : MonoBehaviour
         if (_inventory != null)
             _inventory.OnInventoryChanged -= OnEquipmentChanged;
 
+        if (SkillTreeManager.Instance != null)
+            SkillTreeManager.Instance.OnTreeChanged -= OnSkillTreeChanged;
+
         // Clear singleton if this was the local instance
         if (Instance == this) Instance = null;
     }
@@ -214,10 +220,23 @@ public class ExperienceManager : MonoBehaviour
     {
         if (_playerHealth == null) return;
 
-        int strHP  = EquipBonusSTR * hpPerStr;
-        int flatHP = _inventory != null ? _inventory.TotalBonusHP : 0;
-        _playerHealth.ApplyEquipmentHP(strHP + flatHP);
+        int strHP       = EquipBonusSTR * hpPerStr;
+        int flatHP      = _inventory != null ? _inventory.TotalBonusHP : 0;
+        int skillTreeHP = SkillTreeManager.Instance != null ? SkillTreeManager.Instance.TotalHpBonus : 0;
+        _playerHealth.ApplyEquipmentHP(strHP + flatHP + skillTreeHP);
         SyncMaxHealthToServer();
+    }
+
+    /// <summary>Called whenever a skill tree node is learned — re-applies HP and regen bonuses.</summary>
+    private void OnSkillTreeChanged()
+    {
+        OnEquipmentChanged();
+
+        if (_playerHealth != null)
+        {
+            float skillTreeRegen = SkillTreeManager.Instance != null ? SkillTreeManager.Instance.TotalHpRegenBonus : 0f;
+            _playerHealth.ApplySkillTreeRegen(skillTreeRegen);
+        }
     }
 
     /// <summary>

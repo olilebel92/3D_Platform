@@ -86,6 +86,9 @@ public class SpellData : ScriptableObject
     [Tooltip("Extra damage (or heal) added per skill tree rank above 1. Rank 1 uses baseDamage only.")]
     public float damagePerSkillRank = 0f;
 
+    [Tooltip("Extra chain jumps added per skill tree rank above 1. Only used when spellType = TargetLocked.")]
+    public int chainCountPerRank = 1;
+
     [Tooltip("Seconds before this spell can be cast again after firing.")]
     public float cooldown = 1f;
 
@@ -94,7 +97,8 @@ public class SpellData : ScriptableObject
 
     [TextArea(2, 4)]
     [Tooltip("Supports tokens: {base} base damage, {bonus} rank bonus damage, {total} combined, " +
-             "{cooldown} cooldown in seconds, {rankBonus} damagePerSkillRank value.")]
+             "{cooldown} cooldown in seconds, {rankBonus} damagePerSkillRank value, " +
+             "{chains} effective chain count at current rank.")]
     public string description = "A mysterious spell.";
 
     [Header("Visuals")]
@@ -239,14 +243,16 @@ public class SpellData : ScriptableObject
     /// <param name="skillRank">Current skill tree rank of this spell (1 = no bonus).</param>
     public string GetDescription(float baseDamage = 0f, int skillRank = 1)
     {
-        float bonus = (skillRank - 1) * damagePerSkillRank;
-        float total = baseDamage + bonus;
+        float bonus          = (skillRank - 1) * damagePerSkillRank;
+        float total          = baseDamage + bonus;
+        int   effectiveChains = chainCount + Mathf.Max(0, skillRank - 1) * chainCountPerRank;
         return description
             .Replace("{base}",      Gold(baseDamage.ToString("0")))
             .Replace("{bonus}",     Gold(bonus.ToString("0")))
             .Replace("{total}",     Gold(total.ToString("0")))
             .Replace("{cooldown}",  Gold(cooldown.ToString("0.#")))
-            .Replace("{rankBonus}", Gold(damagePerSkillRank.ToString("0")));
+            .Replace("{rankBonus}", Gold(damagePerSkillRank.ToString("0")))
+            .Replace("{chains}",    Gold(effectiveChains.ToString()));
     }
 
     static string Gold(string value) => $"<color=#FFD700>{value}</color>";
