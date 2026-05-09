@@ -23,22 +23,46 @@ public class CursorManager : MonoBehaviour
     private bool _usingGamepad = false;
     private int  _menuCount    = 0;   // incremented per open menu; cursor always visible when > 0
 
+    // ─── Bootstrap ───────────────────────────────────────────────────────────
+
+    // BeforeSceneLoad guarantees coverage from frame 0. A scene-placed CursorManager
+    // (with textures configured) replaces the bare auto instance in its own Awake.
+    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
+    private static void EnsureExists()
+    {
+        if (Instance != null) return;
+        var go = new GameObject("CursorManager [auto]");
+        go.AddComponent<CursorManager>();
+    }
+
     // ─── Unity ────────────────────────────────────────────────────────────────
 
     void Awake()
     {
-        if (Instance != null) { Destroy(gameObject); return; }
+        if (Instance != null && Instance != this)
+        {
+            // A scene-placed (configured) CursorManager replaces the bare auto instance.
+            Destroy(Instance.gameObject);
+        }
         Instance = this;
         DontDestroyOnLoad(gameObject);
         RefreshVisibility();
         ApplyDefault();
     }
 
+    void OnEnable()  => InputSystem.onDeviceChange += OnDeviceChange;
+    void OnDisable() => InputSystem.onDeviceChange -= OnDeviceChange;
+
     void Start() { }
 
     void Update()
     {
-        bool gamepadActive = Gamepad.current != null && Gamepad.current.wasUpdatedThisFrame;
+        // wasUpdatedThisFrame fires on the plug-in frame even without real input;
+        // require non-default state so that mere device connection never triggers a switch.
+        bool gamepadActive = Gamepad.current != null &&
+                             Gamepad.current.wasUpdatedThisFrame &&
+                             !Gamepad.current.CheckStateIsAtDefault();
+
         bool mouseActive   = Mouse.current   != null &&
                              (Mouse.current.delta.ReadValue().sqrMagnitude > 0.01f ||
                               Mouse.current.leftButton.wasPressedThisFrame          ||
@@ -54,6 +78,20 @@ public class CursorManager : MonoBehaviour
             _usingGamepad = false;
             RefreshVisibility();
             ApplyDefault();
+        }
+    }
+
+    private void OnDeviceChange(InputDevice device, InputDeviceChange change)
+    {
+        // When the active gamepad is unplugged, immediately revert to mouse mode.
+        if (device is Gamepad && change == InputDeviceChange.Removed && _usingGamepad)
+        {
+            if (Gamepad.current == null)
+            {
+                _usingGamepad = false;
+                RefreshVisibility();
+                ApplyDefault();
+            }
         }
     }
 
@@ -113,6 +151,7 @@ public class CursorManager : MonoBehaviour
     {
         Cursor.visible = true;
         Cursor.lockState = CursorLockMode.None;
-        Cursor.SetCursor(texture, hotspot, CursorMode.Auto);
+        // ForceSoftware with a null texture triggers UI Toolkit warnings; fall back to Auto (OS default).
+        Cursor.SetCursor(texture, hotspot, texture != null ? CursorMode.ForceSoftware : CursorMode.Auto);
     }
 }

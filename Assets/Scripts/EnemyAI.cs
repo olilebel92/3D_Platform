@@ -50,11 +50,11 @@ public class EnemyAI : NetworkBehaviour
     // Read by EnemyHealthBar on all clients to drive the HP bar UI.
 
     [HideInInspector]
-    public NetworkVariable<int> NetworkHealth = new NetworkVariable<int>(
+    public NetworkVariable<float> NetworkHealth = new NetworkVariable<float>(
         0, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
 
     [HideInInspector]
-    public NetworkVariable<int> NetworkMaxHealth = new NetworkVariable<int>(
+    public NetworkVariable<float> NetworkMaxHealth = new NetworkVariable<float>(
         0, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
 
     // ─── State ────────────────────────────────────────────────────────────────

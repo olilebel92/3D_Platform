@@ -79,8 +79,7 @@ public class DeathScreenManager : MonoBehaviour
         if (!IsMultiplayer)
             Time.timeScale = 0f;
 
-        Cursor.lockState = CursorLockMode.None;
-        Cursor.visible = true;
+        CursorManager.Instance?.OpenMenu();
 
         if (SceneTransitionManager.Instance != null)
             SceneTransitionManager.Instance.FadeOutThen(OnFadeComplete);

@@ -238,8 +238,7 @@ public class PlayerController : NetworkBehaviour
             }
         }
 
-        Cursor.lockState = CursorLockMode.None;
-        Cursor.visible   = true;
+        CursorManager.Instance?.ApplyDefault();
 
         // Solo / non-networked fallback: NGO never calls OnNetworkSpawn when
         // NetworkManager is not running, so enable input here instead.
@@ -296,14 +295,14 @@ public class PlayerController : NetworkBehaviour
                               && NetworkManager.Singleton.IsListening;
             if (networkActive && !IsServer) continue;
 
-            int amount = Mathf.RoundToInt(regen);
+            float amount = regen;
             _health.Heal(amount);
             DebugLogger.Log(DebugLogger.Category.Regen,
                 $"{gameObject.name} regen tick +{amount} — HP: {_health.currentHealth}/{_health.maxHealth}");
 
             // Mirror the heal on all clients.
             if (IsSpawned)
-                SyncRegenHealClientRpc(amount);
+                SyncRegenHealClientRpc(regen);
         }
     }
 
@@ -312,7 +311,7 @@ public class PlayerController : NetworkBehaviour
     /// The server (host) skips it — it already healed above.
     /// </summary>
     [ClientRpc]
-    void SyncRegenHealClientRpc(int amount)
+    void SyncRegenHealClientRpc(float amount)
     {
         if (IsServer) return; // host already healed server-side
         if (_health != null)
@@ -327,7 +326,7 @@ public class PlayerController : NetworkBehaviour
     /// re-triggered server-side for a remote client.
     /// </summary>
     [ServerRpc]
-    public void SyncServerHealthServerRpc(int clientHealth)
+    public void SyncServerHealthServerRpc(float clientHealth)
     {
         if (_health == null) return;
         _health.currentHealth = Mathf.Clamp(clientHealth, 0, _health.maxHealth);
@@ -341,7 +340,7 @@ public class PlayerController : NetworkBehaviour
     /// (which run server-side) use the correct cap instead of the initial prefab value.
     /// </summary>
     [ServerRpc]
-    public void SyncMaxHealthServerRpc(int newMaxHealth)
+    public void SyncMaxHealthServerRpc(float newMaxHealth)
     {
         if (_health == null) return;
         _health.maxHealth = newMaxHealth;
@@ -454,9 +453,7 @@ public class PlayerController : NetworkBehaviour
         if (SceneTransitionManager.Instance != null)
             SceneTransitionManager.Instance.FadeIn();
 
-        // Isometric: cursor must always be visible and free for aiming.
-        Cursor.lockState = CursorLockMode.None;
-        Cursor.visible   = true;
+        CursorManager.Instance?.ApplyDefault();
 
         Debug.Log($"[PlayerController] Respawned at {spawnPos}");
     }

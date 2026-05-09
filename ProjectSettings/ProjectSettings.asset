@@ -144,7 +144,7 @@ PlayerSettings:
   loadStoreDebugModeEnabled: 0
   visionOSBundleVersion: 1.0
   tvOSBundleVersion: 1.0
-  bundleVersion: 0.1
+  bundleVersion: 0.2
   preloadedAssets:
   - {fileID: -944628639613478452, guid: f1b6e00cef9d28041b2bace5af920bff, type: 3}
   metroInputSource: 0
@@ -904,7 +904,7 @@ PlayerSettings:
   cloudProjectId: cb3d8a86-f589-473c-a8d6-4123844c2f20
   framebufferDepthMemorylessMode: 0
   qualitySettingsNames: []
-  projectName: 3D_Platform
+  projectName: DoldiGame
   organizationId: oli92
   cloudEnabled: 0
   legacyClampBlendShapeWeights: 0

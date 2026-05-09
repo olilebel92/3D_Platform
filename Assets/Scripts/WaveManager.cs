@@ -285,7 +285,7 @@ public class WaveManager : NetworkBehaviour
         HealthSystem health = enemy.GetComponent<HealthSystem>();
         if (health != null)
         {
-            int scaledMax = Mathf.Max(1, Mathf.RoundToInt(health.maxHealth * hpMult));
+            float scaledMax = Mathf.Max(1f, health.maxHealth * hpMult);
             health.maxHealth     = scaledMax;
             health.currentHealth = scaledMax;
         }

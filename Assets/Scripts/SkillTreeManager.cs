@@ -234,6 +234,47 @@ public class SkillTreeManager : MonoBehaviour
         return true;
     }
 
+    /// <summary>
+    /// Refund all learned nodes, restore all spent skill points, and remove
+    /// any spells that were unlocked via the skill tree from the spell bar.
+    /// Safe to call when nothing is learned.
+    /// </summary>
+    public void RefundAll()
+    {
+        if (_nodeLevels.Count == 0) return;
+
+        int pointsRefunded = 0;
+        foreach (var kv in _nodeLevels)
+        {
+            pointsRefunded += kv.Key.cost * kv.Value;
+
+            if (kv.Key.unlocksSpell != null)
+                RemoveSpellFromBar(kv.Key.unlocksSpell);
+        }
+
+        _nodeLevels.Clear();
+        SkillPoints += pointsRefunded;
+
+        TotalStrBonus             = 0;
+        TotalAgiBonus             = 0;
+        TotalIntBonus             = 0;
+        TotalSpellDamageBonus     = 0f;
+        TotalFireDamageBonus      = 0f;
+        TotalSpellDamagePctBonus  = 0f;
+        TotalFireDamagePctBonus   = 0f;
+        TotalHealBonus            = 0f;
+        TotalHealPctBonus         = 0f;
+        TotalLightningDamageBonus    = 0f;
+        TotalLightningDamagePctBonus = 0f;
+        TotalHpBonus              = 0;
+        TotalHpRegenBonus         = 0f;
+
+        Debug.Log($"[SkillTree] All nodes refunded. Points restored: {pointsRefunded}. Total: {SkillPoints}");
+
+        RefreshUI();
+        OnTreeChanged?.Invoke();
+    }
+
     /// <summary>Show a tooltip for the hovered node.</summary>
     public void ShowTooltip(SkillTreeNode node)
     {
@@ -340,6 +381,22 @@ public class SkillTreeManager : MonoBehaviour
         }
 
         Debug.LogWarning($"[SkillTree] No empty spell bar slot found for '{spell.spellName}'.");
+    }
+
+    private void RemoveSpellFromBar(SpellData spell)
+    {
+        if (SpellBarManager.Instance == null || spell == null) return;
+
+        for (int i = 0; i < SpellBarManager.Instance.slots.Count; i++)
+        {
+            if (SpellBarManager.Instance.slots[i] != null &&
+                SpellBarManager.Instance.slots[i].CurrentSpell == spell)
+            {
+                SpellBarManager.Instance.ClearSlot(i);
+                Debug.Log($"[SkillTree] Removed '{spell.spellName}' from spell bar slot {i}.");
+                return;
+            }
+        }
     }
 
     // ─── UI Refresh ───────────────────────────────────────────────────────────

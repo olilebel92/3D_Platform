@@ -127,6 +127,10 @@ public class ExperienceManager : MonoBehaviour
     [Tooltip("Sound played when the player levels up.")]
     public AudioClip levelUpClip;
 
+    [Header("VFX")]
+    [Tooltip("Prefab instantiated at the player's position when the player levels up.")]
+    public GameObject levelUpVFXPrefab;
+
     private AudioSource _audioSource;
 
     // ─── Events ──────────────────────────────────────────────────────────────
@@ -337,6 +341,9 @@ public class ExperienceManager : MonoBehaviour
 
         if (_audioSource != null && levelUpClip != null)
             _audioSource.PlayOneShot(levelUpClip);
+
+        if (levelUpVFXPrefab != null)
+            Instantiate(levelUpVFXPrefab, transform.position, Quaternion.identity);
 
         if (SkillTreeManager.Instance != null)
             SkillTreeManager.Instance.AddSkillPoint();

@@ -24,8 +24,6 @@ public class InventoryUI : MonoBehaviour
     [Tooltip("Prefab used for each item slot (needs DraggableItem component).")]
     public GameObject itemSlotPrefab;
 
-    [Header("Cursor")]
-    public bool unlockCursorWhileOpen = true;
 
     [Header("Pause")]
     [Tooltip("Pause the game (Time.timeScale = 0) while the inventory is open.")]
@@ -247,6 +245,8 @@ public class InventoryUI : MonoBehaviour
         bool anyPanelOpen = _isOpen || (_characterWindow != null && _characterWindow.IsOpen);
         CameraControllerThirdPerson.IsLocked = anyPanelOpen;
 
+        if (_isOpen) CursorManager.Instance?.OpenMenu();
+        else         CursorManager.Instance?.CloseMenu();
 
         Debug.Log("[InventoryUI] Inventory " + (_isOpen ? "opened." : "closed."));
     }
@@ -266,11 +266,7 @@ public class InventoryUI : MonoBehaviour
         bool anyPanelOpen = _characterWindow != null && _characterWindow.IsOpen;
         CameraControllerThirdPerson.IsLocked = anyPanelOpen;
 
-        if (unlockCursorWhileOpen)
-        {
-            Cursor.lockState = anyPanelOpen ? CursorLockMode.None : CursorLockMode.Locked;
-            Cursor.visible   = anyPanelOpen;
-        }
+        CursorManager.Instance?.CloseMenu();
     }
 
     // ─── Grid ─────────────────────────────────────────────────────────────────

@@ -16,7 +16,7 @@
             <ui:VisualElement picking-mode="Ignore" class="corner corner--bl"/>
             <ui:VisualElement picking-mode="Ignore" class="corner corner--br"/>
             <ui:Label name="title-label" text="Doldi" class="title"/>
-            <ui:Label text="Test" class="subtitle"/>
+            <ui:Label name="subtitle-label" text="Test" class="subtitle"/>
             <ui:VisualElement class="rune-divider">
                 <ui:VisualElement class="rune-divider__line"/>
                 <ui:VisualElement class="rune-divider__glyph">
@@ -39,7 +39,7 @@
                 </ui:VisualElement>
                 <ui:VisualElement class="rune-divider__line"/>
             </ui:VisualElement>
-            <ui:Label text="V0.1 - Prototype" class="version-stamp"/>
+            <ui:Label name="version-label" text="V0.1 - Prototype" class="version-stamp"/>
         </ui:VisualElement>
         <ui:VisualElement name="scrim" class="scrim"/>
         <ui:VisualElement name="dialog-wrap" class="dialog-wrap">

@@ -186,6 +186,8 @@ public class DraggableItem : MonoBehaviour,
 
         _canvasGroup.alpha          = 1f;
         _canvasGroup.blocksRaycasts = true;
+
+        if (Item != null) EquipSlotUI.SetHighlight(Item.slot, false);
     }
 
     // ─── IDropHandler — swap with another inventory slot ─────────────────────
@@ -225,12 +227,17 @@ public class DraggableItem : MonoBehaviour,
 
     public void OnPointerEnter(PointerEventData eventData)
     {
-        if (Item != null) ItemTooltip.Instance?.Show(Item, _rectTransform);
+        if (Item == null || InventoryUI.IsDragging) return;
+        ItemTooltip.Instance?.Show(Item, _rectTransform);
+        EquipSlotUI.SetHighlight(Item.slot, true);
     }
 
     public void OnPointerExit(PointerEventData eventData)
     {
         ItemTooltip.Instance?.Hide();
+        // Keep the slot highlighted while the item is being dragged
+        if (!InventoryUI.IsDragging && Item != null)
+            EquipSlotUI.SetHighlight(Item.slot, false);
     }
 
     private void RefreshEquippedVisual()

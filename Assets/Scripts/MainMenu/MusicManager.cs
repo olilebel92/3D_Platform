@@ -1,13 +1,22 @@
 ﻿using System.Collections;
 using UnityEngine;
+using UnityEngine.SceneManagement;
 
 /// <summary>
 /// Persistent singleton that plays background music across all scenes.
 /// Starts after a 1 second delay with a 2 second fade in.
+/// Fades out and stops when the GameScene is loaded.
 /// Place this on a GameObject in your Menu scene — it will survive scene loads.
 /// </summary>
 public class MusicManager : MonoBehaviour
 {
+    [Header("Stop On Scene")]
+    [Tooltip("Music fades out and stops when this scene is loaded.")]
+    public string stopOnScene = "GameScene";
+
+    [Tooltip("Seconds to fade out before stopping.")]
+    public float fadeOutDuration = 1f;
+
     // ─── Singleton ────────────────────────────────────────────────────────────
 
     public static MusicManager Instance { get; private set; }
@@ -46,6 +55,8 @@ public class MusicManager : MonoBehaviour
         Instance = this;
         transform.SetParent(null);
         DontDestroyOnLoad(gameObject);
+
+        SceneManager.sceneLoaded += OnSceneLoaded;
 
         // Load saved music volume so the fade-in targets the correct level
         volume = PlayerPrefs.GetFloat("vol_music", volume);
@@ -122,5 +133,34 @@ public class MusicManager : MonoBehaviour
         volume = Mathf.Clamp01(value);
         if (_audioSource != null)
             _audioSource.volume = volume;
+    }
+
+    // ─── Scene Handling ───────────────────────────────────────────────────────
+
+    void OnDestroy()
+    {
+        SceneManager.sceneLoaded -= OnSceneLoaded;
+    }
+
+    private void OnSceneLoaded(Scene scene, LoadSceneMode mode)
+    {
+        if (!string.IsNullOrEmpty(stopOnScene) && scene.name == stopOnScene)
+            StartCoroutine(FadeOutAndStop());
+    }
+
+    private IEnumerator FadeOutAndStop()
+    {
+        float startVolume = _audioSource.volume;
+        float elapsed = 0f;
+        while (elapsed < fadeOutDuration)
+        {
+            elapsed += Time.unscaledDeltaTime;
+            _audioSource.volume = Mathf.Lerp(startVolume, 0f, elapsed / fadeOutDuration);
+            yield return null;
+        }
+
+        _audioSource.Stop();
+        _audioSource.volume = 0f;
+        Debug.Log("[MusicManager] Music stopped for GameScene.");
     }
 }

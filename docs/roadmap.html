@@ -231,33 +231,46 @@
     <div class="cl-entry">
       <div class="cl-header">
         <div class="cl-version">V0.2</div>
-        <div><div class="cl-title">Spells, Skill Tree &amp; Polish</div><span class="status-badge badge-active">In Progress</span></div>
-        <div class="cl-date">April 2026 — In Progress</div>
+        <div><div class="cl-title">Spells, Skill Tree &amp; Polish</div><span class="status-badge badge-completed">Completed</span></div>
+        <div class="cl-date">May 8, 2026</div>
       </div>
-      <div class="cl-section-title">Spells</div>
+      <div class="cl-section-title">Spells &amp; Combat</div>
       <ul class="cl-list">
         <li>HealingWave — AoE heal spell, server-authoritative, SpellData asset + runtime</li>
-        <li>StatusEffectHandler — stun system; stun blocks casts and movement; highest-value-wins (no stacking)</li>
-        <li>PlayerNameTag — world-space TMP billboard, NGO-synced to LobbyPlayer.PlayerName</li>
-        <li>DebugLogger — in-game dev log overlay</li>
+        <li>StatusEffectHandler — stun system; blocks casts and movement; highest-value-wins (no stacking)</li>
+        <li>Chain lightning walk-to-cast — WalkingToTarget state auto-walks player to out-of-range targets; right-click cancel</li>
+        <li>Chain count scales per skill rank (chainCountPerRank) — upgrading node gives more bounces</li>
+        <li>Enemy stun on attack — configurable chance + duration; stun VFX spawn/clear on apply and expire</li>
+        <li>Melee blocked during active spell cast; cast range ring via TelegraphProjector</li>
       </ul>
       <div class="cl-section-title">Skill Tree</div>
       <ul class="cl-list">
         <li>SkillTreeNode: multi-level support (maxLevel, scalingFactor) — nodes can be leveled up multiple times</li>
-        <li>New stat bonuses: STR/AGI/INT flat per level; spell/fire/heal damage percent bonuses</li>
-        <li>SkillTreeManager: aggregates all per-stat totals; _nodeLevels Dictionary; Awake panel-hide</li>
+        <li>Stat bonuses: STR/AGI/INT flat per level; spell/fire/heal damage percent bonuses; HP and HP regen bonuses</li>
+        <li>SkillTreeConnectorUI — connector line renderer for skill tree UI</li>
+        <li>Passive nodes: HP.asset and Stats.asset with icons</li>
+        <li>SkillTreeManager aggregates all per-stat totals including HP and regen; applied to player via ExperienceManager</li>
       </ul>
-      <div class="cl-section-title">Wave &amp; Player Systems</div>
+      <div class="cl-section-title">Wave, Player &amp; Systems</div>
       <ul class="cl-list">
         <li>WaveManager: WaveRewardEntry — per-wave custom item drops; RegisterPlayer() fixes MP spawn-order race</li>
         <li>PlayerController.All — static registry, GC-free alternative to FindGameObjectsWithTag</li>
         <li>PlayerController: IsSprinting / CancelSprint() for spell-cast interaction; cast momentum carry-through</li>
-        <li>ExperienceManager: InitializeStartingLevel() for inspector testing; SyncMaxHealthToServer()</li>
+        <li>PlayerNameTag — world-space TMP billboard, NGO-synced to LobbyPlayer.PlayerName</li>
+        <li>Thor armor set — Chest, Helm, Pants, Boots ScriptableObjects + leather icons</li>
+      </ul>
+      <div class="cl-section-title">Performance</div>
+      <ul class="cl-list">
+        <li>ChainLightning: per-jump GC alloc eliminated via static NonAlloc buffer</li>
+        <li>IsoCursorAim: ~120 allocs/sec saved at 60Hz — NonAlloc raycast + O(n) best-dist scan</li>
+        <li>WaveManager: all FindGameObjectsWithTag replaced with PlayerController.All</li>
+        <li>Shader preload via ShaderVariantCollection — eliminates first-cast hitch</li>
       </ul>
       <div class="cl-section-title">Settings &amp; Debug</div>
       <ul class="cl-list">
         <li>SettingsManager + SettingsUI — master &amp; music volume sliders, persisted via PlayerPrefs</li>
         <li>UI_FPSCounter — F3 toggle overlay showing smoothed FPS, ms, and memory usage</li>
+        <li>DebugLogger — in-game dev log overlay</li>
       </ul>
     </div>
 
@@ -400,10 +413,9 @@ const VERSIONS = [
    details:["SceneTransitionManager: full refactor supporting both uGUI and UI Toolkit; new FadeOutThen / FadeIn / LoadSceneAlreadyFaded API with configurable fadeInDelay","LobbyManager: wired SoundManager.PlayUI() on all button callbacks; scene loads now use FadeOutThen for smooth transitions","MainMenuManager: host startup wrapped in FadeOutThen callback","ExperienceManager: guard SyncMaxHealthServerRpc with IsOwner check to prevent non-owner RPCs","EnemyReward: fix drop spawning during Editor stop-play teardown via _appIsQuitting flag","CursorManager: switch to CursorMode.Auto","PlayMode: replace placeholder scenario with 2-Players test scenario","Regenerated Cinzel + JetBrains Mono SDF font atlases"],
    note:null},
 
-    {
-        version: "V0.2", title: "Spells, Skill Tree & Polish", status:"active",quarter:"Q2 2026",date:"In Progress — April 2026",phase:"p1",loop:null,
-   bullets:["HealingWave spell + stun system","Skill tree multi-level nodes with stat bonuses","Settings panel, FPS overlay, wave custom rewards"],
-   details:["HealingWave — AoE heal spell, server-authoritative, SpellData asset + runtime","StatusEffectHandler — stun system; stun blocks casts and movement; highest-value-wins","PlayerNameTag — world-space TMP billboard, NGO-synced to LobbyPlayer.PlayerName","SkillTreeNode: multi-level support (maxLevel, scalingFactor); STR/AGI/INT flat bonuses; spell/fire/heal % bonuses","WaveManager WaveRewardEntry — per-wave custom item drops; RegisterPlayer() fixes MP spawn-order race","PlayerController.All — static registry, GC-free alternative to FindGameObjectsWithTag","PlayerController: IsSprinting / CancelSprint() for spell-cast interaction; cast momentum carry-through","ExperienceManager: InitializeStartingLevel() for inspector testing; SyncMaxHealthToServer()","SettingsManager + SettingsUI — master & music volume sliders, persisted via PlayerPrefs","UI_FPSCounter — F3 toggle overlay showing smoothed FPS, ms, and memory usage"],
+    {version:"V0.2", title: "Spells, Skill Tree & Polish", status:"completed",quarter:"Q2 2026",date:"May 8, 2026",phase:"p1",loop:null,
+   bullets:["HealingWave spell + stun system","Skill tree multi-level nodes with HP/regen/stat bonuses","Chain lightning walk-to-cast + rank scaling, enemy stun","Settings panel, FPS overlay, wave custom rewards, Thor armor set"],
+   details:["HealingWave — AoE heal spell, server-authoritative, SpellData asset + runtime","StatusEffectHandler — stun system; stun blocks casts and movement; highest-value-wins","Chain lightning walk-to-cast: WalkingToTarget state auto-walks player to out-of-range targets","Chain count scales per skill rank (chainCountPerRank) — upgrading node gives more bounces","Enemy stun on attack — configurable chance + duration; stun VFX spawn/clear on apply and expire","SkillTreeNode: multi-level support (maxLevel, scalingFactor); STR/AGI/INT flat bonuses; spell/fire/heal % bonuses; HP and HP regen bonuses","SkillTreeConnectorUI — connector line renderer for skill tree UI; passive HP and Stats nodes added","PlayerNameTag — world-space TMP billboard, NGO-synced to LobbyPlayer.PlayerName","WaveManager WaveRewardEntry — per-wave custom item drops; RegisterPlayer() fixes MP spawn-order race","PlayerController.All — static registry, GC-free alternative to FindGameObjectsWithTag; cast momentum carry-through","SettingsManager + SettingsUI — master & music volume sliders, persisted via PlayerPrefs","UI_FPSCounter — F3 toggle overlay showing smoothed FPS, ms, and memory usage","Thor armor set — Chest, Helm, Pants, Boots ScriptableObjects + leather icons","GC pass — NonAlloc raycasts, static ChainLightning buffer, ~120 allocs/sec saved in IsoCursorAim","Shader preload via ShaderVariantCollection — eliminates first-cast hitch"],
    note:null},
 
   {version:"V0.25",title:"Combat Sync",status:"planned",quarter:"Q2 2026",date:"Est. May – Jun 2026",phase:"p2",loop:null,

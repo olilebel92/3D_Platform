@@ -21,7 +21,9 @@ public class MainMenuManager : MonoBehaviour
 
     [Header("UI")]
     [SerializeField] UIDocument document;
-    [SerializeField] string gameTitleString = "HACKNSLASH";
+    [SerializeField] string gameTitleString    = "HACKNSLASH";
+    [SerializeField] string subtitleString     = "";
+    [SerializeField] string versionString      = "v0.0";
     [SerializeField] DevLog devLog;
 
     [Header("UI Sounds")]
@@ -73,6 +75,13 @@ public class MainMenuManager : MonoBehaviour
         dialogWrap    = root.Q("dialog-wrap");
 
         root.Q<Label>("title-label").text = gameTitleString;
+
+        var subtitleLabel = root.Q<Label>("subtitle-label");
+        if (subtitleLabel != null) subtitleLabel.text = subtitleString;
+
+        var versionLabel = root.Q<Label>("version-label");
+        if (versionLabel != null) versionLabel.text = versionString;
+
         waitingLabel = root.Q<Label>("waiting-label");
         ipField      = root.Q<TextField>("ip-field");
 

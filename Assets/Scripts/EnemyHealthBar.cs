@@ -42,7 +42,7 @@ public class EnemyHealthBar : MonoBehaviour
     private Camera       _cam;
     private float        _hideTimer;
     private bool         _networked;
-    private int          _lastHealth;
+    private float        _lastHealth;
 
     // ─── Unity Lifecycle ──────────────────────────────────────────────────────
 
@@ -88,7 +88,7 @@ public class EnemyHealthBar : MonoBehaviour
         // Compare currentHealth against the last known value each frame.
         if (!_networked)
         {
-            int current = _health.currentHealth;
+            float current = _health.currentHealth;
             if (current != _lastHealth)
             {
                 ShowDamage(_lastHealth, current, _health.maxHealth);
@@ -117,15 +117,15 @@ public class EnemyHealthBar : MonoBehaviour
 
     // ─── Callbacks ────────────────────────────────────────────────────────────
 
-    private void OnNetworkHealthChanged(int prev, int current)
+    private void OnNetworkHealthChanged(float prev, float current)
     {
         ShowDamage(prev, current, _ai.NetworkMaxHealth.Value);
     }
 
-    private void ShowDamage(int prev, int current, int max)
+    private void ShowDamage(float prev, float current, float max)
     {
         if (_fillImage != null && max > 0)
-            _fillImage.fillAmount = (float)current / max;
+            _fillImage.fillAmount = current / max;
 
         // Only reveal the bar on actual damage (current < prev).
         // This prevents it from flashing on spawn when health initialises 0 → max.

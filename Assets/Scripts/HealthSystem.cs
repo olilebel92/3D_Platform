@@ -6,8 +6,8 @@ public class HealthSystem : MonoBehaviour
 {
     // ─── Health Settings ──────────────────────────────────────────────────────
     [Header("Health Settings")]
-    public int maxHealth = 5;
-    public int currentHealth;
+    public float maxHealth = 5;
+    public float currentHealth;
 
     [Tooltip("Base HP restored per second (server-side only). Stacks with equipment regen.")]
     [SerializeField] private float regenPerSecond = 1f;
@@ -42,7 +42,7 @@ public class HealthSystem : MonoBehaviour
     // ─── Private State ────────────────────────────────────────────────────────
 
     /// <summary>HP from the Inspector + all STR level-up spends. Never includes equipment.</summary>
-    private int _permanentMaxHealth;
+    private float _permanentMaxHealth;
 
     private bool _isDead = false;
     private PlayerInventory _inventory;
@@ -109,12 +109,12 @@ public class HealthSystem : MonoBehaviour
     /// Use this from server-authoritative callers (e.g. HealingWave) that send a
     /// targeted ClientRpc to show the popup on the correct client instead.
     /// </param>
-    public void Heal(int amount, bool suppressPopup = false)
+    public void Heal(float amount, bool suppressPopup = false)
     {
-        int before = currentHealth;
+        float before = currentHealth;
         currentHealth += amount;
         currentHealth = Mathf.Clamp(currentHealth, 0, maxHealth);
-        int gained = currentHealth - before;
+        float gained = currentHealth - before;
 
         // Revive dead state — happens when the respawn flow heals the player back
         // above 0. Without this, _isDead stays true after respawn and all subsequent
@@ -129,11 +129,11 @@ public class HealthSystem : MonoBehaviour
                 $"{gameObject.name} healed +{gained} — HP: {currentHealth}/{maxHealth}");
 
         if (gained > 0 && !suppressPopup && DamagePopupManager.Instance != null)
-            DamagePopupManager.Instance.ShowHeal(transform.position, gained);
+            DamagePopupManager.Instance.ShowHeal(transform.position, Mathf.RoundToInt(gained));
     }
 
     /// <summary>Permanently increases max HP (called when spending a STR stat point). Does NOT heal current HP.</summary>
-    public void IncreaseMaxHealth(int amount)
+    public void IncreaseMaxHealth(float amount)
     {
         _permanentMaxHealth += amount;
         maxHealth           += amount;
@@ -146,10 +146,10 @@ public class HealthSystem : MonoBehaviour
     /// Recalculates max HP from equipment STR bonus. Called whenever inventory changes.
     /// Does NOT permanently change HP — unequipping restores the previous max.
     /// </summary>
-    public void ApplyEquipmentHP(int equipmentBonus)
+    public void ApplyEquipmentHP(float equipmentBonus)
     {
-        int newMax = _permanentMaxHealth + equipmentBonus;
-        maxHealth  = newMax;
+        float newMax = _permanentMaxHealth + equipmentBonus;
+        maxHealth    = newMax;
 
         // Only clamp down if current HP now exceeds the new max (e.g. unequipping a high-HP item)
         currentHealth = Mathf.Clamp(currentHealth, 1, maxHealth);
@@ -208,9 +208,9 @@ public class HealthSystem : MonoBehaviour
     void UpdateHealthUI()
     {
         if (healthText != null)
-            healthText.text = "HP: " + currentHealth + "/" + maxHealth;
+            healthText.text = $"HP: {currentHealth:0.#}/{maxHealth:0}";
 
         if (hpBarFill != null)
-            hpBarFill.fillAmount = (float)currentHealth / maxHealth;
+            hpBarFill.fillAmount = currentHealth / maxHealth;
     }
 }

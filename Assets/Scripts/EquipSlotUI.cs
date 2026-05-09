@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.EventSystems;
 using UnityEngine.UI;
@@ -30,6 +31,26 @@ public class EquipSlotUI : MonoBehaviour, IDropHandler, IPointerEnterHandler, IP
     public Color equippedColor = Color.white;
     public Color hoverColor    = new Color(0.8f, 1f, 0.8f, 1f);
 
+    // ─── Static Registry ──────────────────────────────────────────────────────
+
+    private static readonly Dictionary<EquipmentSlot, EquipSlotUI> _registry = new();
+
+    /// <summary>Highlight (or clear) the equip slot that matches the given slot type.</summary>
+    public static void SetHighlight(EquipmentSlot slot, bool on)
+    {
+        if (_registry.TryGetValue(slot, out var ui))
+            ui.SetHighlightInternal(on);
+    }
+
+    private void SetHighlightInternal(bool on)
+    {
+        if (slotIconImage == null) return;
+        if (on)
+            slotIconImage.color = hoverColor;
+        else
+            Refresh();  // restores correct empty/equipped colour
+    }
+
     // ─── Unity Lifecycle ──────────────────────────────────────────────────────
 
     // Tracks which inventory we are currently subscribed to so we can cleanly unsub.
@@ -37,6 +58,8 @@ public class EquipSlotUI : MonoBehaviour, IDropHandler, IPointerEnterHandler, IP
 
     void Start()
     {
+        _registry[slotType] = this;
+
         if (unequipButton != null)
         {
             unequipButton.onClick.AddListener(OnUnequip);
@@ -71,6 +94,9 @@ public class EquipSlotUI : MonoBehaviour, IDropHandler, IPointerEnterHandler, IP
     {
         if (_subscribedInventory != null)
             _subscribedInventory.OnInventoryChanged -= Refresh;
+
+        if (_registry.TryGetValue(slotType, out var registered) && registered == this)
+            _registry.Remove(slotType);
     }
 
     // ─── IDropHandler ─────────────────────────────────────────────────────────
