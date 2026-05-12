@@ -178,10 +178,10 @@ Shader "Toon Shaders Pro/URP/Toon"
             }
 
             void frag(
-				v2f i, 
+				v2f i,
 				out float4 outColor : SV_Target0
 #ifdef _WRITE_RENDERING_LAYERS
-				, out float4 outRenderingLayers : SV_Target1
+				, out uint outRenderingLayers : SV_Target1
 #endif
 			)
             {
@@ -299,9 +299,9 @@ Shader "Toon Shaders Pro/URP/Toon"
             	baseColor.a = OutputAlpha(baseColor.a, IsSurfaceTypeTransparent(_Surface));
 
                 outColor = baseColor;
-            	
+
 #ifdef _WRITE_RENDERING_LAYERS
-				outRenderingLayers = float4(EncodeMeshRenderingLayer(), 0, 0, 0);
+				outRenderingLayers = EncodeMeshRenderingLayer();
 #endif
             }
 
@@ -541,7 +541,7 @@ Shader "Toon Shaders Pro/URP/Toon"
 				v2f i,
 				out float4 outNormalWS : SV_Target0
 			#ifdef _WRITE_RENDERING_LAYERS
-			    , out float4 outRenderingLayers : SV_Target1
+			    , out uint outRenderingLayers : SV_Target1
 			#endif
 			)
             {
@@ -570,9 +570,9 @@ Shader "Toon Shaders Pro/URP/Toon"
 
                 // Draw the mesh's normals in world space to the output texture.
 	            outNormalWS = float4(NormalizeNormalPerPixel(normalWS), 0.0f);
-            	
+
 #ifdef _WRITE_RENDERING_LAYERS
-				outRenderingLayers = float4(EncodeMeshRenderingLayer(), 0, 0, 0);
+				outRenderingLayers = EncodeMeshRenderingLayer();
 #endif
             }
             ENDHLSL

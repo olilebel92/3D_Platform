@@ -1,0 +1,119 @@
+using System.Reflection;
+using UnityEngine;
+using UnityEngine.InputSystem;
+
+/// <summary>
+/// Debug-only cheat tool. Attach to the Player GameObject.
+/// Press 0 in Play Mode to toggle, or right-click → "Enable God Mode".
+/// Assign all SpellData assets to the Spells list in the Inspector.
+/// </summary>
+public class GodMode : MonoBehaviour
+{
+    [Header("God Mode Settings")]
+    [SerializeField] private float _godHP = 50000f;
+    [SerializeField] private int _godSkillPoints = 999;
+
+    [Header("Spells to Equip")]
+    [Tooltip("Drag all SpellData assets here (up to 10 slots).")]
+    [SerializeField] private SpellData[] _spells;
+
+    // ─── Cached refs ───
+
+    private HealthSystem _health;
+    private bool _isActive;
+
+    private void Start()
+    {
+        _health = GetComponent<HealthSystem>();
+    }
+
+    private void Update()
+    {
+        if (Keyboard.current[Key.Digit0].wasPressedThisFrame)
+            Toggle();
+    }
+
+    // ─── Context Menu (play mode only) ───
+
+    [ContextMenu("Enable God Mode")]
+    public void EnableGodMode()
+    {
+        if (!Application.isPlaying) { Debug.LogWarning("[GodMode] Only usable in Play Mode."); return; }
+        ApplyHP();
+        ApplySkillPoints();
+        ApplySpells();
+        _isActive = true;
+        Debug.Log($"[GodMode] ENABLED — HP {_godHP}, {_godSkillPoints} skill points, {_spells?.Length ?? 0} spells equipped.");
+    }
+
+    [ContextMenu("Disable God Mode")]
+    public void DisableGodMode()
+    {
+        if (!Application.isPlaying) { Debug.LogWarning("[GodMode] Only usable in Play Mode."); return; }
+        _isActive = false;
+        Debug.Log("[GodMode] Disabled.");
+    }
+
+    // ─── Private Helpers ───
+
+    private void Toggle()
+    {
+        if (_isActive)
+            DisableGodMode();
+        else
+            EnableGodMode();
+    }
+
+    private void ApplyHP()
+    {
+        if (_health == null)
+        {
+            _health = GetComponent<HealthSystem>();
+            if (_health == null) { Debug.LogWarning("[GodMode] HealthSystem not found on this GameObject."); return; }
+        }
+
+        // Patch the private backing field so ApplyEquipmentHP won't reset us
+        FieldInfo permanentField = typeof(HealthSystem).GetField(
+            "_permanentMaxHealth",
+            BindingFlags.NonPublic | BindingFlags.Instance);
+        permanentField?.SetValue(_health, _godHP);
+
+        _health.maxHealth = _godHP;
+        _health.currentHealth = _godHP;
+        _health.RefreshUI();
+    }
+
+    private void ApplySkillPoints()
+    {
+        if (SkillTreeManager.Instance == null)
+        {
+            Debug.LogWarning("[GodMode] SkillTreeManager.Instance is null — skill points not applied.");
+            return;
+        }
+
+        for (int i = 0; i < _godSkillPoints; i++)
+            SkillTreeManager.Instance.AddSkillPoint();
+    }
+
+    private void ApplySpells()
+    {
+        if (SpellBarManager.Instance == null)
+        {
+            Debug.LogWarning("[GodMode] SpellBarManager.Instance is null — spells not applied.");
+            return;
+        }
+
+        if (_spells == null || _spells.Length == 0)
+        {
+            Debug.LogWarning("[GodMode] No spells assigned. Drag SpellData assets into the Spells list.");
+            return;
+        }
+
+        int count = Mathf.Min(_spells.Length, 10);
+        for (int i = 0; i < count; i++)
+        {
+            if (_spells[i] != null)
+                SpellBarManager.Instance.SetSpell(i, _spells[i]);
+        }
+    }
+}

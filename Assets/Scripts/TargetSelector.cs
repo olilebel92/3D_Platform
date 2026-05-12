@@ -9,7 +9,10 @@ using UnityEngine.InputSystem;
 /// Left-clicking confirms the target. Escape cancels.
 ///
 /// Glow is applied via MaterialPropertyBlock — no material instances are created.
-/// Requires emission to be enabled on the enemy material (_EMISSION keyword).
+/// On hover, overrides _RimColor + _RimExtension + _RimThresholds on every child
+/// renderer so that the toon shader's rim term lights up the full silhouette
+/// regardless of the material's authored rim settings. On un-hover, the property
+/// block is cleared with SetPropertyBlock(null) to revert all overrides.
 ///
 /// Multiplayer: disabled on non-owner clients via OnNetworkSpawn.
 /// Singleplayer: active immediately via Start().
@@ -21,11 +24,15 @@ public class TargetSelector : NetworkBehaviour
     [SerializeField] private LayerMask _targetLayerMask = ~0;
 
     [Header("Glow")]
-    [Tooltip("Emission color applied to an enemy while hovering over it.")]
+    [Tooltip("Highlight color applied to an enemy while hovering over it. Drives the toon shader's _RimColor.")]
     [SerializeField] private Color _hoverGlowColor    = new Color(0.4f, 0.8f, 1f);
 
     [Tooltip("Intensity multiplier for the hover glow (higher = brighter).")]
     [SerializeField] private float _hoverGlowIntensity = 2f;
+
+    private static readonly int RimColorId      = Shader.PropertyToID("_RimColor");
+    private static readonly int RimExtensionId  = Shader.PropertyToID("_RimExtension");
+    private static readonly int RimThresholdsId = Shader.PropertyToID("_RimThresholds");
 
     // ─── Public State ─────────────────────────────────────────────────────────
 
@@ -170,12 +177,19 @@ public class TargetSelector : NetworkBehaviour
 
     // ─── Glow ─────────────────────────────────────────────────────────────────
 
-    void SetGlow(Transform target, Color emissionColor)
+    void SetGlow(Transform target, Color highlight)
     {
+        // Force the toon shader's rim term visible across the whole silhouette:
+        //   rimAmount = (1 - NoV) * saturate(rawDiffuseAmount + _RimExtension)
+        //   rimAmount = smoothstep(_RimThresholds.x, _RimThresholds.y, rimAmount)
+        // _RimExtension = 1 makes the diffuse-side gating evaluate to 1 everywhere,
+        // and _RimThresholds = (0, 1) gives a smooth (1 - NoV) falloff.
         foreach (Renderer rend in target.GetComponentsInChildren<Renderer>())
         {
             rend.GetPropertyBlock(_propBlock);
-            _propBlock.SetColor("_EmissionColor", emissionColor);
+            _propBlock.SetColor(RimColorId,      highlight);
+            _propBlock.SetFloat(RimExtensionId,  1f);
+            _propBlock.SetVector(RimThresholdsId, new Vector4(0f, 1f, 0f, 0f));
             rend.SetPropertyBlock(_propBlock);
         }
     }
@@ -184,10 +198,6 @@ public class TargetSelector : NetworkBehaviour
     {
         if (target == null) return;
         foreach (Renderer rend in target.GetComponentsInChildren<Renderer>())
-        {
-            rend.GetPropertyBlock(_propBlock);
-            _propBlock.SetColor("_EmissionColor", Color.black);
-            rend.SetPropertyBlock(_propBlock);
-        }
+            rend.SetPropertyBlock(null);
     }
 }

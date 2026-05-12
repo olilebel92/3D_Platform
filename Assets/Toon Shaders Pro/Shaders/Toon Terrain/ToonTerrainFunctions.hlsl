@@ -3,13 +3,10 @@
 
 #include "Packages/com.unity.render-pipelines.universal/ShaderLibrary/Lighting.hlsl"
 
-#if UNITY_VERSION < 60020000
-float EncodeMeshRenderingLayer()
-{
-    uint renderingLayers = GetMeshRenderingLayer();
-    return EncodeMeshRenderingLayer(renderingLayers);
-}
-#endif
+// Local patch: removed wrong-version EncodeMeshRenderingLayer override.
+// URP 17.3 already provides a uint-returning version; the override produced
+// a float that got bit-reinterpreted into the R32_UInt rendering-layers texture
+// and broke DecalProjector rendering-layer filtering.
 
 // BRDF functions derived from Unity's BRDF.hlsl.
 

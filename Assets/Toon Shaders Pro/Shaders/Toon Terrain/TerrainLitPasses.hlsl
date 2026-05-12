@@ -401,7 +401,7 @@ void ComputeMasks(out half4 masks[4], half4 hasMask, Varyings IN)
 // Terrain fragment shader.
 void SplatmapFragment(Varyings i , out half4 outColor : SV_Target0
 #ifdef _WRITE_RENDERING_LAYERS
-    , out float4 outRenderingLayers : SV_Target1
+    , out uint outRenderingLayers : SV_Target1
 #endif
     )
 {
@@ -530,7 +530,7 @@ void SplatmapFragment(Varyings i , out half4 outColor : SV_Target0
     outColor = half4(baseColor.rgb, 1.0h);
 
 #ifdef _WRITE_RENDERING_LAYERS
-    outRenderingLayers = float4(EncodeMeshRenderingLayer(), 0, 0, 0);
+    outRenderingLayers = EncodeMeshRenderingLayer();
 #endif
 }
 

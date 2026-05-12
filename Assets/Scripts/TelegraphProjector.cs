@@ -36,8 +36,8 @@ public class TelegraphProjector : MonoBehaviour
     [Header("Rendering Layer")]
     [Tooltip("URP Rendering Layer Mask that the decal projects onto. " +
              "Set this to match the Rendering Layer assigned to your ground/terrain meshes only. " +
-             "Default (1) = 'Default' rendering layer — change to your dedicated Ground layer bit.")]
-    [SerializeField] private uint groundRenderingLayerMask = 1;
+             "Pick the dedicated Ground layer — leaving 'Default' selected projects onto everything.")]
+    [SerializeField] private RenderingLayerMask groundRenderingLayerMask = 1;
 
     [Header("Ground Snap")]
     [Tooltip("Physics layer mask used to snap the projector to ground level when the caster is airborne.")]
@@ -170,8 +170,9 @@ public class TelegraphProjector : MonoBehaviour
         if (_rangeMat.HasProperty("_BaseMap"))      { _rangeMat.SetTexture("_BaseMap",      _rangeTexture); set = true; }
         if (!set) _rangeMat.mainTexture = _rangeTexture;
 
-        _rangeDecalProjector.material           = _rangeMat;
+        // Set rendering layer BEFORE material — see RebuildDecal() for why.
         _rangeDecalProjector.renderingLayerMask = groundRenderingLayerMask;
+        _rangeDecalProjector.material           = _rangeMat;
 
         float d = radius * 2f;
         _rangeProjectorGO.transform.position = new Vector3(
@@ -314,8 +315,12 @@ public class TelegraphProjector : MonoBehaviour
         if (_activeMat.HasProperty("_BaseMap"))      { _activeMat.SetTexture("_BaseMap",      _activeTexture); set = true; }
         if (!set) _activeMat.mainTexture = _activeTexture;
 
-        _decalProjector.material           = _activeMat;
+        // URP quirk: DecalProjector.renderingLayerMask setter does NOT call OnValidate,
+        // so the cached entity mask only updates when something else (material change)
+        // triggers re-registration. Set the mask FIRST so the material-change handler
+        // re-registers with the correct value — otherwise decals bleed onto every layer.
         _decalProjector.renderingLayerMask = groundRenderingLayerMask;
+        _decalProjector.material           = _activeMat;
 
         UpdateProjectorTransform();
     }
