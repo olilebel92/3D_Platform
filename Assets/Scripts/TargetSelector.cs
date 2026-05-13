@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using Unity.Netcode;
 using UnityEngine;
 using UnityEngine.InputSystem;
@@ -5,27 +6,43 @@ using UnityEngine.InputSystem;
 /// <summary>
 /// Manages enemy target selection for TargetLocked spells.
 ///
-/// Hovering over an enemy during targeting mode makes it glow (hover color).
-/// Left-clicking confirms the target. Escape cancels.
+/// Three hover modes selectable from the Inspector:
+///   Outline          — adds a HackNSLASH/TargetOutline material pass to the enemy's
+///                      renderers. Uses smooth normals (averaged per vertex position,
+///                      baked into UV2 on first hover) so hard-edge meshes have no
+///                      corner gaps, and the Y-clamp in the shader prevents underground.
+///   RimGlow          — overrides _RimColor/_RimExtension/_RimThresholds via
+///                      MaterialPropertyBlock for a full-surface rim glow.
+///   OutlineAndRimGlow — both effects simultaneously.
 ///
-/// Glow is applied via MaterialPropertyBlock — no material instances are created.
-/// On hover, overrides _RimColor + _RimExtension + _RimThresholds on every child
-/// renderer so that the toon shader's rim term lights up the full silhouette
-/// regardless of the material's authored rim settings. On un-hover, the property
-/// block is cleared with SetPropertyBlock(null) to revert all overrides.
+/// Smooth-normal meshes are cached statically per original mesh so the bake only
+/// runs once per unique mesh across the lifetime of the session.
 ///
 /// Multiplayer: disabled on non-owner clients via OnNetworkSpawn.
 /// Singleplayer: active immediately via Start().
 /// </summary>
 public class TargetSelector : NetworkBehaviour
 {
+    public enum HoverMode { Outline, RimGlow, OutlineAndRimGlow }
+
     [Header("Targeting")]
     [Tooltip("Layer mask for target-selection raycasts. Restrict to enemy layers to avoid false hits.")]
     [SerializeField] private LayerMask _targetLayerMask = ~0;
 
-    [Header("Glow")]
+    [Header("Hover Mode")]
+    [Tooltip("Outline: clean hull outline via a custom shader.\nRimGlow: full-surface rim glow.\nOutlineAndRimGlow: both simultaneously.")]
+    [SerializeField] private HoverMode _hoverMode = HoverMode.Outline;
+
+    [Header("Outline")]
+    [Tooltip("Outline color applied to an enemy while hovering over it.")]
+    [SerializeField] private Color _outlineColor = Color.red;
+
+    [Tooltip("Outline thickness in world units.")]
+    [SerializeField] private float _outlineThickness = 0.03f;
+
+    [Header("Rim Glow")]
     [Tooltip("Highlight color applied to an enemy while hovering over it. Drives the toon shader's _RimColor.")]
-    [SerializeField] private Color _hoverGlowColor    = new Color(0.4f, 0.8f, 1f);
+    [SerializeField] private Color _hoverGlowColor = new Color(0.4f, 0.8f, 1f);
 
     [Tooltip("Intensity multiplier for the hover glow (higher = brighter).")]
     [SerializeField] private float _hoverGlowIntensity = 2f;
@@ -53,15 +70,20 @@ public class TargetSelector : NetworkBehaviour
 
     // ─── Private State ────────────────────────────────────────────────────────
 
-    private Transform            _hoveredTarget;
+    private Transform             _hoveredTarget;
+    private Material              _outlineMat;
     private MaterialPropertyBlock _propBlock;
+
+    // Smooth-normal meshes cached by original mesh instance ID — static so baking
+    // runs once per unique mesh across the whole session.
+    private static readonly Dictionary<int, Mesh> s_smoothMeshCache = new();
 
     // ─── NGO Lifecycle ────────────────────────────────────────────────────────
 
     public override void OnNetworkSpawn()
     {
         if (!IsOwner) { enabled = false; return; }
-        _propBlock = new MaterialPropertyBlock();
+        Init();
     }
 
     // ─── Singleplayer Fallback ────────────────────────────────────────────────
@@ -69,7 +91,23 @@ public class TargetSelector : NetworkBehaviour
     void Start()
     {
         bool networkActive = NetworkManager.Singleton != null && NetworkManager.Singleton.IsListening;
-        if (!networkActive) _propBlock = new MaterialPropertyBlock();
+        if (!networkActive) Init();
+    }
+
+    void Init()
+    {
+        _propBlock = new MaterialPropertyBlock();
+
+        var shader = Shader.Find("HackNSLASH/TargetOutline");
+        if (shader == null)
+            Debug.LogWarning("[TargetSelector] HackNSLASH/TargetOutline shader not found — outline disabled.");
+        else
+            _outlineMat = new Material(shader);
+    }
+
+    void OnDestroy()
+    {
+        if (_outlineMat != null) Destroy(_outlineMat);
     }
 
     // ─── Update ───────────────────────────────────────────────────────────────
@@ -95,16 +133,14 @@ public class TargetSelector : NetworkBehaviour
         Transform newHover = GetEnemyUnderCursor();
         if (newHover == _hoveredTarget) return;
 
-        // Clear glow on previous hover
         if (_hoveredTarget != null)
-            ClearGlow(_hoveredTarget);
+            ClearHover(_hoveredTarget);
 
         _hoveredTarget = newHover;
 
-        // Apply glow + cursor on new hover
         if (_hoveredTarget != null)
         {
-            SetGlow(_hoveredTarget, _hoverGlowColor * _hoverGlowIntensity);
+            ApplyHover(_hoveredTarget);
             CursorManager.Instance?.ApplyEnemyHover();
         }
         else
@@ -124,12 +160,12 @@ public class TargetSelector : NetworkBehaviour
         Debug.Log("[TargetSelector] Awaiting target — left-click an enemy.");
     }
 
-    /// <summary>Exits targeting mode and clears glow + selection.</summary>
+    /// <summary>Exits targeting mode and clears hover effect + selection.</summary>
     public void CancelTargeting()
     {
         if (!IsTargeting) return;
         IsTargeting = false;
-        if (_hoveredTarget != null) { ClearGlow(_hoveredTarget); _hoveredTarget = null; }
+        if (_hoveredTarget != null) { ClearHover(_hoveredTarget); _hoveredTarget = null; }
         ClearTarget();
         CursorManager.Instance?.ApplyDefault();
         OnTargetingCancelled?.Invoke();
@@ -149,7 +185,7 @@ public class TargetSelector : NetworkBehaviour
     {
         if (_hoveredTarget == null) return;
 
-        ClearGlow(_hoveredTarget);
+        ClearHover(_hoveredTarget);
 
         SelectedTarget = _hoveredTarget;
         _hoveredTarget = null;
@@ -175,26 +211,130 @@ public class TargetSelector : NetworkBehaviour
         return t;
     }
 
-    // ─── Glow ─────────────────────────────────────────────────────────────────
+    // ─── Hover Dispatch ───────────────────────────────────────────────────────
 
-    void SetGlow(Transform target, Color highlight)
+    void ApplyHover(Transform target)
     {
-        // Force the toon shader's rim term visible across the whole silhouette:
-        //   rimAmount = (1 - NoV) * saturate(rawDiffuseAmount + _RimExtension)
-        //   rimAmount = smoothstep(_RimThresholds.x, _RimThresholds.y, rimAmount)
-        // _RimExtension = 1 makes the diffuse-side gating evaluate to 1 everywhere,
-        // and _RimThresholds = (0, 1) gives a smooth (1 - NoV) falloff.
+        if (_hoverMode == HoverMode.Outline || _hoverMode == HoverMode.OutlineAndRimGlow)
+            SetOutline(target);
+        if (_hoverMode == HoverMode.RimGlow || _hoverMode == HoverMode.OutlineAndRimGlow)
+            SetRimGlow(target, _hoverGlowColor * _hoverGlowIntensity);
+    }
+
+    void ClearHover(Transform target)
+    {
+        if (_hoverMode == HoverMode.Outline || _hoverMode == HoverMode.OutlineAndRimGlow)
+            ClearOutline(target);
+        if (_hoverMode == HoverMode.RimGlow || _hoverMode == HoverMode.OutlineAndRimGlow)
+            ClearRimGlow(target);
+    }
+
+    // ─── Outline ──────────────────────────────────────────────────────────────
+
+    void SetOutline(Transform target)
+    {
+        if (_outlineMat == null) return;
+        _outlineMat.SetColor("_OutlineColor", _outlineColor);
+        _outlineMat.SetFloat("_OutlineThickness", _outlineThickness);
+
+        foreach (Renderer rend in target.GetComponentsInChildren<Renderer>())
+        {
+            EnsureSmoothNormals(rend);
+
+            var mats = rend.sharedMaterials;
+            var withOutline = new Material[mats.Length + 1];
+            mats.CopyTo(withOutline, 0);
+            withOutline[mats.Length] = _outlineMat;
+            rend.sharedMaterials = withOutline;
+        }
+    }
+
+    void ClearOutline(Transform target)
+    {
+        if (target == null) return;
+        foreach (Renderer rend in target.GetComponentsInChildren<Renderer>())
+        {
+            var mats = rend.sharedMaterials;
+            if (mats.Length > 0 && mats[mats.Length - 1] == _outlineMat)
+            {
+                var restored = new Material[mats.Length - 1];
+                System.Array.Copy(mats, restored, restored.Length);
+                rend.sharedMaterials = restored;
+            }
+        }
+    }
+
+    // Ensures the renderer's mesh has averaged normals stored in UV2 so the
+    // outline shader can use them for gap-free extrusion. Result is cached.
+    static void EnsureSmoothNormals(Renderer rend)
+    {
+        Mesh src = GetMesh(rend);
+        if (src == null) return;
+
+        int id = src.GetInstanceID();
+        if (!s_smoothMeshCache.TryGetValue(id, out Mesh smooth))
+        {
+            smooth = Object.Instantiate(src);
+            smooth.name = src.name + "_SN";
+            BakeSmoothNormals(src, smooth);
+
+            // Cache by both IDs so a second hover on the same enemy returns immediately.
+            s_smoothMeshCache[id]                       = smooth;
+            s_smoothMeshCache[smooth.GetInstanceID()]   = smooth;
+        }
+
+        SetMesh(rend, smooth);
+    }
+
+    static void BakeSmoothNormals(Mesh src, Mesh dst)
+    {
+        var verts   = src.vertices;
+        var normals = src.normals;
+
+        var sums = new Dictionary<Vector3, Vector3>(verts.Length);
+        for (int i = 0; i < verts.Length; i++)
+        {
+            sums.TryGetValue(verts[i], out Vector3 s);
+            sums[verts[i]] = s + normals[i];
+        }
+
+        var smooth = new Vector3[verts.Length];
+        for (int i = 0; i < verts.Length; i++)
+            smooth[i] = sums[verts[i]].normalized;
+
+        dst.SetUVs(2, new List<Vector3>(smooth));
+    }
+
+    static Mesh GetMesh(Renderer rend)
+    {
+        if (rend is SkinnedMeshRenderer smr) return smr.sharedMesh;
+        if (rend.TryGetComponent<MeshFilter>(out var mf)) return mf.sharedMesh;
+        return null;
+    }
+
+    static void SetMesh(Renderer rend, Mesh mesh)
+    {
+        if (rend is SkinnedMeshRenderer smr) smr.sharedMesh = mesh;
+        else if (rend.TryGetComponent<MeshFilter>(out var mf)) mf.sharedMesh = mesh;
+    }
+
+    // ─── Rim Glow ─────────────────────────────────────────────────────────────
+
+    void SetRimGlow(Transform target, Color highlight)
+    {
+        // _RimExtension = 1 makes the diffuse-side gating evaluate to 1 everywhere.
+        // _RimThresholds = (0, 1) gives a smooth (1 - NoV) falloff across the full surface.
         foreach (Renderer rend in target.GetComponentsInChildren<Renderer>())
         {
             rend.GetPropertyBlock(_propBlock);
-            _propBlock.SetColor(RimColorId,      highlight);
-            _propBlock.SetFloat(RimExtensionId,  1f);
+            _propBlock.SetColor(RimColorId,       highlight);
+            _propBlock.SetFloat(RimExtensionId,   1f);
             _propBlock.SetVector(RimThresholdsId, new Vector4(0f, 1f, 0f, 0f));
             rend.SetPropertyBlock(_propBlock);
         }
     }
 
-    void ClearGlow(Transform target)
+    void ClearRimGlow(Transform target)
     {
         if (target == null) return;
         foreach (Renderer rend in target.GetComponentsInChildren<Renderer>())

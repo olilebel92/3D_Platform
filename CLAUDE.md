@@ -5,6 +5,7 @@
 - Never auto-read scripts unrelated to the current task. Read a script only when: the task directly involves it, OR another script you're already working on references its API and you need to understand that API.
 - Never read binary/asset files (`.prefab`, `.unity`, `.asset`, `.mat`, images, audio, etc.) — list filename only if needed. Exception: ScriptableObject `.asset` files may be read as text when directly required (e.g. debugging item/spell config) — ask first.
 - For networking tasks, also read `.claude/rules/networking.md`.
+- For any task involving the dashboard, creating/editing ScriptableObjects (ItemData, SpellData, or any new SO type), or adding stats/enums, also read `.claude/rules/dashboard.md`.
 
 ## Tech Stack
 - Unity 6.0.3.11f1 (MonoBehaviour-based)

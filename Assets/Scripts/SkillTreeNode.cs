@@ -127,6 +127,11 @@ public class SkillTreeNode : ScriptableObject
 
     static string Gold(string value) => $"<color=#FFD700>{value}</color>";
 
+    [Header("Additional Requirements")]
+    [Tooltip("If true, the player must have unlocked at least one spell in the skill tree before buying this node. " +
+             "Use on spell damage / modifier nodes to prevent spending points before having any spell.")]
+    public bool requiresAnySpell = false;
+
     [Header("Spell Unlock")]
     [Tooltip("If assigned, this spell is added to the first empty spell bar slot when learned.")]
     public SpellData unlocksSpell;

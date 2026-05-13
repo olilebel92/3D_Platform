@@ -41,6 +41,9 @@ public class SkillTreeManager : MonoBehaviour
     [Tooltip("TMP label showing available skill points (e.g. on HUD or in window).")]
     public TextMeshProUGUI skillPointsText;
 
+    [Tooltip("(Optional) TMP label inside the skill tree window showing the player's current level.")]
+    public TextMeshProUGUI playerLevelText;
+
     [Header("Tooltip")]
     [Tooltip("Panel that appears when hovering over a node.")]
     public GameObject tooltipPanel;
@@ -134,6 +137,9 @@ public class SkillTreeManager : MonoBehaviour
         HideTooltip();
         SetWindowOpen(false, force: true);
 
+        if (ExperienceManager.Instance != null)
+            ExperienceManager.Instance.OnLevelUp += OnPlayerLevelUp;
+
         if (startingSkillPoints > 0)
         {
             SkillPoints += startingSkillPoints;
@@ -179,11 +185,19 @@ public class SkillTreeManager : MonoBehaviour
         if (node == null) return false;
         if (GetNodeLevel(node) >= node.maxLevel) return false;
         if (SkillPoints < node.cost) return false;
+        if (node.requiresAnySpell && !HasAnySpellUnlocked()) return false;
 
         foreach (var req in node.prerequisites)
             if (req.node == null || GetNodeLevel(req.node) < req.requiredLevel) return false;
 
         return true;
+    }
+
+    private bool HasAnySpellUnlocked()
+    {
+        foreach (var kv in _nodeLevels)
+            if (kv.Key.unlocksSpell != null && kv.Value > 0) return true;
+        return false;
     }
 
     /// <summary>Returns true if this node has been learned at least once.</summary>
@@ -292,10 +306,17 @@ public class SkillTreeManager : MonoBehaviour
                 ? $" <color=#AAAAFF>[Lv {lvl}/{node.maxLevel}]</color>"
                 : "";
 
-            string cost = maxed          ? $" <color=#00FF88>(Maxed)</color>"
-                        : CanLearn(node) ? $" <color=#FFD700>(Cost {node.cost} SP)</color>"
-                        : lvl > 0        ? $" <color=#FFD700>(Cost {node.cost} SP — Locked)</color>"
-                        :                  $" <color=#FF6666>(Locked)</color>";
+            string cost;
+            if (maxed)
+                cost = " <color=#00FF88>(Maxed)</color>";
+            else if (CanLearn(node))
+                cost = $" <color=#FFD700>(Cost {node.cost} SP)</color>";
+            else if (node.requiresAnySpell && !HasAnySpellUnlocked())
+                cost = " <color=#FF6666>(Unlock a spell first)</color>";
+            else if (lvl > 0)
+                cost = $" <color=#FFD700>(Cost {node.cost} SP — Locked)</color>";
+            else
+                cost = " <color=#FF6666>(Locked)</color>";
 
             if (tooltipName != null)
                 tooltipName.text = node.nodeName + cost + levelInfo;
@@ -401,12 +422,24 @@ public class SkillTreeManager : MonoBehaviour
 
     // ─── UI Refresh ───────────────────────────────────────────────────────────
 
+    private void OnPlayerLevelUp(int level)
+    {
+        if (playerLevelText != null)
+            playerLevelText.text = $"Level {level}";
+    }
+
     private void RefreshUI()
     {
         if (skillPointsText != null)
         {
             skillPointsText.gameObject.SetActive(SkillPoints > 0);
             skillPointsText.text = $"Skill Points: {SkillPoints}";
+        }
+
+        if (playerLevelText != null)
+        {
+            int lvl = ExperienceManager.Instance != null ? ExperienceManager.Instance.currentLevel : 0;
+            playerLevelText.text = lvl > 0 ? $"Level {lvl}" : "";
         }
 
         // Re-render the tooltip if the player is hovering a node while state changes

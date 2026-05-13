@@ -117,6 +117,9 @@ public class WaveManager : NetworkBehaviour
     [Tooltip("Status text, e.g. 'Enemies remaining: 5' or 'Next wave in 3s...'.")]
     public TMP_Text statusText;
 
+    // ─── Public State ─────────────────────────────────────────────────────────
+    public int CurrentWave => currentWave;
+
     // ─── Private State ────────────────────────────────────────────────────────
     private int  currentWave      = 0;
     private int  aliveEnemyCount  = 0;

@@ -1,0 +1,5 @@
+streamlit>=1.32
+pyyaml>=6.0
+pandas>=2.0
+pywebview>=4.0
+pythonnet>=3.0

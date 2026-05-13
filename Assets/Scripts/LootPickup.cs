@@ -44,6 +44,10 @@ public class LootPickup : NetworkBehaviour
     [Tooltip("Amount of XP granted to the collecting player on pickup.")]
     public int xpReward = 25;
 
+    [Tooltip("Scales xpReward with wave number: final XP = xpReward × (1 + xpWaveScale × currentWave). " +
+             "Set 0 to keep flat XP. e.g. 0.5 = +50% XP per wave.")]
+    public float xpWaveScale = 0f;
+
     // ─── HP ───────────────────────────────────────────────────────────────────
     [Tooltip("Flat: restores a fixed amount. Percent: restores a % of max HP. Both: applies flat then percent.")]
     public RestoreMode hpRestoreMode = RestoreMode.Flat;
@@ -70,6 +74,11 @@ public class LootPickup : NetworkBehaviour
     [Tooltip("The ItemData ScriptableObject to add to the collecting player's inventory.")]
     public ItemData itemReward;
 
+    // ─── Collider ─────────────────────────────────────────────────────────────
+    [Header("Collider")]
+    [Tooltip("Auto-sets the trigger SphereCollider radius on Awake. Increase if players miss the pickup by walking over it.")]
+    public float pickupRadius = 0.8f;
+
     // ─── Common ───────────────────────────────────────────────────────────────
     [Header("Settings")]
     [Tooltip("Tag used to identify players. Must match the Player GameObject tag.")]
@@ -93,6 +102,13 @@ public class LootPickup : NetworkBehaviour
 
     // ─── Internal ─────────────────────────────────────────────────────────────
     private bool _collected = false;
+
+    // ─── Unity Lifecycle ──────────────────────────────────────────────────────
+    void Awake()
+    {
+        SphereCollider sc = GetComponent<SphereCollider>();
+        if (sc != null) sc.radius = pickupRadius;
+    }
 
     // ─── Network Lifecycle ────────────────────────────────────────────────────
     public override void OnNetworkSpawn()
@@ -169,7 +185,13 @@ public class LootPickup : NetworkBehaviour
             // ── XP ────────────────────────────────────────────────────────────
             case LootType.XPReward:
                 ExperienceManager xp = playerObj.GetComponent<ExperienceManager>();
-                if (xp != null) xp.GainXP(xpReward);
+                if (xp != null)
+                {
+                    int finalXP = xpReward;
+                    if (xpWaveScale > 0f && WaveManager.Instance != null)
+                        finalXP = Mathf.Max(1, Mathf.RoundToInt(xpReward * (1f + xpWaveScale * WaveManager.Instance.CurrentWave)));
+                    xp.GainXP(finalXP);
+                }
                 else Debug.LogWarning("[LootPickup] No ExperienceManager on collecting player.");
                 break;
 
