@@ -3,19 +3,22 @@ using UnityEngine.UI;
 
 /// <summary>
 /// World-space HP bar displayed above an enemy when it takes damage.
-/// Hidden by default; shows on damage, auto-hides after hideDelay seconds.
+/// Hidden by default; shows on damage, auto-hides after a delay.
 ///
-/// Networked mode: reads from EnemyAI.NetworkHealth (NetworkVariable) — synced
-/// to all clients automatically whenever the server updates it.
+/// This component lives on the HealthBar prefab (not the enemy prefab).
+/// EnemyHealthBarManager instantiates it as a child of each enemy and
+/// calls Initialize() — no per-enemy prefab setup required.
 ///
-/// Non-networked mode (solo play without NGO host): polls HealthSystem.currentHealth
-/// directly each frame so the bar works when testing without going through the main menu.
+/// Networked mode  : reads EnemyAI.NetworkHealth (NetworkVariable) — synced
+///                   to all clients automatically when the server updates it.
+/// Non-networked   : polls HealthSystem.currentHealth each frame so the bar
+///                   works when testing outside the main menu (no NGO host).
 ///
-/// Setup on the enemy prefab:
-///   1. Add a child GameObject "HealthBarCanvas" — Canvas, Render Mode = World Space.
-///   2. Under it add a Background Image and a Fill Image (Type = Filled, Method = Horizontal).
-///   3. Assign _barRoot (the canvas GO) and _fillImage (the Fill image) in the Inspector.
-///   4. Add this component to the enemy root (same object as EnemyAI).
+/// Prefab structure:
+///   HealthBarPrefab_Root  ← EnemyHealthBar lives here
+///   └── HealthBarCanvas   ← World Space Canvas — assign to _barRoot
+///       ├── Background    ← Image
+///       └── Fill          ← Image (Type=Filled, Method=Horizontal) — assign to _fillImage
 /// </summary>
 public class EnemyHealthBar : MonoBehaviour
 {
@@ -30,10 +33,10 @@ public class EnemyHealthBar : MonoBehaviour
 
     [Header("Settings")]
     [Tooltip("Seconds before the bar hides when the enemy is at full HP.")]
-    [SerializeField] private float _hideDelayFull     = 3f;
+    [SerializeField] private float _hideDelayFull    = 3f;
 
     [Tooltip("Seconds before the bar hides when the enemy is below full HP.")]
-    [SerializeField] private float _hideDelayDamaged  = 10f;
+    [SerializeField] private float _hideDelayDamaged = 10f;
 
     // ─── Private State ────────────────────────────────────────────────────────
 
@@ -43,36 +46,13 @@ public class EnemyHealthBar : MonoBehaviour
     private float        _hideTimer;
     private bool         _networked;
     private float        _lastHealth;
+    private Canvas       _canvas;
 
-    // ─── Unity Lifecycle ──────────────────────────────────────────────────────
+    // ─── Lifecycle ────────────────────────────────────────────────────────────
 
-    void Start()
+    void Awake()
     {
-        _ai     = GetComponent<EnemyAI>();
-        _health = GetComponent<HealthSystem>();
-
-        if (_ai == null || _health == null)
-        {
-            Debug.LogWarning("[EnemyHealthBar] Missing EnemyAI or HealthSystem on " + gameObject.name);
-            enabled = false;
-            return;
-        }
-
         if (_barRoot != null) _barRoot.SetActive(false);
-
-        _networked = Unity.Netcode.NetworkManager.Singleton != null
-                  && Unity.Netcode.NetworkManager.Singleton.IsListening;
-
-        if (_networked)
-        {
-            // Networked: driven by NetworkVariable — fires on all clients when server updates.
-            _ai.NetworkHealth.OnValueChanged += OnNetworkHealthChanged;
-        }
-        else
-        {
-            // Non-networked: seed the last-known value so the first hit is detected correctly.
-            _lastHealth = _health.maxHealth;
-        }
     }
 
     void OnDestroy()
@@ -83,9 +63,9 @@ public class EnemyHealthBar : MonoBehaviour
 
     void Update()
     {
+        if (_ai == null) return;
+
         // ── Non-networked polling ─────────────────────────────────────────────
-        // When NGO isn't running, NetworkVariables are never updated.
-        // Compare currentHealth against the last known value each frame.
         if (!_networked)
         {
             float current = _health.currentHealth;
@@ -105,6 +85,12 @@ public class EnemyHealthBar : MonoBehaviour
             Vector3 dir = _barRoot.transform.position - _cam.transform.position;
             if (dir != Vector3.zero)
                 _barRoot.transform.rotation = Quaternion.LookRotation(dir);
+
+            if (_canvas != null)
+            {
+                float dist = dir.magnitude;
+                _canvas.sortingOrder = Mathf.Clamp(10000 - (int)(dist * 100f), 0, 32767);
+            }
         }
 
         if (_hideTimer > 0f)
@@ -113,6 +99,42 @@ public class EnemyHealthBar : MonoBehaviour
             if (_hideTimer <= 0f)
                 _barRoot.SetActive(false);
         }
+    }
+
+    // ─── Public API ───────────────────────────────────────────────────────────
+
+    /// <summary>Called by EnemyHealthBarManager immediately after instantiation.</summary>
+    public void Initialize(EnemyAI ai, HealthSystem health)
+    {
+        _ai     = ai;
+        _health = health;
+
+        _networked = Unity.Netcode.NetworkManager.Singleton != null
+                  && Unity.Netcode.NetworkManager.Singleton.IsListening;
+
+        if (_networked)
+            _ai.NetworkHealth.OnValueChanged += OnNetworkHealthChanged;
+        else
+            _lastHealth = _health.currentHealth;
+
+        _canvas = _barRoot != null ? _barRoot.GetComponentInChildren<Canvas>() : null;
+        if (_canvas != null)
+        {
+            _canvas.overrideSorting = true;
+            _canvas.sortingOrder    = 100;
+        }
+
+        SetLayerRecursively(_barRoot, LayerMask.NameToLayer("HudOverlay"));
+    }
+
+    // ─── Helpers ─────────────────────────────────────────────────────────────
+
+    private static void SetLayerRecursively(GameObject go, int layer)
+    {
+        if (go == null || layer < 0) return;
+        go.layer = layer;
+        foreach (Transform t in go.transform)
+            SetLayerRecursively(t.gameObject, layer);
     }
 
     // ─── Callbacks ────────────────────────────────────────────────────────────
@@ -127,8 +149,8 @@ public class EnemyHealthBar : MonoBehaviour
         if (_fillImage != null && max > 0)
             _fillImage.fillAmount = current / max;
 
-        // Only reveal the bar on actual damage (current < prev).
-        // This prevents it from flashing on spawn when health initialises 0 → max.
+        // Only reveal on actual damage (current < prev).
+        // Prevents flashing on spawn when health initialises 0 → max.
         if (current < prev)
         {
             if (_barRoot != null) _barRoot.SetActive(true);

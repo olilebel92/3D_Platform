@@ -374,3 +374,132 @@ def write_spell_asset(data: dict) -> tuple[bool, str]:
     dest.write_text(content, encoding="utf-8")
     _write_meta(dest, _new_guid())
     return True, f"Created '{asset_name}.asset' in Spells/T2/{school_label}/."
+
+
+# ─── Read Enemies ───
+
+def scan_enemies() -> list[dict]:
+    """Return list of parsed EnemyData dicts from the Enemies directory."""
+    enemies = []
+    for path in sorted(config.ENEMIES_DIR.glob("*.asset")):
+        mb = _load_unity_yaml(path)
+        if not mb:
+            continue
+        script = mb.get("m_Script", {})
+        if script.get("guid") != config.ENEMY_SCRIPT_GUID:
+            continue
+
+        def gf(key, default=0.0):
+            v = mb.get(key, default)
+            return float(v) if v is not None else default
+
+        def gi(key, default=0):
+            v = mb.get(key, default)
+            return int(v) if v is not None else default
+
+        def gb(key):
+            return bool(gi(key))
+
+        enemies.append({
+            "asset_file":       path.stem,
+            "enemyName":        mb.get("enemyName", ""),
+            "description":      mb.get("description", ""),
+            "creatureType":     config.CREATURE_TYPE.get(gi("creatureType"), "Undead"),
+            "category":         config.ENEMY_CATEGORY.get(gi("category"), "Normal"),
+            "maxHealth":        gf("maxHealth", 10.0),
+            "moveSpeed":        gf("moveSpeed", 3.0),
+            "attackDamage":     gi("attackDamage", 1),
+            "attackCooldown":   gf("attackCooldown", 1.5),
+            "attackRange":      gf("attackRange", 2.0),
+            "detectionRange":   gf("detectionRange", 10.0),
+            "attackStunChance": gf("attackStunChance", 0.2),
+            "attackStunDuration": gf("attackStunDuration", 1.0),
+            "retargetInterval": gf("retargetInterval", 1.0),
+            "angularSpeed":     gf("angularSpeed", 200.0),
+            "rotationSpeed":    gf("rotationSpeed", 200.0),
+            "xpReward":         gi("xpReward", 50),
+            "giveHPOnDeath":    gb("giveHPOnDeath"),
+            "hpRewardOnDeath":  gi("hpRewardOnDeath", 1),
+        })
+    return enemies
+
+
+# ─── Write Enemies ───
+
+_ENEMY_ASSET_TEMPLATE = """\
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {{fileID: 0}}
+  m_PrefabInstance: {{fileID: 0}}
+  m_PrefabAsset: {{fileID: 0}}
+  m_GameObject: {{fileID: 0}}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {{fileID: 11500000, guid: {script_guid}, type: 3}}
+  m_Name: {asset_name}
+  m_EditorClassIdentifier: {class_id}
+  enemyName: {enemy_name}
+  description: {description}
+  icon: {{fileID: 0}}
+  creatureType: {creature_type}
+  category: {category}
+  maxHealth: {max_health}
+  moveSpeed: {move_speed}
+  attackDamage: {attack_damage}
+  attackCooldown: {attack_cooldown}
+  attackRange: {attack_range}
+  detectionRange: {detection_range}
+  attackStunChance: {attack_stun_chance}
+  attackStunDuration: {attack_stun_duration}
+  retargetInterval: {retarget_interval}
+  angularSpeed: {angular_speed}
+  rotationSpeed: {rotation_speed}
+  xpReward: {xp_reward}
+  giveHPOnDeath: {give_hp_on_death}
+  hpRewardOnDeath: {hp_reward_on_death}"""
+
+
+def write_enemy_asset(data: dict) -> tuple[bool, str]:
+    """Write a new EnemyData .asset + .meta. Returns (success, message)."""
+    asset_name = sanitize_asset_name(data["asset_name"])
+    if not asset_name:
+        return False, "Asset name is empty after sanitization."
+
+    _ensure_dir_with_meta(config.ENEMIES_DIR)
+    dest = config.ENEMIES_DIR / f"{asset_name}.asset"
+    if dest.exists():
+        return False, f"Asset '{asset_name}.asset' already exists."
+
+    def f4(val): return round(float(val), 6)
+    def b(val): return 1 if val else 0
+
+    content = _ENEMY_ASSET_TEMPLATE.format(
+        script_guid=config.ENEMY_SCRIPT_GUID,
+        asset_name=asset_name,
+        class_id=config.ENEMY_CLASS_ID,
+        enemy_name=_yaml_str(data.get("enemy_name", asset_name)),
+        description=_yaml_str(data.get("description", "")),
+        creature_type=config.CREATURE_TYPE_INV.get(data.get("creature_type", "Undead"), 0),
+        category=config.ENEMY_CATEGORY_INV.get(data.get("category", "Normal"), 0),
+        max_health=f4(data.get("max_health", 10.0)),
+        move_speed=f4(data.get("move_speed", 3.0)),
+        attack_damage=int(data.get("attack_damage", 1)),
+        attack_cooldown=f4(data.get("attack_cooldown", 1.5)),
+        attack_range=f4(data.get("attack_range", 2.0)),
+        detection_range=f4(data.get("detection_range", 10.0)),
+        attack_stun_chance=f4(data.get("attack_stun_chance", 0.2)),
+        attack_stun_duration=f4(data.get("attack_stun_duration", 1.0)),
+        retarget_interval=f4(data.get("retarget_interval", 1.0)),
+        angular_speed=f4(data.get("angular_speed", 200.0)),
+        rotation_speed=f4(data.get("rotation_speed", 200.0)),
+        xp_reward=int(data.get("xp_reward", 50)),
+        give_hp_on_death=b(data.get("give_hp_on_death", False)),
+        hp_reward_on_death=int(data.get("hp_reward_on_death", 1)),
+    )
+
+    dest.write_text(content, encoding="utf-8")
+    _write_meta(dest, _new_guid())
+    return True, f"Created '{asset_name}.asset' in Enemies/."

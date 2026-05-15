@@ -59,6 +59,7 @@ public class LobbyChatManager : NetworkBehaviour
 
     public override void OnDestroy()
     {
+        base.OnDestroy();
         if (Instance == this) Instance = null;
     }
 

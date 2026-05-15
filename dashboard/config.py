@@ -5,6 +5,7 @@ from cs_parser import parse_cs_file
 PROJECT_ROOT = Path(__file__).parent.parent
 ITEMS_DIR    = PROJECT_ROOT / "Assets/ScriptableObjects/Item"
 SPELLS_DIR   = PROJECT_ROOT / "Assets/ScriptableObjects/Spells"
+ENEMIES_DIR  = PROJECT_ROOT / "Assets/ScriptableObjects/Enemies"
 
 # Confirmed from .cs.meta files
 ITEM_SCRIPT_GUID  = "9c5f8a9e4be4b6c42a10ba05afe871e9"
@@ -12,9 +13,14 @@ SPELL_SCRIPT_GUID = "4378247a87f53c34aa130d1b75a0dc31"
 ITEM_CLASS_ID     = "Assembly-CSharp::ItemData"
 SPELL_CLASS_ID    = "Assembly-CSharp::SpellData"
 
+# Filled automatically after Unity imports EnemyData.cs — see step 9 of setup
+ENEMY_SCRIPT_GUID = "3dbeaa33d044b3849959fdc32f1563ee"
+ENEMY_CLASS_ID    = "Assembly-CSharp::EnemyData"
+
 # ─── Parse enums directly from C# source ───────────────────────────────────
 _item_enums  = parse_cs_file(PROJECT_ROOT / "Assets/Scripts/ItemData.cs")
 _spell_enums = parse_cs_file(PROJECT_ROOT / "Assets/Scripts/SpellData.cs")
+_enemy_enums = parse_cs_file(PROJECT_ROOT / "Assets/Scripts/EnemyData.cs")
 
 # ItemData enums
 EQUIPMENT_SLOT = _item_enums.get("EquipmentSlot", {0: "Boots", 1: "Helm", 2: "Pants", 3: "Chest"})
@@ -40,6 +46,13 @@ COLOR_MODE_INV     = {v: k for k, v in COLOR_MODE.items()}
 SPAWN_ORIGIN_INV   = {v: k for k, v in SPAWN_ORIGIN.items()}
 SPAWN_ROTATION_INV = {v: k for k, v in SPAWN_ROTATION.items()}
 
+# EnemyData enums
+CREATURE_TYPE  = _enemy_enums.get("CreatureType",  {0: "Undead", 1: "Human", 2: "Orc", 3: "Slime"})
+ENEMY_CATEGORY = _enemy_enums.get("EnemyCategory", {0: "Normal", 1: "Elite", 2: "Boss", 3: "Magic", 4: "Hunter"})
+
+CREATURE_TYPE_INV  = {v: k for k, v in CREATURE_TYPE.items()}
+ENEMY_CATEGORY_INV = {v: k for k, v in ENEMY_CATEGORY.items()}
+
 # ─── Dashboard-only display constants ───────────────────────────────────────
 # These are visual hints only — unknown values fall back to grey.
 RARITY_COLORS: dict[str, str] = {
@@ -49,6 +62,14 @@ RARITY_COLORS: dict[str, str] = {
     "Epic":      "#A335EE",
     "Legendary": "#FF8000",
     "Godly":     "#FF1A1A",
+}
+
+ENEMY_CATEGORY_COLORS: dict[str, str] = {
+    "Normal":  "#CCCCCC",
+    "Elite":   "#0070DD",
+    "Boss":    "#FF1A1A",
+    "Magic":   "#A335EE",
+    "Hunter":  "#1EFF00",
 }
 
 SPELL_SCHOOL_COLORS: dict[str, str] = {

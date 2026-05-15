@@ -1,9 +1,15 @@
 using UnityEngine;
 using UnityEngine.AI;
+using UnityEngine.Rendering;
 using Unity.Netcode;
 
 public class EnemyAI : NetworkBehaviour
 {
+    // ─── Enemy Data ───────────────────────────────────────────────────────────
+    [Header("Enemy Data")]
+    [Tooltip("Optional ScriptableObject. When assigned, overrides all stat fields below at runtime.")]
+    [SerializeField] private EnemyData _data;
+
     // ─── References ───────────────────────────────────────────────────────────
     [Header("References")]
     [Tooltip("Leave blank — target is resolved automatically from connected players.")]
@@ -34,6 +40,21 @@ public class EnemyAI : NetworkBehaviour
 
     [Header("Movement")]
     public float moveSpeed = 3f;
+    [Tooltip("NavMeshAgent angular speed while chasing (deg/sec).")]
+    public float angularSpeed = 200f;
+    [Tooltip("Rotation speed while attacking (deg/sec).")]
+    public float rotationSpeed = 200f;
+
+    [Header("Separation")]
+    [Tooltip("Radius within which this enemy pushes away from other enemies.")]
+    [SerializeField] private float _separationRadius = 1.2f;
+    [Tooltip("Strength of the separation push (world units/sec).")]
+    [SerializeField] private float _separationStrength = 3f;
+
+    [Header("Visual")]
+    [Tooltip("Width of the toon diffuse blend window around the lit/shadow threshold. " +
+             "Increase (e.g. 0.1–0.2) to stop toon bands snapping on low-poly meshes during idle.")]
+    [SerializeField] private float _diffuseSmoothingHalfWidth = 0.08f;
 
     // ─── Multi-target retarget interval ──────────────────────────────────────
     [Header("Multiplayer")]
@@ -45,6 +66,8 @@ public class EnemyAI : NetworkBehaviour
     private static readonly int AnimWalk   = Animator.StringToHash("Walk");
     private static readonly int AnimAttack = Animator.StringToHash("Attack");
     private static readonly int AnimIdle   = Animator.StringToHash("Idle");
+    private bool animHasWalk;
+    private bool animHasIdle;
 
     // ─── Networked Health ─────────────────────────────────────────────────────
     // Read by EnemyHealthBar on all clients to drive the HP bar UI.
@@ -65,10 +88,9 @@ public class EnemyAI : NetworkBehaviour
 
     public override void OnNetworkSpawn()
     {
-        // Initialise NetworkVariables here — OnNetworkSpawn fires during
-        // NetworkObject.Spawn() when the object IS registered with NGO,
-        // so writes are valid and won't trigger the "not spawned yet" warning.
-        // maxHealth is an Inspector field, always ready before Start().
+        // Apply EnemyData before syncing HP so NetworkHealth reflects the SO value.
+        ApplyData();
+
         if (IsServer)
         {
             HealthSystem h = GetComponent<HealthSystem>();
@@ -84,11 +106,45 @@ public class EnemyAI : NetworkBehaviour
 
     void Start()
     {
+        // ApplyData runs here for singleplayer (OnNetworkSpawn doesn't fire without NGO).
+        ApplyData();
+
         agent    = GetComponent<NavMeshAgent>();
         animator = GetComponentInChildren<Animator>();
+        animHasWalk = HasAnimParam(AnimWalk);
+        animHasIdle = HasAnimParam(AnimIdle);
 
         if (agent != null)
-            agent.speed = moveSpeed;
+        {
+            agent.speed                 = moveSpeed;
+            agent.angularSpeed          = angularSpeed;
+            agent.obstacleAvoidanceType = UnityEngine.AI.ObstacleAvoidanceType.GoodQualityObstacleAvoidance;
+            agent.avoidancePriority     = Random.Range(20, 80);
+        }
+
+        foreach (Renderer r in GetComponentsInChildren<Renderer>())
+        {
+            r.receiveShadows    = false;
+            // TwoSided fills back-face gaps in the shadow projection for animated meshes.
+            r.shadowCastingMode = r is SkinnedMeshRenderer
+                ? ShadowCastingMode.TwoSided
+                : ShadowCastingMode.On;
+
+            // Toon Shaders Pro ignores receiveShadows — zero out shadow sampling via
+            // MaterialPropertyBlock so toon step-bands don't shift under shadows.
+            var mpb = new MaterialPropertyBlock();
+            r.GetPropertyBlock(mpb);
+            mpb.SetFloat("_ReceiveShadows", 0f);
+            // Widen the toon diffuse smoothstep window so low-poly normals don't
+            // snap the lit/shadow band during subtle idle movement.
+            float hw = _diffuseSmoothingHalfWidth;
+            mpb.SetVector("_DiffuseThresholds", new Vector4(-hw, hw, 0f, 0f));
+            r.SetPropertyBlock(mpb);
+        }
+
+        HealthSystem h = GetComponent<HealthSystem>();
+        if (EnemyHealthBarManager.Instance != null && h != null)
+            EnemyHealthBarManager.Instance.AttachTo(this, h, transform);
     }
 
     void Update()
@@ -125,6 +181,8 @@ public class EnemyAI : NetworkBehaviour
             case State.Chase:  HandleChase();  break;
             case State.Attack: HandleAttack(); break;
         }
+
+        ApplySeparation();
     }
 
     // ─── Nearest-Player Resolution ────────────────────────────────────────────
@@ -132,8 +190,8 @@ public class EnemyAI : NetworkBehaviour
     // Called on a timer to avoid per-frame FindGameObjectsWithTag overhead.
     void RefreshNearestTarget()
     {
-        GameObject[] players = GameObject.FindGameObjectsWithTag("Player");
-        if (players == null || players.Length == 0)
+        var players = PlayerController.All;
+        if (players == null || players.Count == 0)
         {
             player        = null;
             _playerHealth = null;
@@ -165,6 +223,34 @@ public class EnemyAI : NetworkBehaviour
         }
     }
 
+    // ─── Separation Steering ──────────────────────────────────────────────────
+
+    // Static reuse buffer keeps separation queries GC-free across all enemies.
+    private static readonly Collider[] s_separationBuffer = new Collider[16];
+
+    void ApplySeparation()
+    {
+        if (agent == null || !agent.isOnNavMesh) return;
+
+        int count = Physics.OverlapSphereNonAlloc(transform.position, _separationRadius, s_separationBuffer);
+        Vector3 push = Vector3.zero;
+        for (int i = 0; i < count; i++)
+        {
+            Collider col = s_separationBuffer[i];
+            if (col.gameObject == gameObject) continue;
+            if (!col.CompareTag("Enemy")) continue;
+
+            Vector3 away = transform.position - col.transform.position;
+            float dist = away.magnitude;
+            if (dist < 0.001f) continue;
+
+            push += away.normalized * (1f - dist / _separationRadius);
+        }
+
+        if (push != Vector3.zero)
+            agent.Move(push * (_separationStrength * Time.deltaTime));
+    }
+
     // ─── State Handlers ───────────────────────────────────────────────────────
     void HandleIdle()
     {
@@ -183,11 +269,15 @@ public class EnemyAI : NetworkBehaviour
     {
         if (agent != null) agent.ResetPath();
 
-        // Always face the player while attacking
+        // Smoothly face the player while attacking
         Vector3 direction = (player.position - transform.position).normalized;
         direction.y = 0f;
         if (direction != Vector3.zero)
-            transform.rotation = Quaternion.LookRotation(direction);
+        {
+            Quaternion target = Quaternion.LookRotation(direction);
+            transform.rotation = Quaternion.RotateTowards(
+                transform.rotation, target, rotationSpeed * Time.deltaTime);
+        }
 
         // Cooldown timer
         attackTimer -= Time.deltaTime;
@@ -268,7 +358,7 @@ public class EnemyAI : NetworkBehaviour
     [ClientRpc]
     private void DealDamageClientRpc(int damage, float stunDuration, ClientRpcParams clientRpcParams = default)
     {
-        foreach (GameObject p in GameObject.FindGameObjectsWithTag("Player"))
+        foreach (GameObject p in PlayerController.All)
         {
             NetworkObject net = p.GetComponent<NetworkObject>();
             if (net != null && net.IsOwner)
@@ -296,14 +386,22 @@ public class EnemyAI : NetworkBehaviour
 
         if (stateHash == AnimWalk)
         {
-            animator.SetBool(AnimWalk, true);
-            animator.SetBool(AnimIdle, false);
+            if (animHasWalk) animator.SetBool(AnimWalk, true);
+            if (animHasIdle) animator.SetBool(AnimIdle, false);
         }
         else
         {
-            animator.SetBool(AnimWalk, false);
-            animator.SetBool(AnimIdle, true);
+            if (animHasWalk) animator.SetBool(AnimWalk, false);
+            if (animHasIdle) animator.SetBool(AnimIdle, true);
         }
+    }
+
+    private bool HasAnimParam(int hash)
+    {
+        if (animator == null) return false;
+        foreach (var p in animator.parameters)
+            if (p.nameHash == hash) return true;
+        return false;
     }
 
     // ─── Solo / MP Helper ─────────────────────────────────────────────────────
@@ -314,13 +412,74 @@ public class EnemyAI : NetworkBehaviour
         return IsServer;   // multiplayer — server only
     }
 
-    // ─── Public Method for Spawner ────────────────────────────────────────────
+    // ─── Public Methods for Spawner ───────────────────────────────────────────
+
+    /// <summary>Assign an EnemyData asset and immediately apply its values. Call before Spawn().</summary>
+    public void SetData(EnemyData data)
+    {
+        _data = data;
+        ApplyData();
+    }
+
+    // Difficulty multipliers — set by WaveManager before Spawn so ApplyData composes
+    // them with the EnemyData SO values. Default 1f for non-WaveManager spawns.
+    private float _hpMult  = 1f;
+    private float _dmgMult = 1f;
+    private float _spdMult = 1f;
+
+    /// <summary>Sets per-wave scaling multipliers. ApplyData multiplies the SO values by these.</summary>
+    public void SetDifficultyMultipliers(float hp, float dmg, float spd)
+    {
+        _hpMult  = hp;
+        _dmgMult = dmg;
+        _spdMult = spd;
+    }
+
     // EnemySpawner can still call this to pre-assign a target on spawn;
     // the retarget loop will override it with the nearest player if needed.
     public void SetTarget(Transform target)
     {
         player        = target;
         _playerHealth = target != null ? target.GetComponent<HealthSystem>() : null;
+    }
+
+    // ─── Data Application ─────────────────────────────────────────────────────
+
+    private void ApplyData()
+    {
+        if (_data == null) return;
+
+        // Multipliers default to 1f and are set by WaveManager.SetDifficultyMultipliers before Spawn.
+        moveSpeed          = _data.moveSpeed * _spdMult;
+        angularSpeed       = _data.angularSpeed;
+        rotationSpeed      = _data.rotationSpeed;
+        attackDamage       = Mathf.Max(1, Mathf.RoundToInt(_data.attackDamage * _dmgMult));
+        attackCooldown     = _data.attackCooldown;
+        attackRange        = _data.attackRange;
+        detectionRange     = _data.detectionRange;
+        attackStunChance   = _data.attackStunChance;
+        attackStunDuration = _data.attackStunDuration;
+        retargetInterval   = _data.retargetInterval;
+
+        // Server-authority: only the server (or solo player) writes HealthSystem.
+        // Clients receive HP via NetworkHealth — writing here would race the NV broadcast.
+        bool networkActive = NetworkManager.Singleton != null && NetworkManager.Singleton.IsListening;
+        if (!networkActive || IsServer)
+        {
+            HealthSystem h = GetComponent<HealthSystem>();
+            if (h != null)
+            {
+                float scaledMax = Mathf.Max(1f, _data.maxHealth * _hpMult);
+                h.maxHealth     = scaledMax;
+                h.currentHealth = scaledMax;
+            }
+        }
+
+        if (agent != null)
+        {
+            agent.speed        = moveSpeed;
+            agent.angularSpeed = angularSpeed;
+        }
     }
 
     // ─── Gizmos ───────────────────────────────────────────────────────────────

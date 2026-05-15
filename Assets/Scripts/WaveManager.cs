@@ -285,6 +285,13 @@ public class WaveManager : NetworkBehaviour
         float dmgMult = Mathf.Pow(1f + damageScalePerWave,  currentWave - 1);
         float spdMult = 1f + (currentWave - 1) * speedScalePerWave;
 
+        // Push multipliers to EnemyAI FIRST so ApplyData (called during Spawn) composes
+        // them with the EnemyData SO values. For prefabs without _data, the direct
+        // mutations below scale the Inspector fields instead.
+        EnemyAI ai = enemy.GetComponent<EnemyAI>();
+        if (ai != null)
+            ai.SetDifficultyMultipliers(hpMult, dmgMult, spdMult);
+
         HealthSystem health = enemy.GetComponent<HealthSystem>();
         if (health != null)
         {
@@ -293,7 +300,6 @@ public class WaveManager : NetworkBehaviour
             health.currentHealth = scaledMax;
         }
 
-        EnemyAI ai = enemy.GetComponent<EnemyAI>();
         if (ai != null)
         {
             ai.attackDamage = Mathf.Max(1, Mathf.RoundToInt(ai.attackDamage * dmgMult));

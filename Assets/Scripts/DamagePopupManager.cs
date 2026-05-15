@@ -52,6 +52,10 @@ public class DamagePopupManager : MonoBehaviour
     [Tooltip("Height above the damaged object's origin where the popup appears.")]
     public float heightOffset = 1.8f;
 
+    // ─── Private State ────────────────────────────────────────────────────────
+
+    private int _hudOverlayLayer = -1;
+
     // ─── Unity Lifecycle ──────────────────────────────────────────────────────
 
     void Awake()
@@ -62,6 +66,7 @@ public class DamagePopupManager : MonoBehaviour
             return;
         }
         Instance = this;
+        _hudOverlayLayer = LayerMask.NameToLayer("HudOverlay");
     }
 
     // ─── Public API ───────────────────────────────────────────────────────────
@@ -82,6 +87,7 @@ public class DamagePopupManager : MonoBehaviour
 
         Vector3 spawnPos = worldPosition + Vector3.up * heightOffset;
         GameObject obj = Instantiate(popupPrefab, spawnPos, Quaternion.identity);
+        if (_hudOverlayLayer >= 0) obj.layer = _hudOverlayLayer;
 
         DamagePopup popup = obj.GetComponent<DamagePopup>();
         if (popup != null)
@@ -109,6 +115,7 @@ public class DamagePopupManager : MonoBehaviour
 
         Vector3 spawnPos = worldPosition + Vector3.up * heightOffset;
         GameObject obj = Instantiate(popupPrefab, spawnPos, Quaternion.identity);
+        if (_hudOverlayLayer >= 0) obj.layer = _hudOverlayLayer;
 
         DamagePopup popup = obj.GetComponent<DamagePopup>();
         if (popup != null)
@@ -130,6 +137,7 @@ public class DamagePopupManager : MonoBehaviour
 
         Vector3 spawnPos = worldPosition + Vector3.up * heightOffset;
         GameObject obj = Instantiate(popupPrefab, spawnPos, Quaternion.identity);
+        if (_hudOverlayLayer >= 0) obj.layer = _hudOverlayLayer;
 
         DamagePopup popup = obj.GetComponent<DamagePopup>();
         if (popup != null)

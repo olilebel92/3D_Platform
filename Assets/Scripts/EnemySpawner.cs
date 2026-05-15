@@ -8,6 +8,9 @@ public class EnemySpawner : MonoBehaviour
     [Tooltip("Drag your Enemy prefab here. Must have a NetworkObject component.")]
     public GameObject enemyPrefab;
 
+    [Tooltip("Optional. When assigned, applies this data to every enemy spawned by this spawner.")]
+    public EnemyData enemyData;
+
     // ─── Spawn Points ─────────────────────────────────────────────────────────
     [Header("Spawn Points")]
     [Tooltip("Add empty GameObjects as spawn points. Falls back to spawner position if empty.")]
@@ -19,6 +22,8 @@ public class EnemySpawner : MonoBehaviour
     public float spawnInterval = 4f;
     [Tooltip("Maximum enemies alive at once.")]
     public int maxEnemies = 5;
+    [Tooltip("Random XZ scatter radius around each spawn point (prevents stacking).")]
+    [SerializeField] private float _spawnScatterRadius = 1.5f;
 
     private float _spawnTimer = 0f;
     private int _currentEnemyCount = 0;
@@ -40,9 +45,13 @@ public class EnemySpawner : MonoBehaviour
     // ─── Spawning ─────────────────────────────────────────────────────────────
     void SpawnEnemy()
     {
-        if (enemyPrefab == null)
+        GameObject prefabToSpawn = (enemyData != null && enemyData.prefab != null)
+            ? enemyData.prefab
+            : enemyPrefab;
+
+        if (prefabToSpawn == null)
         {
-            Debug.LogWarning("[EnemySpawner] No enemy prefab assigned!");
+            Debug.LogWarning("[EnemySpawner] No enemy prefab assigned (set EnemyData.prefab or EnemySpawner.enemyPrefab)!");
             return;
         }
 
@@ -53,7 +62,16 @@ public class EnemySpawner : MonoBehaviour
             if (randomPoint != null) spawnPos = randomPoint.position;
         }
 
-        GameObject enemy = Instantiate(enemyPrefab, spawnPos, Quaternion.identity);
+        Vector2 scatter = Random.insideUnitCircle * _spawnScatterRadius;
+        spawnPos += new Vector3(scatter.x, 0f, scatter.y);
+
+        GameObject enemy = Instantiate(prefabToSpawn, spawnPos, Quaternion.identity);
+
+        if (enemyData != null)
+        {
+            enemy.GetComponent<EnemyAI>()?.SetData(enemyData);
+            enemy.GetComponent<EnemyReward>()?.SetData(enemyData);
+        }
 
         EnemyTracker tracker = enemy.GetComponent<EnemyTracker>();
         if (tracker == null) tracker = enemy.AddComponent<EnemyTracker>();
