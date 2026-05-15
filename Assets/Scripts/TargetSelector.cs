@@ -105,8 +105,9 @@ public class TargetSelector : NetworkBehaviour
             _outlineMat = new Material(shader);
     }
 
-    void OnDestroy()
+    public override void OnDestroy()
     {
+        base.OnDestroy();
         if (_outlineMat != null) Destroy(_outlineMat);
     }
 

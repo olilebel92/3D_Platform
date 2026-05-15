@@ -3,6 +3,8 @@
 ## Overview
 A local Streamlit-based desktop dashboard for browsing and creating Unity ScriptableObjects (Items, Spells). Opens as a native desktop window (pywebview). Starts via double-click on the desktop shortcut.
 
+**This is a desktop application — all features must work in the pywebview window. Browser-only behaviour is not acceptable.**
+
 ## Location
 ```
 dashboard/
@@ -22,10 +24,19 @@ dashboard/
 ## Running
 ```bash
 cd dashboard
-streamlit run app.py        # browser mode
-python launcher.pyw         # desktop window mode (maximized, dark)
+python launcher.pyw         # canonical: desktop window (maximized, dark, port 8501)
 ```
 Double-click **"HackNSLASH Dashboard"** shortcut on the desktop to launch.
+
+> **Debug only:** `streamlit run app.py` opens a raw browser tab — use this only to isolate Streamlit rendering issues, never as a supported launch path.
+
+## Desktop App Rules (Hard)
+- The canonical entry point is `launcher.pyw` — always test there, never in a raw browser tab.
+- Streamlit runs headless on port 8501; do NOT open a browser or use `--server.headless false`.
+- Window starts maximised, min size 900 × 600 — all layouts must be usable at that minimum.
+- Never use Streamlit features that rely on browser context: `st.experimental_get_query_params`, external `target="_blank"` links, JS `window.open()`, etc.
+- Use `st.button` / `st.link_button` for navigation; never instruct the user to open a browser URL manually.
+- On window close, `launcher.pyw` sends SIGINT then force-kills the Streamlit process — do not leave background threads or file locks that survive that.
 
 ## How Sync Works
 - **Unity → Dashboard**: Dashboard reads `.asset` files from disk on page load. Click "Refresh All" to re-read after changes made in Unity.
@@ -73,6 +84,7 @@ To add a new ScriptableObject type (e.g. EnemyData) to the dashboard:
 4. Add `scan_*()` and `write_*_asset()` functions to `asset_io.py` following the Item/Spell pattern
 5. Create a new `enemy_tab.py` following `items_tab.py`
 6. Add the tab to `app.py`
+7. Verify the new tab renders correctly in the desktop window (`launcher.pyw`) — check minimum 900 × 600 layout
 
 ## Dependencies
 ```

@@ -1,4 +1,5 @@
 using System.Reflection;
+using Unity.Netcode;
 using UnityEngine;
 using UnityEngine.InputSystem;
 
@@ -20,15 +21,21 @@ public class GodMode : MonoBehaviour
     // ─── Cached refs ───
 
     private HealthSystem _health;
+    private NetworkObject _netObj;
     private bool _isActive;
 
     private void Start()
     {
         _health = GetComponent<HealthSystem>();
+        _netObj = GetComponent<NetworkObject>();
     }
 
     private void Update()
     {
+        // In MP, only respond to input on the locally-owned player.
+        // In solo (no NetworkObject or unspawned), no gate.
+        if (_netObj != null && _netObj.IsSpawned && !_netObj.IsOwner) return;
+
         if (Keyboard.current[Key.Digit0].wasPressedThisFrame)
             Toggle();
     }

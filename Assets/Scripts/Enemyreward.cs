@@ -13,6 +13,12 @@ using Unity.Netcode;
 /// </summary>
 public class EnemyReward : NetworkBehaviour
 {
+    // ─── Enemy Data ───────────────────────────────────────────────────────────
+
+    [Header("Enemy Data")]
+    [Tooltip("Optional ScriptableObject. When assigned, overrides XP and HP reward fields below.")]
+    [SerializeField] private EnemyData _data;
+
     // ─── XP ───────────────────────────────────────────────────────────────────
 
     [Header("XP Reward")]
@@ -40,6 +46,11 @@ public class EnemyReward : NetworkBehaviour
     [Tooltip("Radius around the death position in which drops are scattered.")]
     public float dropScatterRadius = 0.8f;
 
+    // ─── Public Method for Spawner ────────────────────────────────────────────
+
+    /// <summary>Assign an EnemyData asset. Reward values will be read from it on death.</summary>
+    public void SetData(EnemyData data) => _data = data;
+
     // ─── Unity Lifecycle ──────────────────────────────────────────────────────
 
     // True from OnApplicationQuit until the next play session — prevents
@@ -54,6 +65,8 @@ public class EnemyReward : NetworkBehaviour
 
     public override void OnDestroy()
     {
+        base.OnDestroy();
+
         // Skip rewards when quitting, scene unloading, or play mode stopping
         if (_appIsQuitting) return;
         if (!gameObject.scene.isLoaded) return;
@@ -63,11 +76,19 @@ public class EnemyReward : NetworkBehaviour
         bool networkActive = NetworkManager.Singleton != null && NetworkManager.Singleton.IsListening;
         if (networkActive && !IsServer) return;
 
+        // Override reward fields from EnemyData if one is assigned.
+        if (_data != null)
+        {
+            enableXPReward  = true;
+            xpReward        = _data.xpReward;
+            giveHPOnDeath   = _data.giveHPOnDeath;
+            hpReward        = _data.hpRewardOnDeath;
+        }
+
         // ── XP — shared across all connected players ──────────────────────────
         if (enableXPReward && xpReward > 0)
         {
-            GameObject[] players = GameObject.FindGameObjectsWithTag("Player");
-            foreach (GameObject p in players)
+            foreach (GameObject p in PlayerController.All)
             {
                 // ExperienceManager is per-player (no global singleton since v0.03)
                 ExperienceManager xpManager = p.GetComponent<ExperienceManager>();
@@ -98,7 +119,7 @@ public class EnemyReward : NetworkBehaviour
     // Safer than client.PlayerObject which requires SpawnAsPlayerObject (not used here).
     private GameObject FindPlayerByClientId(ulong clientId)
     {
-        foreach (GameObject p in GameObject.FindGameObjectsWithTag("Player"))
+        foreach (GameObject p in PlayerController.All)
         {
             NetworkObject net = p.GetComponent<NetworkObject>();
             if (net != null && net.OwnerClientId == clientId)
@@ -111,8 +132,8 @@ public class EnemyReward : NetworkBehaviour
     // Returns the closest "Player" tagged GameObject, or null if none exist.
     private GameObject FindNearestPlayer()
     {
-        GameObject[] players = GameObject.FindGameObjectsWithTag("Player");
-        if (players == null || players.Length == 0) return null;
+        var players = PlayerController.All;
+        if (players == null || players.Count == 0) return null;
 
         GameObject nearest     = null;
         float      nearestDist = float.MaxValue;
