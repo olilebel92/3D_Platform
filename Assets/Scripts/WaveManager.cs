@@ -302,7 +302,8 @@ public class WaveManager : NetworkBehaviour
 
         if (ai != null)
         {
-            ai.attackDamage = Mathf.Max(1, Mathf.RoundToInt(ai.attackDamage * dmgMult));
+            ai.attackDamageMin = Mathf.Max(1, Mathf.RoundToInt(ai.attackDamageMin * dmgMult));
+            ai.attackDamageMax = Mathf.Max(ai.attackDamageMin, Mathf.RoundToInt(ai.attackDamageMax * dmgMult));
             ai.moveSpeed    = ai.moveSpeed * spdMult;
         }
     }

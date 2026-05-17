@@ -147,6 +147,16 @@
                             <ui:Button name="ui-test-button" text="TEST" class="btn btn--ghost btn--small"/>
                         </ui:VisualElement>
                     </ui:VisualElement>
+                    <ui:VisualElement class="section-header">
+                        <ui:VisualElement class="section-header__rule"/>
+                        <ui:Label text="GRAPHICS"/>
+                        <ui:VisualElement class="section-header__rule"/>
+                    </ui:VisualElement>
+                    <ui:VisualElement class="slider-row">
+                        <ui:Label text="FPS CAP" class="slider-row__label"/>
+                        <ui:DropdownField name="fps-dropdown" class="slider-row__slider"/>
+                        <ui:VisualElement class="slider-row__test-slot"/>
+                    </ui:VisualElement>
                 </ui:ScrollView>
                 <ui:VisualElement class="btn-row" style="justify-content: center;">
                     <ui:Button name="settings-back-button" text="BACK" class="btn btn--ghost" style="flex-grow: 0; max-width: 140px;"/>

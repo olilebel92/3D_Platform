@@ -9,10 +9,16 @@ public static class SettingsManager
 {
     // ─── PlayerPrefs Keys ─────────────────────────────────────────────────────
 
-    const string KeyMaster = "vol_master";
-    const string KeyMusic  = "vol_music";
-    const string KeySfx    = "vol_sfx";
-    const string KeyUi     = "vol_ui";
+    const string KeyMaster    = "vol_master";
+    const string KeyMusic     = "vol_music";
+    const string KeySfx       = "vol_sfx";
+    const string KeyUi        = "vol_ui";
+    const string KeyFramerate = "framerate";
+
+    // ─── Allowed Framerate Values ─────────────────────────────────────────────
+
+    /// <summary>Values exposed to the player in the FPS-cap dropdown. -1 = uncapped.</summary>
+    public static readonly int[] AllowedFramerates = { 30, 60, 120, -1 };
 
     // ─── Mixer Reference ──────────────────────────────────────────────────────
 
@@ -72,6 +78,19 @@ public static class SettingsManager
         }
     }
 
+    // ─── Framerate Cap ────────────────────────────────────────────────────────
+
+    /// <summary>Target framerate cap. -1 = uncapped. VSync is forced off when applied.</summary>
+    public static int FramerateCap
+    {
+        get => PlayerPrefs.GetInt(KeyFramerate, 60);
+        set
+        {
+            PlayerPrefs.SetInt(KeyFramerate, value);
+            ApplyFramerate(value);
+        }
+    }
+
     // ─── Apply ────────────────────────────────────────────────────────────────
 
     /// <summary>
@@ -87,6 +106,8 @@ public static class SettingsManager
 
         SetMixerVolume("SFXVolume", SfxVolume);
         SetMixerVolume("UIVolume",  UiVolume);
+
+        ApplyFramerate(FramerateCap);
     }
 
     // ─── Helpers ──────────────────────────────────────────────────────────────
@@ -96,5 +117,12 @@ public static class SettingsManager
         if (Mixer == null) return;
         float db = linear > 0f ? Mathf.Log10(linear) * 20f : -80f;
         Mixer.SetFloat(param, db);
+    }
+
+    static void ApplyFramerate(int fps)
+    {
+        // VSync silently overrides targetFrameRate when > 0, so always disable it.
+        QualitySettings.vSyncCount   = 0;
+        Application.targetFrameRate  = fps;
     }
 }

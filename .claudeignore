@@ -1,3 +1,6 @@
+# Intent: keep scripts and game-relevant text readable; hide generated junk,
+# binaries, and bulky Unity YAML assets. Filenames remain visible via Glob.
+
 # === Unity Generated & Heavy Folders ===
 Library/
 Temp/
@@ -8,25 +11,40 @@ Logs/
 UserSettings/
 ProjectSettings/
 Packages/
+!Packages/manifest.json   # exception: package version source of truth
 
-# === Binary & Asset Files ===
-*.asset
+# === Bulky Unity YAML Assets (text, but huge — filename-only is enough) ===
 *.prefab
 *.unity
 *.mat
-*.png
-*.jpg
-*.jpeg
-*.tga
-*.mp3
-*.wav
-*.fbx
 *.anim
 *.controller
 *.mixer
 
-# === Meta files ===
-*.meta
+# === Binary Asset Files ===
+*.png
+*.jpg
+*.jpeg
+*.tga
+*.psd
+*.tif
+*.mp3
+*.wav
+*.ogg
+*.fbx
+*.obj
+*.blend
+*.dll
+*.pdb
+
+# === ScriptableObject .asset files — INTENTIONALLY NOT IGNORED ===
+# They are text YAML. CLAUDE.md rule applies: "may be read when directly
+# required — ask first." Keeping them out of this file aligns the two rule
+# sources so the exception is actually honourable.
+
+# === Meta files — INTENTIONALLY NOT IGNORED ===
+# Small text YAML containing script GUIDs and import settings. The dashboard
+# pulls ITEM_SCRIPT_GUID / SPELL_SCRIPT_GUID from these. Keep readable.
 
 # === Visual Studio / Rider / IDE files ===
 .vs/
@@ -36,14 +54,11 @@ Packages/
 *.user
 *.userprefs
 
-# === Claude-specific (exclude memory/settings, but allow rules/) ===
+# === Claude-specific (memory/settings hidden, but rules/ stay readable) ===
 .claudeignore
 CLAUDE.md
 .claude/settings*
 .claude/projects/
-
-# === Docs / non-code web files ===
-docs/
 
 # === Other junk ===
 *.log

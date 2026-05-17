@@ -50,6 +50,11 @@ public class PlayerAttack : NetworkBehaviour
     [Tooltip("AudioSource used to play attack sounds. Auto-found if blank.")]
     public AudioSource audioSource;
 
+    [Tooltip("Minimum pitch multiplier for swing sound.")]
+    [SerializeField] private float swingPitchMin = 0.9f;
+    [Tooltip("Maximum pitch multiplier for swing sound.")]
+    [SerializeField] private float swingPitchMax = 1.1f;
+
     [Header("References")]
     [Tooltip("Leave blank — auto-found on this GameObject at Start.")]
     public Animator animator;
@@ -206,7 +211,10 @@ public class PlayerAttack : NetworkBehaviour
 
         // ── Attack sound ──────────────────────────────────────────────────────
         if (audioSource != null && attackSwingClip != null)
+        {
+            audioSource.pitch = Random.Range(swingPitchMin, swingPitchMax);
             audioSource.PlayOneShot(attackSwingClip);
+        }
 
         // ── Open damage window ────────────────────────────────────────────────
         _hitThisSwing.Clear();
@@ -227,10 +235,13 @@ public class PlayerAttack : NetworkBehaviour
 
     // ─── Hit Detection ────────────────────────────────────────────────────────
 
+    // Static reuse buffer keeps melee hit queries GC-free.
+    private static readonly Collider[] s_meleeBuffer = new Collider[16];
+
     private void DamageEnemiesInRange()
     {
         Vector3 hitCenter = transform.position + transform.forward * attackOffset;
-        Collider[] hits = Physics.OverlapSphere(hitCenter, attackRadius);
+        int hitCount = Physics.OverlapSphereNonAlloc(hitCenter, attackRadius, s_meleeBuffer);
 
         // ── Damage Range ──────────────────────────────────────────────────────
         // Roll a value between computed min and max; falls back to Inspector value.
@@ -253,8 +264,9 @@ public class PlayerAttack : NetworkBehaviour
             ? Mathf.RoundToInt(baseDamage * (1f + _xp.ComputedCritDamage))
             : baseDamage;
 
-        foreach (Collider hit in hits)
+        for (int i = 0; i < hitCount; i++)
         {
+            Collider hit = s_meleeBuffer[i];
             if (!hit.CompareTag(enemyTag)) continue;
 
             int id = hit.gameObject.GetInstanceID();

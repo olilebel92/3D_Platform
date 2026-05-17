@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEngine;
 
 // ─── Enums ────────────────────────────────────────────────────────────────────
@@ -27,11 +28,14 @@ public class EnemyData : ScriptableObject
     [TextArea(2, 4)] public string description;
     public Sprite icon;
 
-    [Tooltip("The creature's race/species — Undead, Human, Orc, Slime, etc.")]
-    public CreatureType creatureType = CreatureType.Undead;
+    [Tooltip("The creature's races/species — an enemy can belong to multiple types (e.g. Undead + Slime).")]
+    public List<CreatureType> creatureTypes = new() { CreatureType.Undead };
 
     [Tooltip("Difficulty tier — Normal, Elite, Boss, Magic, Hunter.")]
     public EnemyCategory category = EnemyCategory.Normal;
+
+    [Tooltip("Level shown on the enemy health bar.")]
+    public int level = 1;
 
     [Header("Prefab")]
     [Tooltip("The enemy GameObject prefab to spawn. Must have NetworkObject + EnemyAI. " +
@@ -47,8 +51,10 @@ public class EnemyData : ScriptableObject
     [Tooltip("NavMesh movement speed (units/sec).")]
     public float moveSpeed = 3f;
 
-    [Tooltip("Flat damage dealt per attack.")]
-    public int attackDamage = 1;
+    [Tooltip("Minimum damage dealt per attack (inclusive).")]
+    public int attackDamageMin = 1;
+    [Tooltip("Maximum damage dealt per attack (inclusive).")]
+    public int attackDamageMax = 2;
 
     [Tooltip("Seconds between each attack.")]
     public float attackCooldown = 1.5f;
@@ -64,6 +70,9 @@ public class EnemyData : ScriptableObject
 
     [Tooltip("How long (seconds) the stun lasts when triggered.")]
     public float attackStunDuration = 1f;
+
+    [Tooltip("Seconds the enemy stops moving after triggering an attack (match to attack animation length).")]
+    public float attackMoveLockDuration = 0.6f;
 
     [Tooltip("How often (seconds) the enemy re-evaluates the nearest player in multiplayer.")]
     public float retargetInterval = 1f;

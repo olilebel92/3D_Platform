@@ -28,6 +28,7 @@ public class DamagePopup : MonoBehaviour
     private TextMeshPro _label;
     private Camera _mainCam;
     private float _timer;
+    private float _moveDelay;
     private Vector3 _drift;
     private Color _color;
 
@@ -40,7 +41,9 @@ public class DamagePopup : MonoBehaviour
     /// <param name="color">Text color.</param>
     /// <param name="prefix">Optional prefix prepended to the number, e.g. "+".</param>
     /// <param name="suffix">Optional suffix appended after the number, e.g. " EXP".</param>
-    public void Initialize(int amount, Color color, float fontSize = 6f, string prefix = "", string suffix = "")
+    public void Initialize(int amount, Color color, float fontSize = 6f, string prefix = "", string suffix = "",
+        TMP_FontAsset font = null, float moveDelay = 0f, float holdDuration = -1f, float fadeDuration = -1f,
+        Color outlineColor = default, float outlineWidth = 0f)
     {
         _label = GetComponent<TextMeshPro>();
         if (_label == null)
@@ -57,6 +60,16 @@ public class DamagePopup : MonoBehaviour
         _color          = color;
         _label.color    = _color;
 
+        _moveDelay = moveDelay;
+        if (holdDuration >= 0f) this.holdDuration = holdDuration;
+        if (fadeDuration >= 0f) this.fadeDuration = fadeDuration;
+        if (font != null) _label.font = font;
+        if (outlineWidth > 0f)
+        {
+            _label.outlineColor = outlineColor;
+            _label.outlineWidth = outlineWidth;
+        }
+
         float dx = Random.Range(-horizontalDrift, horizontalDrift);
         _drift = new Vector3(dx, riseSpeed, 0f);
         _timer = 0f;
@@ -68,18 +81,20 @@ public class DamagePopup : MonoBehaviour
     {
         _timer += Time.deltaTime;
 
-        // Rise
-        transform.position += _drift * Time.deltaTime;
+        // Rise only after the immobile delay
+        if (_timer > _moveDelay)
+            transform.position += _drift * Time.deltaTime;
 
         // Billboard — always face the camera
         if (_mainCam != null)
             transform.forward = _mainCam.transform.forward;
 
-        // Fade out after hold phase
-        float fadeProgress = Mathf.InverseLerp(holdDuration, holdDuration + fadeDuration, _timer);
+        // Fade starts after (moveDelay + holdDuration), finishes after fadeDuration
+        float visibleElapsed = _timer - _moveDelay;
+        float fadeProgress = Mathf.InverseLerp(holdDuration, holdDuration + fadeDuration, visibleElapsed);
         _label.color = new Color(_color.r, _color.g, _color.b, 1f - fadeProgress);
 
-        if (_timer >= holdDuration + fadeDuration)
+        if (_timer >= _moveDelay + holdDuration + fadeDuration)
             Destroy(gameObject);
     }
 }

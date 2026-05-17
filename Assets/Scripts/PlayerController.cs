@@ -39,6 +39,11 @@ public class PlayerController : NetworkBehaviour
     [Tooltip("AudioSource used to play jump sound. Auto-found if blank.")]
     public AudioSource audioSource;
 
+    [Tooltip("Minimum pitch multiplier for jump sound.")]
+    [SerializeField] private float jumpPitchMin = 0.9f;
+    [Tooltip("Maximum pitch multiplier for jump sound.")]
+    [SerializeField] private float jumpPitchMax = 1.1f;
+
     // ─── Regen ────────────────────────────────────────────────────────────────
 
     [Header("Regen")]
@@ -493,7 +498,10 @@ public class PlayerController : NetworkBehaviour
             _isJumping = true;
 
             if (audioSource != null && jumpSound != null)
+            {
+                audioSource.pitch = Random.Range(jumpPitchMin, jumpPitchMax);
                 audioSource.PlayOneShot(jumpSound);
+            }
         }
     }
 

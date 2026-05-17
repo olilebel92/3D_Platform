@@ -45,6 +45,9 @@ public class MainMenuManager : MonoBehaviour
     Slider masterSlider, musicSlider, sfxSlider, uiSlider;
     Label  masterLabel,  musicLabel,  sfxLabel,  uiLabel;
 
+    // Graphics
+    DropdownField fpsDropdown;
+
     // ─── Unity Lifecycle ──────────────────────────────────────────────────────
 
     void Awake()
@@ -101,6 +104,17 @@ public class MainMenuManager : MonoBehaviour
         sfxSlider?.RegisterValueChangedCallback(e    => { SettingsManager.SfxVolume    = e.newValue; UpdateVolumeLabel(sfxLabel,    e.newValue); });
         uiSlider?.RegisterValueChangedCallback(e     => { SettingsManager.UiVolume     = e.newValue; UpdateVolumeLabel(uiLabel,     e.newValue); });
 
+        // ── FPS dropdown ──
+        fpsDropdown = root.Q<DropdownField>("fps-dropdown");
+        if (fpsDropdown != null)
+        {
+            fpsDropdown.choices = new System.Collections.Generic.List<string>();
+            foreach (int fps in SettingsManager.AllowedFramerates)
+                fpsDropdown.choices.Add(FpsToLabel(fps));
+
+            fpsDropdown.RegisterValueChangedCallback(e => SettingsManager.FramerateCap = LabelToFps(e.newValue));
+        }
+
         // ── Button callbacks ──
         root.Q<Button>("play-button")?.RegisterCallback<ClickEvent>(_     => { PlayClick(); OnPlay(); });
         root.Q<Button>("host-button")?.RegisterCallback<ClickEvent>(_     => { PlayClick(); OnHost(); });
@@ -137,6 +151,7 @@ public class MainMenuManager : MonoBehaviour
         musicSlider?.SetValueWithoutNotify(SettingsManager.MusicVolume);   UpdateVolumeLabel(musicLabel,  SettingsManager.MusicVolume);
         sfxSlider?.SetValueWithoutNotify(SettingsManager.SfxVolume);       UpdateVolumeLabel(sfxLabel,    SettingsManager.SfxVolume);
         uiSlider?.SetValueWithoutNotify(SettingsManager.UiVolume);         UpdateVolumeLabel(uiLabel,     SettingsManager.UiVolume);
+        fpsDropdown?.SetValueWithoutNotify(FpsToLabel(SettingsManager.FramerateCap));
 
         SetActivePanel(settingsPanel);
     }
@@ -282,6 +297,10 @@ public class MainMenuManager : MonoBehaviour
     {
         if (label != null) label.text = Mathf.RoundToInt(value * 100f) + "%";
     }
+
+    static string FpsToLabel(int fps) => fps < 0 ? "Unlimited" : fps.ToString();
+
+    static int LabelToFps(string label) => label == "Unlimited" ? -1 : int.Parse(label);
 
     bool ValidateNetworkManager()
     {

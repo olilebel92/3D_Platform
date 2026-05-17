@@ -1,4 +1,5 @@
 ﻿using UnityEngine;
+using TMPro;
 
 /// <summary>
 /// Singleton that spawns floating damage numbers in world space.
@@ -52,6 +53,27 @@ public class DamagePopupManager : MonoBehaviour
     [Tooltip("Height above the damaged object's origin where the popup appears.")]
     public float heightOffset = 1.8f;
 
+    [Header("Appearance")]
+    [Tooltip("Font asset for all popups. Leave empty to use the prefab's default font.")]
+    public TMP_FontAsset popupFont;
+
+    [Tooltip("Outline colour painted on every popup.")]
+    public Color outlineColor = Color.black;
+
+    [Tooltip("Outline thickness (0 = no outline, 1 = maximum).")]
+    [Range(0f, 1f)]
+    public float outlineWidth = 0f;
+
+    [Header("Timing")]
+    [Tooltip("Seconds the popup stays immobile before it starts rising.")]
+    public float moveDelay = 0f;
+
+    [Tooltip("How long the popup is fully visible before it starts fading.")]
+    public float holdDuration = 0.4f;
+
+    [Tooltip("How long the fade-out takes after the hold phase.")]
+    public float fadeDuration = 0.5f;
+
     // ─── Private State ────────────────────────────────────────────────────────
 
     private int _hudOverlayLayer = -1;
@@ -94,7 +116,9 @@ public class DamagePopupManager : MonoBehaviour
         {
             Color color = isPlayerReceiving ? receiveColor : (isCrit ? critColor : dealColor);
             float size  = isPlayerReceiving ? receiveFontSize : (isCrit ? critFontSize : dealFontSize);
-            popup.Initialize(amount, color, size);
+            popup.Initialize(amount, color, size,
+                font: popupFont, moveDelay: moveDelay, holdDuration: holdDuration, fadeDuration: fadeDuration,
+                outlineColor: outlineColor, outlineWidth: outlineWidth);
         }
     }
 
@@ -119,7 +143,9 @@ public class DamagePopupManager : MonoBehaviour
 
         DamagePopup popup = obj.GetComponent<DamagePopup>();
         if (popup != null)
-            popup.Initialize(amount, healColor, healFontSize);
+            popup.Initialize(amount, healColor, healFontSize,
+                font: popupFont, moveDelay: moveDelay, holdDuration: holdDuration, fadeDuration: fadeDuration,
+                outlineColor: outlineColor, outlineWidth: outlineWidth);
     }
 
     /// <summary>
@@ -141,6 +167,8 @@ public class DamagePopupManager : MonoBehaviour
 
         DamagePopup popup = obj.GetComponent<DamagePopup>();
         if (popup != null)
-            popup.Initialize(amount, xpColor, xpFontSize, suffix: " EXP");
+            popup.Initialize(amount, xpColor, xpFontSize, suffix: " EXP",
+                font: popupFont, moveDelay: moveDelay, holdDuration: holdDuration, fadeDuration: fadeDuration,
+                outlineColor: outlineColor, outlineWidth: outlineWidth);
     }
 }

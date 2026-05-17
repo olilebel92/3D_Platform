@@ -14,6 +14,11 @@ public class EnemyColorRandomizer : NetworkBehaviour
     [Tooltip("Maximum value for each RGB channel (0–1).")]
     [SerializeField] private float maxChannelValue = 1f;
 
+    [Header("Subtlety")]
+    [Tooltip("How strongly the random tint is applied. 0 = pure white (no tint), 1 = full random color. Lower values produce softer, pastel tints.")]
+    [Range(0f, 1f)]
+    [SerializeField] private float tintStrength = 0.5f;
+
     private readonly NetworkVariable<Color> _syncedColor = new(
         Color.white,
         NetworkVariableReadPermission.Everyone,
@@ -72,10 +77,11 @@ public class EnemyColorRandomizer : NetworkBehaviour
 
     private Color RandomColor()
     {
-        return new Color(
+        Color raw = new Color(
             Random.Range(minChannelValue, maxChannelValue),
             Random.Range(minChannelValue, maxChannelValue),
             Random.Range(minChannelValue, maxChannelValue)
         );
+        return Color.Lerp(Color.white, raw, tintStrength);
     }
 }

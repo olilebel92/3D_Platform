@@ -23,8 +23,6 @@ public class UI_FPSCounter : MonoBehaviour
 
     void Start()
     {
-        Application.targetFrameRate = 60;
-
         if (panel != null)
             panel.SetActive(true); // Start visible
     }

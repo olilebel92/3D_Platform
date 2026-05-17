@@ -31,6 +31,11 @@ public class HealthSystem : MonoBehaviour
     [Tooltip("AudioSource used to play hit sounds. Auto-found if blank.")]
     public AudioSource audioSource;
 
+    [Tooltip("Minimum pitch multiplier for hit sound.")]
+    [SerializeField] private float hitPitchMin = 0.9f;
+    [Tooltip("Maximum pitch multiplier for hit sound.")]
+    [SerializeField] private float hitPitchMax = 1.1f;
+
     // ─── Death Settings ───────────────────────────────────────────────────────
     [Header("Death Settings")]
     [Tooltip("If true, destroys the GameObject on death. Use for enemies.")]
@@ -38,6 +43,10 @@ public class HealthSystem : MonoBehaviour
 
     [Tooltip("Seconds before the object is destroyed after death.")]
     public float deathDelay = 0.5f;
+
+    // ─── Events ───────────────────────────────────────────────────────────────
+    /// <summary>Fired when currentHealth drops below 0f, before the destroy delay.</summary>
+    public System.Action OnDeath;
 
     // ─── Private State ────────────────────────────────────────────────────────
 
@@ -91,7 +100,10 @@ public class HealthSystem : MonoBehaviour
 
         // ── Hit Sound ─────────────────────────────────────────────────────────
         if (audioSource != null && hitSound != null)
+        {
+            audioSource.pitch = Random.Range(hitPitchMin, hitPitchMax);
             audioSource.PlayOneShot(hitSound);
+        }
 
         // ── Damage Popup ──────────────────────────────────────────────────────
         if (DamagePopupManager.Instance != null)
@@ -100,7 +112,7 @@ public class HealthSystem : MonoBehaviour
             DamagePopupManager.Instance.ShowDamage(transform.position, amount, isPlayer, isCrit);
         }
 
-        if (currentHealth <= 0)
+        if (currentHealth <= 0f)
             Die();
     }
 
@@ -183,7 +195,13 @@ public class HealthSystem : MonoBehaviour
             }
 
             EnemyAI ai = GetComponent<EnemyAI>();
-            if (ai != null) ai.enabled = false;
+            if (ai != null)
+            {
+                ai.PlayDeathAnimation();
+                ai.enabled = false;
+            }
+
+            OnDeath?.Invoke();
 
             Destroy(gameObject, deathDelay);
         }

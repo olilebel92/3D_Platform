@@ -132,6 +132,9 @@ public class Fireball : NetworkBehaviour
 
     // ─── Explosion ────────────────────────────────────────────────────────────
 
+    // Static reuse buffer keeps AOE queries GC-free across all fireballs.
+    private static readonly Collider[] s_explosionBuffer = new Collider[32];
+
     void Explode(Vector3 origin)
     {
         // precomputedDamage is set by SpellCaster before Spawn so the authoritative
@@ -142,9 +145,10 @@ public class Fireball : NetworkBehaviour
         float raw = precomputedDamage > 0f ? precomputedDamage : baseDamage;
 
         bool networked = NetworkManager.Singleton != null && NetworkManager.Singleton.IsListening;
-        Collider[] hits = Physics.OverlapSphere(origin, falloffRadius);
-        foreach (Collider hit in hits)
+        int hitCount = Physics.OverlapSphereNonAlloc(origin, falloffRadius, s_explosionBuffer);
+        for (int i = 0; i < hitCount; i++)
         {
+            Collider hit = s_explosionBuffer[i];
             if (hit.CompareTag("Player")) continue;
 
             HealthSystem health = hit.GetComponent<HealthSystem>();

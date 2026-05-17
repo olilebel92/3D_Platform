@@ -6,7 +6,8 @@
       "Bash(dir \"C:\\\\Users\\\\oli_l\\\\OneDrive\\\\Bureau\\\\Code\\\\HackNSLASH\\\\Roadmap\" /s /b)",
       "Bash(git mv:*)",
       "Bash(git add *)",
-      "PowerShell(git cherry-pick 7ef5f15)"
+      "PowerShell(git cherry-pick 7ef5f15)",
+      "Bash(python -m py_compile dashboard/items_tab.py dashboard/spells_tab.py dashboard/enemies_tab.py)"
     ]
   }
 }

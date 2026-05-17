@@ -46,32 +46,34 @@ public class EnemyReward : NetworkBehaviour
     [Tooltip("Radius around the death position in which drops are scattered.")]
     public float dropScatterRadius = 0.8f;
 
+    // ─── Lifecycle ────────────────────────────────────────────────────────────
+    private HealthSystem _health;
+
+    void Awake()
+    {
+        _health = GetComponent<HealthSystem>();
+        if (_health != null) _health.OnDeath += GrantRewards;
+    }
+
+    void OnDestroy()
+    {
+        if (_health != null) _health.OnDeath -= GrantRewards;
+    }
+
     // ─── Public Method for Spawner ────────────────────────────────────────────
 
     /// <summary>Assign an EnemyData asset. Reward values will be read from it on death.</summary>
     public void SetData(EnemyData data) => _data = data;
 
-    // ─── Unity Lifecycle ──────────────────────────────────────────────────────
+    // ─── Reward Entry Point ───────────────────────────────────────────────────
 
-    // True from OnApplicationQuit until the next play session — prevents
-    // OnDestroy from instantiating drops during Editor stop-play teardown,
-    // where Application.isPlaying is still true when objects are destroyed.
-    private static bool _appIsQuitting;
-
-    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
-    static void ResetQuitFlag() => _appIsQuitting = false;
-
-    void OnApplicationQuit() => _appIsQuitting = true;
-
-    public override void OnDestroy()
+    /// <summary>
+    /// Grants XP, HP heal, and rolls drops. Subscribed to HealthSystem.OnDeath,
+    /// which fires at currentHealth ≤ 0f — not from OnDestroy, which can fire
+    /// during scene unload and would spawn drops into a dying scene.
+    /// </summary>
+    public void GrantRewards()
     {
-        base.OnDestroy();
-
-        // Skip rewards when quitting, scene unloading, or play mode stopping
-        if (_appIsQuitting) return;
-        if (!gameObject.scene.isLoaded) return;
-        if (!Application.isPlaying) return;
-
         // Server-authority in MP, always run in solo.
         bool networkActive = NetworkManager.Singleton != null && NetworkManager.Singleton.IsListening;
         if (networkActive && !IsServer) return;

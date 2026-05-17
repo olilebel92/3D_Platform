@@ -42,6 +42,17 @@ Double-click **"HackNSLASH Dashboard"** shortcut on the desktop to launch.
 - **Unity → Dashboard**: Dashboard reads `.asset` files from disk on page load. Click "Refresh All" to re-read after changes made in Unity.
 - **Dashboard → Unity**: Writing a new asset creates `.asset` + `.asset.meta` directly on disk. Unity auto-detects and imports within seconds — no restart needed.
 
+## Create vs Edit Flow
+Each tab has three sections in order: Library table, **Edit Existing**, **Create New**.
+- **Create** uses `write_*_asset()` in `asset_io.py`. Renders the full template, generates a new `.asset.meta` GUID. Fails if the asset file already exists.
+- **Edit** uses `update_*_asset(asset_file, data)`. Reads the existing `.asset`, replaces only the scalar lines the dashboard manages via `_update_scalar_fields()` (regex line-replacement). Crucially:
+  - The `.asset.meta` is **never** rewritten on edit → the Unity GUID is preserved, so prefab/scene references stay intact.
+  - Unity-assigned reference fields (`icon`, `prefab`, `hitEffect`, `castSound`, `hitSound`) are **never** in the updates dict → they stay as whatever Unity set them to (`{fileID: N, guid: ..., type: 3}`). The dashboard intentionally cannot clear or change these.
+  - Asset filename is **locked on edit** (Streamlit `disabled=True`). Renaming an asset would invalidate references; do that in Unity if needed.
+- **Spell school change on edit** moves both the `.asset` and `.asset.meta` to `Spells/T2/<NewSchool>/`. The destination folder is created with its own `.meta` if it doesn't exist.
+
+When adding a new field to an existing SO type, both `write_*_asset` (create template) AND `update_*_asset` (updates dict) must include it — otherwise edit will leave the field at its old/default value.
+
 ## ScriptableObject Asset Paths
 | Type     | Directory                                      |
 |----------|------------------------------------------------|

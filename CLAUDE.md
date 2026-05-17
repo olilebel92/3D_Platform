@@ -47,7 +47,7 @@
 - Never edit `PlayerInputActions.cs`
 - Never use legacy Input system
 - Never call `FindObjectOfType<>()` or heavy searches in `Update()` — cache in `Awake()` or `Start()`
-- Never use `DontDestroyOnLoad()` unless explicitly asked
+- Never use `DontDestroyOnLoad()` in new code unless explicitly asked. Existing exceptions: `CursorManager` and `MusicManager` (persistent input/audio singletons that survive scene loads by design)
 - Player GameObject is always tagged `"Player"`
 - Prefer early returns and guard clauses
 - Initialize fields where possible; avoid unnecessary allocations in hot paths

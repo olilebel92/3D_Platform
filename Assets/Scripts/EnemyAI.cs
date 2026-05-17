@@ -10,6 +10,9 @@ public class EnemyAI : NetworkBehaviour
     [Tooltip("Optional ScriptableObject. When assigned, overrides all stat fields below at runtime.")]
     [SerializeField] private EnemyData _data;
 
+    public string EnemyDisplayName => _data != null ? _data.enemyName : gameObject.name;
+    public int    EnemyLevel        => _data != null ? _data.level     : 1;
+
     // ─── References ───────────────────────────────────────────────────────────
     [Header("References")]
     [Tooltip("Leave blank — target is resolved automatically from connected players.")]
@@ -29,14 +32,19 @@ public class EnemyAI : NetworkBehaviour
     [Header("Attack Settings")]
     [Tooltip("Seconds between each attack.")]
     public float attackCooldown = 1.5f;
-    [Tooltip("Damage dealt per attack.")]
-    public int attackDamage = 1;
+    [Tooltip("Minimum damage dealt per attack (inclusive).")]
+    public int attackDamageMin = 1;
+    [Tooltip("Maximum damage dealt per attack (inclusive).")]
+    public int attackDamageMax = 2;
     [Tooltip("Chance (0–1) to stun the target on a successful attack.")]
     [Range(0f, 1f)]
     public float attackStunChance = 0.2f;
     [Tooltip("Duration (seconds) of the stun applied on a successful stun roll.")]
     public float attackStunDuration = 1f;
+    [Tooltip("Seconds the enemy stops moving after triggering an attack (match to attack animation length).")]
+    public float attackMoveLockDuration = 0.6f;
     private float attackTimer = 0f;
+    private float attackMoveLockTimer = 0f;
 
     [Header("Movement")]
     public float moveSpeed = 3f;
@@ -66,8 +74,10 @@ public class EnemyAI : NetworkBehaviour
     private static readonly int AnimWalk   = Animator.StringToHash("Walk");
     private static readonly int AnimAttack = Animator.StringToHash("Attack");
     private static readonly int AnimIdle   = Animator.StringToHash("Idle");
+    private static readonly int AnimDeath  = Animator.StringToHash("Death");
     private bool animHasWalk;
     private bool animHasIdle;
+    private bool animHasDeath;
 
     // ─── Networked Health ─────────────────────────────────────────────────────
     // Read by EnemyHealthBar on all clients to drive the HP bar UI.
@@ -111,8 +121,9 @@ public class EnemyAI : NetworkBehaviour
 
         agent    = GetComponent<NavMeshAgent>();
         animator = GetComponentInChildren<Animator>();
-        animHasWalk = HasAnimParam(AnimWalk);
-        animHasIdle = HasAnimParam(AnimIdle);
+        animHasWalk  = HasAnimParam(AnimWalk);
+        animHasIdle  = HasAnimParam(AnimIdle);
+        animHasDeath = HasAnimParam(AnimDeath);
 
         if (agent != null)
         {
@@ -173,6 +184,13 @@ public class EnemyAI : NetworkBehaviour
             currentState = State.Chase;
         else
             currentState = State.Idle;
+
+        // ── Move-lock: keep enemy frozen in Attack state for the animation window
+        if (attackMoveLockTimer > 0f)
+        {
+            attackMoveLockTimer -= Time.deltaTime;
+            currentState = State.Attack;
+        }
 
         // ── Run State Logic ──────────────────────────────────────────────────
         switch (currentState)
@@ -284,10 +302,20 @@ public class EnemyAI : NetworkBehaviour
         if (attackTimer <= 0f)
         {
             attackTimer = attackCooldown;
+            attackMoveLockTimer = attackMoveLockDuration;
 
-            // Trigger attack animation on all clients
+            bool networkActive = NetworkManager.Singleton != null
+                              && NetworkManager.Singleton.IsListening;
+
+            // Trigger attack animation. In MP the ClientRpc broadcasts to all
+            // clients; in solo we trigger locally (no NetworkManager listening).
             if (animator != null)
-                TriggerAttackAnimClientRpc();
+            {
+                if (networkActive)
+                    TriggerAttackAnimClientRpc();
+                else
+                    animator.SetTrigger(AnimAttack);
+            }
 
             // ── Apply damage ──────────────────────────────────────────────────
             // Solo: call TakeDamage directly on the HealthSystem.
@@ -295,15 +323,14 @@ public class EnemyAI : NetworkBehaviour
             //       won't update the owning client's HP or UI. Instead, send a
             //       targeted ClientRpc to the player's owning client so damage
             //       is applied locally where the UI references live.
-            bool networkActive = NetworkManager.Singleton != null
-                              && NetworkManager.Singleton.IsListening;
 
+            int rolledDamage = Random.Range(attackDamageMin, attackDamageMax + 1);
             float stunDuration = (Random.value < attackStunChance) ? attackStunDuration : 0f;
 
             if (!networkActive)
             {
                 if (_playerHealth != null)
-                    _playerHealth.TakeDamage(attackDamage);
+                    _playerHealth.TakeDamage(rolledDamage);
 
                 if (stunDuration > 0f && player != null)
                     player.GetComponent<StatusEffectHandler>()?.ApplyStun(stunDuration);
@@ -317,7 +344,7 @@ public class EnemyAI : NetworkBehaviour
                         TargetClientIds = new[] { _targetNetObj.OwnerClientId }
                     }
                 };
-                DealDamageClientRpc(attackDamage, stunDuration, ownerOnly);
+                DealDamageClientRpc(rolledDamage, stunDuration, ownerOnly);
             }
         }
 
@@ -348,6 +375,35 @@ public class EnemyAI : NetworkBehaviour
     {
         if (animator != null)
             animator.SetTrigger(AnimAttack);
+    }
+
+    /// <summary>
+    /// Plays the Death animation and stops the agent. Called by HealthSystem.Die()
+    /// before the AI is disabled so the death clip can run during deathDelay.
+    /// In MP, broadcasts to all clients so the animation plays everywhere before despawn.
+    /// </summary>
+    public void PlayDeathAnimation()
+    {
+        if (agent != null && agent.isOnNavMesh)
+            agent.ResetPath();
+
+        if (animator == null || !animHasDeath) return;
+
+        bool networkActive = NetworkManager.Singleton != null
+                          && NetworkManager.Singleton.IsListening;
+        if (networkActive)
+            TriggerDeathAnimClientRpc();
+        else
+            animator.SetTrigger(AnimDeath);
+    }
+
+    // Fires the Death trigger on every client so the death clip plays everywhere
+    // before the server-side Destroy() replicates the despawn.
+    [ClientRpc]
+    void TriggerDeathAnimClientRpc()
+    {
+        if (animator != null && animHasDeath)
+            animator.SetTrigger(AnimDeath);
     }
 
     // Sent only to the targeted player's owning client.
@@ -453,13 +509,15 @@ public class EnemyAI : NetworkBehaviour
         moveSpeed          = _data.moveSpeed * _spdMult;
         angularSpeed       = _data.angularSpeed;
         rotationSpeed      = _data.rotationSpeed;
-        attackDamage       = Mathf.Max(1, Mathf.RoundToInt(_data.attackDamage * _dmgMult));
+        attackDamageMin    = Mathf.Max(1, Mathf.RoundToInt(_data.attackDamageMin * _dmgMult));
+        attackDamageMax    = Mathf.Max(attackDamageMin, Mathf.RoundToInt(_data.attackDamageMax * _dmgMult));
         attackCooldown     = _data.attackCooldown;
         attackRange        = _data.attackRange;
         detectionRange     = _data.detectionRange;
         attackStunChance   = _data.attackStunChance;
-        attackStunDuration = _data.attackStunDuration;
-        retargetInterval   = _data.retargetInterval;
+        attackStunDuration    = _data.attackStunDuration;
+        attackMoveLockDuration = _data.attackMoveLockDuration;
+        retargetInterval       = _data.retargetInterval;
 
         // Server-authority: only the server (or solo player) writes HealthSystem.
         // Clients receive HP via NetworkHealth — writing here would race the NV broadcast.
@@ -472,6 +530,7 @@ public class EnemyAI : NetworkBehaviour
                 float scaledMax = Mathf.Max(1f, _data.maxHealth * _hpMult);
                 h.maxHealth     = scaledMax;
                 h.currentHealth = scaledMax;
+                h.destroyOnDeath = true;   // SO-driven enemies always despawn on death
             }
         }
 

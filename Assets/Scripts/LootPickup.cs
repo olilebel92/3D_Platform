@@ -253,7 +253,7 @@ public class LootPickup : NetworkBehaviour
     // which requires SpawnAsPlayerObject (PlayerSpawner uses SpawnWithOwnership).
     private GameObject FindPlayerByClientId(ulong clientId)
     {
-        foreach (GameObject p in GameObject.FindGameObjectsWithTag("Player"))
+        foreach (GameObject p in PlayerController.All)
         {
             NetworkObject net = p.GetComponent<NetworkObject>();
             if (net != null && net.OwnerClientId == clientId)
@@ -266,7 +266,7 @@ public class LootPickup : NetworkBehaviour
     // Used inside ClientRpcs so the receiving machine can find its own player.
     private GameObject FindLocalPlayer()
     {
-        foreach (GameObject p in GameObject.FindGameObjectsWithTag("Player"))
+        foreach (GameObject p in PlayerController.All)
         {
             NetworkObject net = p.GetComponent<NetworkObject>();
             if (net != null && net.IsOwner)

@@ -142,6 +142,9 @@ public class LockOnSystem : MonoBehaviour
         }
     }
 
+    // Static reuse buffer keeps lock-on queries GC-free.
+    private static readonly Collider[] s_lockOnBuffer = new Collider[32];
+
     /// <summary>
     /// Finds the best lockable enemy.
     /// <paramref name="exclude"/> is always skipped (used to ignore the current/dying target).
@@ -150,7 +153,7 @@ public class LockOnSystem : MonoBehaviour
     /// </summary>
     private Transform FindBestTarget(Transform exclude, float stickDir)
     {
-        Collider[] hits = Physics.OverlapSphere(transform.position, lockRange);
+        int hitCount = Physics.OverlapSphereNonAlloc(transform.position, lockRange, s_lockOnBuffer);
 
         Transform best = null;
         float bestScore = float.MaxValue;
@@ -161,8 +164,9 @@ public class LockOnSystem : MonoBehaviour
 
         bool useDirectional = exclude != null && Mathf.Abs(stickDir) > 0.001f;
 
-        foreach (Collider col in hits)
+        for (int i = 0; i < hitCount; i++)
         {
+            Collider col = s_lockOnBuffer[i];
             if (!col.CompareTag(enemyTag)) continue;
 
             // Always skip the excluded (current/dying) target
