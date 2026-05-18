@@ -59,6 +59,9 @@ public class SpellCaster : NetworkBehaviour
     [Tooltip("Telegraph projector on this player. Assign the TelegraphProjector component here.")]
     [SerializeField] private TelegraphProjector _telegraphProjector;
 
+    [Header("Feedback")]
+    [Tooltip("Sound played when a cast fails because mana is insufficient. Optional.")]
+    [SerializeField] private AudioClip _noManaSound;
 
     // ─── Cast State ───────────────────────────────────────────────────────────
 
@@ -69,6 +72,7 @@ public class SpellCaster : NetworkBehaviour
     private float     _castStartTime     = 0f;
     private bool      _throwEventFired   = false;
     private Transform _walkTarget        = null; // enemy being approached in WalkingToTarget
+    private float     _lastNoManaFeedbackTime = -10f;
 
     // ─── Channel Object Tracking ─────────────────────────────────────────────
     // Channel spells spawn their VFX prefab once and keep it alive for the full
@@ -105,6 +109,7 @@ public class SpellCaster : NetworkBehaviour
     private PlayerController    _playerController;
     private AudioSource         _audioSource;
     private TargetSelector      _targetSelector;
+    private ManaSystem          _mana;
 
     // ─── Public Cast State API (for UI) ──────────────────────────────────────
 
@@ -259,6 +264,7 @@ public class SpellCaster : NetworkBehaviour
     {
         _statusEffects    = GetComponent<StatusEffectHandler>();
         _targetSelector   = GetComponent<TargetSelector>();
+        _mana             = GetComponent<ManaSystem>();
         _cameraTransform  = Camera.main?.transform;
 
         if (_targetSelector != null)
@@ -513,6 +519,18 @@ public class SpellCaster : NetworkBehaviour
         if (IsOnCooldown(spell))
         {
             Debug.Log($"[SpellCaster] {spell.spellName} on cooldown ({GetCooldownRemaining(spell):0.0}s left).");
+            return;
+        }
+
+        if (_mana != null && spell.manaCost > 0f && !_mana.SpendMana(spell.manaCost))
+        {
+            Debug.Log($"[SpellCaster] Not enough mana for {spell.spellName} (cost {spell.manaCost}, have {_mana.CurrentMana:0.#}).");
+            if (Time.time - _lastNoManaFeedbackTime >= 0.6f)
+            {
+                _lastNoManaFeedbackTime = Time.time;
+                if (_noManaSound != null) _audioSource.PlayOneShot(_noManaSound);
+                HudMessageUI.Instance?.ShowNoMana();
+            }
             return;
         }
 

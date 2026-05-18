@@ -4,7 +4,7 @@ using UnityEngine;
 // ─── Enums ────────────────────────────────────────────────────────────────────
 
 /// <summary>The creature's race or species — used for tagging, filtering, and future resistances.</summary>
-public enum CreatureType { Undead, Human, Orc, Slime }
+public enum CreatureType { Undead, Human, Orc, Slime, Elemental, Humanoid }
 
 /// <summary>The enemy's role tier — drives difficulty design and loot scaling.</summary>
 public enum EnemyCategory { Normal, Elite, Boss, Magic, Hunter }

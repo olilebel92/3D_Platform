@@ -281,8 +281,14 @@ public class PlayerInventory : MonoBehaviour
     /// <summary>Total flat HP bonus from all equipped items.</summary>
     public int   TotalBonusHP         => _equipped.Values.Sum(i => i.BonusHP);
 
+    /// <summary>Total flat Mana bonus from all equipped items.</summary>
+    public int   TotalBonusMana        => _equipped.Values.Sum(i => i.BonusMana);
+
     /// <summary>Total HP regeneration per second from all equipped items.</summary>
-    public float TotalBonusRegen      => _equipped.Values.Sum(i => i.BonusRegenPerSecond);
+    public float TotalBonusHPRegen     => _equipped.Values.Sum(i => i.BonusHPRegenPerSecond);
+
+    /// <summary>Total Mana regeneration per second from all equipped items.</summary>
+    public float TotalBonusManaRegen   => _equipped.Values.Sum(i => i.BonusManaRegenPerSecond);
 
     /// <summary>Total Crit Rate bonus (0-1) from all equipped items.</summary>
     public float TotalBonusCritRate   => _equipped.Values.Sum(i => i.BonusCritRate);

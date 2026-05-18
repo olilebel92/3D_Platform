@@ -144,6 +144,7 @@ public class ExperienceManager : MonoBehaviour
     // ─── Private State ────────────────────────────────────────────────────────
 
     private HealthSystem _playerHealth;
+    private ManaSystem _playerMana;
     private PlayerInventory _inventory;
 
     // ─── Unity Lifecycle ──────────────────────────────────────────────────────
@@ -157,6 +158,8 @@ public class ExperienceManager : MonoBehaviour
         _playerHealth = GetComponent<HealthSystem>();
         if (_playerHealth == null)
             Debug.LogWarning("[ExperienceManager] No HealthSystem found on this GameObject.");
+
+        _playerMana = GetComponent<ManaSystem>();
 
         // Cache own PlayerInventory — each player has their own, no singleton needed.
         _inventory = GetComponent<PlayerInventory>();
@@ -229,6 +232,15 @@ public class ExperienceManager : MonoBehaviour
         int skillTreeHP = SkillTreeManager.Instance != null ? SkillTreeManager.Instance.TotalHpBonus : 0;
         _playerHealth.ApplyEquipmentHP(strHP + flatHP + skillTreeHP);
         SyncMaxHealthToServer();
+
+        if (_playerMana != null)
+        {
+            int   flatMana      = _inventory != null ? _inventory.TotalBonusMana     : 0;
+            float manaRegen     = _inventory != null ? _inventory.TotalBonusManaRegen : 0f;
+            int   skillTreeMana = SkillTreeManager.Instance != null ? SkillTreeManager.Instance.TotalManaBonus : 0;
+            _playerMana.ApplyEquipmentMana(flatMana + skillTreeMana);
+            _playerMana.ApplyEquipmentManaRegen(manaRegen);
+        }
     }
 
     /// <summary>Called whenever a skill tree node is learned — re-applies HP and regen bonuses.</summary>
@@ -240,6 +252,12 @@ public class ExperienceManager : MonoBehaviour
         {
             float skillTreeRegen = SkillTreeManager.Instance != null ? SkillTreeManager.Instance.TotalHpRegenBonus : 0f;
             _playerHealth.ApplySkillTreeRegen(skillTreeRegen);
+        }
+
+        if (_playerMana != null)
+        {
+            float skillTreeManaRegen = SkillTreeManager.Instance != null ? SkillTreeManager.Instance.TotalManaRegenBonus : 0f;
+            _playerMana.ApplySkillTreeManaRegen(skillTreeManaRegen);
         }
     }
 
@@ -340,7 +358,10 @@ public class ExperienceManager : MonoBehaviour
             $"LEVEL UP → Level {currentLevel}! +1 stat point ({statPoints} unspent). Next level: {xpToNextLevel} XP.");
 
         if (_audioSource != null && levelUpClip != null)
+        {
+            _audioSource.pitch = 1f;
             _audioSource.PlayOneShot(levelUpClip);
+        }
 
         if (levelUpVFXPrefab != null)
             Instantiate(levelUpVFXPrefab, transform.position, Quaternion.identity);

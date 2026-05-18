@@ -23,12 +23,16 @@ MonoBehaviour:
   cost: 2
   prerequisites:
   - node: {fileID: 11400000, guid: a58741de65d1fbb4da6d7077def810c8, type: 2}
-    requiredLevel: 5
+    requiredLevel: 1
   maxLevel: 10
   scalingFactor: 1
   strBonus: 0
   agiBonus: 0
   intBonus: 0
+  hpBonus: 0
+  hpRegenBonus: 0
+  manaBonus: 0
+  manaRegenBonus: 0
   spellDamageBonus: 0
   fireDamageBonus: 0
   healBonus: 0
@@ -37,4 +41,5 @@ MonoBehaviour:
   healPctBonus: 0
   lightningDamageBonus: 0
   lightningDamagePctBonus: 0
+  requiresAnySpell: 0
   unlocksSpell: {fileID: 11400000, guid: 4b1f89da9991a3f47853bd5be20165ff, type: 2}

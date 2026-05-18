@@ -14,9 +14,6 @@ public class HealthSystem : MonoBehaviour
 
     // ─── UI ───────────────────────────────────────────────────────────────────
     [Header("UI (optional — leave blank for enemies)")]
-    [Tooltip("Optional text label showing HP as numbers.")]
-    public TMP_Text healthText;
-
     [Tooltip("Fill Image for the HP bar. Set Image Type to Filled, Fill Method to Horizontal.")]
     public Image hpBarFill;
 
@@ -43,6 +40,9 @@ public class HealthSystem : MonoBehaviour
 
     [Tooltip("Seconds before the object is destroyed after death.")]
     public float deathDelay = 0.5f;
+
+    [Tooltip("If true, colliders are NOT disabled on death. Set automatically for bosses.")]
+    public bool keepColliderOnDeath = false;
 
     // ─── Events ───────────────────────────────────────────────────────────────
     /// <summary>Fired when currentHealth drops below 0f, before the destroy delay.</summary>
@@ -79,7 +79,7 @@ public class HealthSystem : MonoBehaviour
 
     /// <summary>Base regen + equipment bonus + skill tree bonus. Read by PlayerController's regen coroutine.</summary>
     public float TotalRegenPerSecond =>
-        regenPerSecond + (_inventory != null ? _inventory.TotalBonusRegen : 0f) + _skillTreeRegen;
+        regenPerSecond + (_inventory != null ? _inventory.TotalBonusHPRegen : 0f) + _skillTreeRegen;
 
     /// <summary>Base regen only (no equipment). Used by CharacterWindow to split base vs bonus display.</summary>
     public float RegenPerSecond => regenPerSecond;
@@ -201,6 +201,12 @@ public class HealthSystem : MonoBehaviour
                 ai.enabled = false;
             }
 
+            if (!keepColliderOnDeath)
+            {
+                foreach (var col in GetComponents<Collider>())
+                    col.enabled = false;
+            }
+
             OnDeath?.Invoke();
 
             Destroy(gameObject, deathDelay);
@@ -225,9 +231,6 @@ public class HealthSystem : MonoBehaviour
 
     void UpdateHealthUI()
     {
-        if (healthText != null)
-            healthText.text = $"HP: {currentHealth:0.#}/{maxHealth:0}";
-
         if (hpBarFill != null)
             hpBarFill.fillAmount = currentHealth / maxHealth;
     }

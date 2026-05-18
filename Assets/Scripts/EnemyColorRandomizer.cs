@@ -2,20 +2,31 @@ using UnityEngine;
 using Unity.Netcode;
 
 /// <summary>
-/// Assigns a random RGB tint to all Renderers on this enemy prefab.
+/// Assigns a tint to all Renderers on this enemy prefab.
+/// Random mode picks a new color every spawn. Fixed mode uses a chosen color.
 /// Color is synced to all clients via NetworkVariable.
 /// Attach to the enemy prefab root (alongside EnemyAI).
 /// </summary>
 public class EnemyColorRandomizer : NetworkBehaviour
 {
-    [Header("Color Range")]
+    public enum ColorMode { Random, Fixed }
+
+    [Header("Mode")]
+    [Tooltip("Random: new tint each spawn. Fixed: always use the color below.")]
+    [SerializeField] private ColorMode _colorMode = ColorMode.Random;
+
+    [Header("Random Mode")]
     [Tooltip("Minimum value for each RGB channel (0–1).")]
     [SerializeField] private float minChannelValue = 0.2f;
     [Tooltip("Maximum value for each RGB channel (0–1).")]
     [SerializeField] private float maxChannelValue = 1f;
 
-    [Header("Subtlety")]
-    [Tooltip("How strongly the random tint is applied. 0 = pure white (no tint), 1 = full random color. Lower values produce softer, pastel tints.")]
+    [Header("Fixed Mode")]
+    [Tooltip("Base color used when mode is Fixed.")]
+    [SerializeField] private Color _fixedColor = Color.red;
+
+    [Header("Tint (both modes)")]
+    [Tooltip("How strongly the tint is applied. 0 = pure white (no tint), 1 = full color.")]
     [Range(0f, 1f)]
     [SerializeField] private float tintStrength = 0.5f;
 
@@ -40,7 +51,7 @@ public class EnemyColorRandomizer : NetworkBehaviour
         // Apply a local random color here as a fallback.
         bool networked = NetworkManager.Singleton != null && NetworkManager.Singleton.IsListening;
         if (!networked)
-            ApplyColor(RandomColor());
+            ApplyColor(PickColor());
     }
 
     public override void OnNetworkSpawn()
@@ -49,7 +60,7 @@ public class EnemyColorRandomizer : NetworkBehaviour
 
         if (IsServer)
         {
-            _syncedColor.Value = RandomColor();
+            _syncedColor.Value = PickColor();
         }
 
         ApplyColor(_syncedColor.Value);
@@ -75,13 +86,14 @@ public class EnemyColorRandomizer : NetworkBehaviour
         }
     }
 
-    private Color RandomColor()
+    private Color PickColor()
     {
-        Color raw = new Color(
-            Random.Range(minChannelValue, maxChannelValue),
-            Random.Range(minChannelValue, maxChannelValue),
-            Random.Range(minChannelValue, maxChannelValue)
-        );
+        Color raw = _colorMode == ColorMode.Fixed
+            ? _fixedColor
+            : new Color(
+                Random.Range(minChannelValue, maxChannelValue),
+                Random.Range(minChannelValue, maxChannelValue),
+                Random.Range(minChannelValue, maxChannelValue));
         return Color.Lerp(Color.white, raw, tintStrength);
     }
 }

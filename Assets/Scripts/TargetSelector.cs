@@ -209,6 +209,13 @@ public class TargetSelector : NetworkBehaviour
         Transform t = hit.collider.transform;
         while (t != null && !t.CompareTag("Enemy"))
             t = t.parent;
+
+        if (t == null) return null;
+
+        // Reject dead enemies (e.g. boss keeps collider after death) — mirrors LockOnSystem
+        HealthSystem hs = t.GetComponent<HealthSystem>();
+        if (hs != null && hs.currentHealth <= 0f) return null;
+
         return t;
     }
 

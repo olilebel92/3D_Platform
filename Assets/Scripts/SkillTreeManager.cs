@@ -101,6 +101,12 @@ public class SkillTreeManager : MonoBehaviour
     /// <summary>Sum of all flat HP regen bonuses from learned nodes (HP per second).</summary>
     public float TotalHpRegenBonus { get; private set; } = 0f;
 
+    /// <summary>Sum of all flat max mana bonuses from learned nodes.</summary>
+    public int TotalManaBonus { get; private set; } = 0;
+
+    /// <summary>Sum of all flat mana regen bonuses from learned nodes (mana per second).</summary>
+    public float TotalManaRegenBonus { get; private set; } = 0f;
+
     // ─── Events ───────────────────────────────────────────────────────────────
 
     /// <summary>Fired after any node is learned or a skill point is added.</summary>
@@ -234,7 +240,9 @@ public class SkillTreeManager : MonoBehaviour
         TotalLightningDamageBonus    += node.lightningDamageBonus    * node.scalingFactor;
         TotalLightningDamagePctBonus += node.lightningDamagePctBonus * node.scalingFactor;
         TotalHpBonus                 += Mathf.RoundToInt(node.hpBonus      * node.scalingFactor);
-        TotalHpRegenBonus            += node.hpRegenBonus * node.scalingFactor;
+        TotalHpRegenBonus            += node.hpRegenBonus   * node.scalingFactor;
+        TotalManaBonus               += Mathf.RoundToInt(node.manaBonus    * node.scalingFactor);
+        TotalManaRegenBonus          += node.manaRegenBonus * node.scalingFactor;
 
         Debug.Log($"[SkillTree] '{node.nodeName}' leveled to {newLevel}/{node.maxLevel}. " +
                   $"Points left: {SkillPoints}. Spell bonus total: +{TotalSpellDamageBonus}");
@@ -282,6 +290,8 @@ public class SkillTreeManager : MonoBehaviour
         TotalLightningDamagePctBonus = 0f;
         TotalHpBonus              = 0;
         TotalHpRegenBonus         = 0f;
+        TotalManaBonus            = 0;
+        TotalManaRegenBonus       = 0f;
 
         Debug.Log($"[SkillTree] All nodes refunded. Points restored: {pointsRefunded}. Total: {SkillPoints}");
 

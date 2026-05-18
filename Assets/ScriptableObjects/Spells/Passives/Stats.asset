@@ -13,7 +13,7 @@ MonoBehaviour:
   m_Name: Stats
   m_EditorClassIdentifier: Assembly-CSharp::SkillTreeNode
   nodeName: All Stat
-  description: +1 All stat
+  description: 
   icon: {fileID: 21300000, guid: 86ba7749040e5d345a98b9d9b6c789da, type: 3}
   cost: 1
   prerequisites: []
@@ -24,6 +24,8 @@ MonoBehaviour:
   intBonus: 1
   hpBonus: 0
   hpRegenBonus: 0
+  manaBonus: 0
+  manaRegenBonus: 0
   spellDamageBonus: 0
   fireDamageBonus: 0
   healBonus: 0
@@ -32,4 +34,5 @@ MonoBehaviour:
   healPctBonus: 0
   lightningDamageBonus: 0
   lightningDamagePctBonus: 0
+  requiresAnySpell: 0
   unlocksSpell: {fileID: 0}

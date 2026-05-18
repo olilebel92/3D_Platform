@@ -92,6 +92,9 @@ public class SpellData : ScriptableObject
     [Tooltip("Seconds before this spell can be cast again after firing.")]
     public float cooldown = 1f;
 
+    [Tooltip("Mana deducted from the player's pool when this spell is cast. 0 = free.")]
+    public float manaCost = 0f;
+
     [Header("Basic Info")]
     public string spellName = "Unnamed Spell";
 

@@ -434,6 +434,7 @@ MonoBehaviour:
   damagePerSkillRank: {damagePerSkillRank}
   chainCountPerRank: {chainCountPerRank}
   cooldown: {cooldown}
+  manaCost: {manaCost}
   spellName: {spellName}
   description: {description}
   icon: {{fileID: 0}}
@@ -504,6 +505,7 @@ def write_spell_asset(data: dict) -> tuple[bool, str]:
         damagePerSkillRank=f4(data.get("damagePerSkillRank", 0)),
         chainCountPerRank=int(data.get("chainCountPerRank", 0)),
         cooldown=f4(data.get("cooldown", 1.0)),
+        manaCost=f4(data.get("manaCost", 0)),
         castStartDelay=f4(data.get("castStartDelay", 0)),
         castTime=f4(data.get("castTime", 0)),
         throwAnimLeadTime=f4(data.get("throwAnimLeadTime", 0)),
@@ -571,6 +573,7 @@ def update_spell_asset(asset_file: str, data: dict) -> tuple[bool, str]:
         "damagePerSkillRank": f4(data.get("damagePerSkillRank", 0)),
         "chainCountPerRank":  str(int(data.get("chainCountPerRank", 0))),
         "cooldown":    f4(data.get("cooldown", 1.0)),
+        "manaCost":    f4(data.get("manaCost", 0)),
         "spellName":   _yaml_str(data.get("spellName", asset_file)),
         "description": _yaml_str(data.get("description", "")),
         "spellType":   str(config.SPELL_TYPE_INV.get(data.get("spellType", "Cast"), 0)),

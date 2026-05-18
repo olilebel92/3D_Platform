@@ -50,7 +50,7 @@ public static class ItemCsvImporter
             // 2  description
             // 3  slot
             // 4  rarity
-            // 5  STR  6 AGI  7 INT  8 FlatHP  9 RegenPerSecond  10 AllStats
+            // 5  STR  6 AGI  7 INT  8 FlatHP  9 HPRegenPerSecond  10 AllStats
             // 11 CritRate  12 CritDamage  13 FireDamage  14 MovementSpeed  15 SpellPower
 
             string assetFileName = cols[0].Trim();
@@ -78,7 +78,7 @@ public static class ItemCsvImporter
             TryAddStat(item, StatType.AGI,            cols, 6);
             TryAddStat(item, StatType.INT,            cols, 7);
             TryAddStat(item, StatType.FlatHP,         cols, 8);
-            TryAddStat(item, StatType.RegenPerSecond, cols, 9);
+            TryAddStat(item, StatType.HPRegenPerSecond, cols, 9);
             TryAddStat(item, StatType.AllStats,       cols, 10);
             TryAddStat(item, StatType.CritRate,       cols, 11);
             TryAddStat(item, StatType.CritDamage,     cols, 12);

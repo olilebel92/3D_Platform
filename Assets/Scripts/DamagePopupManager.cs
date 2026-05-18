@@ -171,4 +171,5 @@ public class DamagePopupManager : MonoBehaviour
                 font: popupFont, moveDelay: moveDelay, holdDuration: holdDuration, fadeDuration: fadeDuration,
                 outlineColor: outlineColor, outlineWidth: outlineWidth);
     }
+
 }

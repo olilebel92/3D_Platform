@@ -15,6 +15,7 @@ public class StaminaSystem : MonoBehaviour
     public GameObject staminaBarPanel;
 
     private float currentStamina;
+    public float CurrentStamina => currentStamina;
     private float rechargeTimer = 0f;
     private bool isExhausted = false;
     private bool isSprinting = false;

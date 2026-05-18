@@ -63,6 +63,12 @@ public class SkillTreeNode : ScriptableObject
     [Tooltip("Flat HP regenerated per second added per level.")]
     public float hpRegenBonus = 0f;
 
+    [Tooltip("Flat maximum mana added per level.")]
+    public int manaBonus = 0;
+
+    [Tooltip("Flat mana regenerated per second added per level.")]
+    public float manaRegenBonus = 0f;
+
     [Tooltip("Flat bonus per level added to all spell damage.")]
     public float spellDamageBonus = 0f;
 
@@ -99,6 +105,10 @@ public class SkillTreeNode : ScriptableObject
         // If this node has no custom description, use the linked spell's description text.
         bool hasOwnDesc = !string.IsNullOrWhiteSpace(description)
                        && description != "Describe what this skill does.";
+
+        if (!hasOwnDesc && unlocksSpell == null)
+            return BuildAutoStatDescription(rank);
+
         string baseText = (!hasOwnDesc && unlocksSpell != null)
             ? unlocksSpell.description
             : description;
@@ -123,6 +133,57 @@ public class SkillTreeNode : ScriptableObject
         }
 
         return desc;
+    }
+
+    private string BuildAutoStatDescription(int level)
+    {
+        var sb = new System.Text.StringBuilder();
+
+        void AddFlat(float raw, string label, bool asInt = false)
+        {
+            if (raw == 0f) return;
+            float perLv = raw * scalingFactor;
+            string perLvStr = asInt ? $"+{Mathf.RoundToInt(perLv)}" : $"+{perLv:0.##}";
+
+            string line;
+            if (maxLevel == 1)
+                line = $"{Gold(perLvStr)} {label}";
+            else if (level == 0)
+                line = $"{Gold(perLvStr)} {label} per level";
+            else
+            {
+                float total = perLv * level;
+                string totalStr = asInt ? $"+{Mathf.RoundToInt(total)}" : $"+{total:0.##}";
+                line = $"{Gold(perLvStr)} {label} per level (now: {Gold(totalStr)})";
+            }
+
+            if (sb.Length > 0) sb.Append('\n');
+            sb.Append(line);
+        }
+
+        void AddPct(float raw, string label)
+        {
+            if (raw == 0f) return;
+            AddFlat(raw * 100f, $"% {label}");
+        }
+
+        AddFlat(strBonus,               "Strength",         asInt: true);
+        AddFlat(agiBonus,               "Agility",          asInt: true);
+        AddFlat(intBonus,               "Intelligence",     asInt: true);
+        AddFlat(hpBonus,                "Max HP",           asInt: true);
+        AddFlat(hpRegenBonus,           "HP Regen/s");
+        AddFlat(manaBonus,              "Max Mana",         asInt: true);
+        AddFlat(manaRegenBonus,         "Mana Regen/s");
+        AddFlat(spellDamageBonus,       "Spell Damage");
+        AddFlat(fireDamageBonus,        "Fire Damage");
+        AddFlat(healBonus,              "Healing Power");
+        AddFlat(lightningDamageBonus,   "Lightning Damage");
+        AddPct(spellDamagePctBonus,     "Spell Damage");
+        AddPct(fireDamagePctBonus,      "Fire Damage");
+        AddPct(healPctBonus,            "Healing Power");
+        AddPct(lightningDamagePctBonus, "Lightning Damage");
+
+        return sb.Length > 0 ? sb.ToString() : "No effects.";
     }
 
     static string Gold(string value) => $"<color=#FFD700>{value}</color>";

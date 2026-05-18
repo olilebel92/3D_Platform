@@ -16,7 +16,9 @@ public enum StatType
     AGI,
     INT,
     FlatHP,          // flat bonus hit points (available from Normal rarity)
-    RegenPerSecond,  // HP regeneration per second (Uncommon+ only)
+    FlatMana,        // flat bonus mana added to max mana pool
+    HPRegenPerSecond,   // HP regeneration per second (Uncommon+ only)
+    ManaRegenPerSecond, // Mana regeneration per second
     AllStats,        // adds to STR, AGI, and INT simultaneously (Rare+ only)
     CritRate,    // stored as whole percentage points  (5 → +5 % crit rate)
     CritDamage,  // stored as whole percentage points  (25 → +25 % crit dmg)
@@ -66,8 +68,11 @@ public class ItemData : ScriptableObject
     public int   BonusINT        => GetInt(StatType.INT) + GetInt(StatType.AllStats);
     /// <summary>Flat bonus hit points added to max HP.</summary>
     public int   BonusHP              => GetInt(StatType.FlatHP);
+    /// <summary>Flat bonus mana added to max mana pool.</summary>
+    public int   BonusMana            => GetInt(StatType.FlatMana);
     /// <summary>HP regenerated per second from equipment.</summary>
-    public float BonusRegenPerSecond  => GetFloat(StatType.RegenPerSecond);
+    public float BonusHPRegenPerSecond   => GetFloat(StatType.HPRegenPerSecond);
+    public float BonusManaRegenPerSecond => GetFloat(StatType.ManaRegenPerSecond);
     /// <summary>Crit rate bonus as a 0-1 fraction (e.g. 0.05 = +5%).</summary>
     public float BonusCritRate   => GetFloat(StatType.CritRate)   / 100f;
     /// <summary>Crit damage bonus as a 0-1 fraction (e.g. 0.25 = +25%).</summary>
@@ -122,14 +127,17 @@ public class ItemData : ScriptableObject
             bool isPercent  = line.type == StatType.CritRate
                            || line.type == StatType.CritDamage
                            || line.type == StatType.MovementSpeed;
-            bool isDecimal  = line.type == StatType.RegenPerSecond;
+            bool isDecimal  = line.type == StatType.HPRegenPerSecond
+                           || line.type == StatType.ManaRegenPerSecond;
             string label = line.type switch
             {
                 StatType.STR        => "Strength",
                 StatType.AGI        => "Agility",
                 StatType.INT        => "Intelligence",
                 StatType.FlatHP     => "HP",
-                StatType.RegenPerSecond => "HP Regen/s",
+                StatType.FlatMana   => "Mana",
+                StatType.HPRegenPerSecond   => "HP Regen/s",
+                StatType.ManaRegenPerSecond => "Mana Regen/s",
                 StatType.AllStats       => "All Stats",
                 StatType.CritRate     => "Crit Rate",
                 StatType.CritDamage   => "Crit Damage",

@@ -40,7 +40,10 @@ public class ItemGenerator : MonoBehaviour
         [Tooltip("Min / Max flat HP value (FlatHP stat).")]
         public Vector2 hpRange     = new(5, 15);
 
-        [Tooltip("Min / Max HP regen per second value (RegenPerSecond stat).")]
+        [Tooltip("Min / Max flat Mana value (FlatMana stat).")]
+        public Vector2 manaRange   = new(5, 15);
+
+        [Tooltip("Min / Max HP regen per second value (HPRegenPerSecond stat).")]
         public Vector2 regenRange  = new(0, 0);
 
         [Tooltip("Min / Max value for AllStats (kept lower than rareRange — it adds to ALL three stats simultaneously).")]
@@ -56,11 +59,11 @@ public class ItemGenerator : MonoBehaviour
     public List<RarityConfig> rarityConfigs = new()
     {
         //                                                                                                                                                                              allStatsRange is intentionally small — it stacks onto all three stats simultaneously
-        new() { rarity = ItemRarity.Normal,    weight = 50, minStatLines = 1, maxStatLines = 2, maxRareLines = 0, commonRange = new(1,  3),  hpRange = new(5,  15),  regenRange = new(0,    0),  allStatsRange = new(0, 0),   rareRange = new(0,  0)  },
-        new() { rarity = ItemRarity.Uncommon,  weight = 30, minStatLines = 2, maxStatLines = 3, maxRareLines = 1, commonRange = new(2,  5),  hpRange = new(10, 25),  regenRange = new(0.5f, 2),  allStatsRange = new(0, 0),   rareRange = new(2,  6)  },
-        new() { rarity = ItemRarity.Rare,      weight = 15, minStatLines = 3, maxStatLines = 3, maxRareLines = 3, commonRange = new(4,  8),  hpRange = new(20, 40),  regenRange = new(1,    3),  allStatsRange = new(1, 3),   rareRange = new(4,  12) },
-        new() { rarity = ItemRarity.Epic,      weight = 4,  minStatLines = 4, maxStatLines = 4, maxRareLines = 3, commonRange = new(6,  12), hpRange = new(35, 60),  regenRange = new(2,    5),  allStatsRange = new(2, 5),   rareRange = new(8,  20) },
-        new() { rarity = ItemRarity.Legendary, weight = 1,  minStatLines = 4, maxStatLines = 5, maxRareLines = 4, commonRange = new(10, 20), hpRange = new(50, 100), regenRange = new(3,    8),  allStatsRange = new(3, 8),   rareRange = new(15, 35) },
+        new() { rarity = ItemRarity.Normal,    weight = 50, minStatLines = 1, maxStatLines = 2, maxRareLines = 0, commonRange = new(1,  3),  hpRange = new(5,  15),  manaRange = new(5,  15),  regenRange = new(0,    0),  allStatsRange = new(0, 0),   rareRange = new(0,  0)  },
+        new() { rarity = ItemRarity.Uncommon,  weight = 30, minStatLines = 2, maxStatLines = 3, maxRareLines = 1, commonRange = new(2,  5),  hpRange = new(10, 25),  manaRange = new(10, 25),  regenRange = new(0.5f, 2),  allStatsRange = new(0, 0),   rareRange = new(2,  6)  },
+        new() { rarity = ItemRarity.Rare,      weight = 15, minStatLines = 3, maxStatLines = 3, maxRareLines = 3, commonRange = new(4,  8),  hpRange = new(20, 40),  manaRange = new(20, 40),  regenRange = new(1,    3),  allStatsRange = new(1, 3),   rareRange = new(4,  12) },
+        new() { rarity = ItemRarity.Epic,      weight = 4,  minStatLines = 4, maxStatLines = 4, maxRareLines = 3, commonRange = new(6,  12), hpRange = new(35, 60),  manaRange = new(35, 60),  regenRange = new(2,    5),  allStatsRange = new(2, 5),   rareRange = new(8,  20) },
+        new() { rarity = ItemRarity.Legendary, weight = 1,  minStatLines = 4, maxStatLines = 5, maxRareLines = 4, commonRange = new(10, 20), hpRange = new(50, 100), manaRange = new(50, 100), regenRange = new(3,    8),  allStatsRange = new(3, 8),   rareRange = new(15, 35) },
     };
 
     [Header("Icons — Boots")]
@@ -275,12 +278,12 @@ public class ItemGenerator : MonoBehaviour
         int commonCount = total - rareCount;
 
         // FlatHP available from Normal; STR/AGI/INT share commonRange
-        var commonPool = new List<StatType> { StatType.STR, StatType.AGI, StatType.INT, StatType.FlatHP };
+        var commonPool = new List<StatType> { StatType.STR, StatType.AGI, StatType.INT, StatType.FlatHP, StatType.FlatMana };
 
         // Regen unlocked at Uncommon; AllStats only at Rare and above
         var rarePool = new List<StatType> { StatType.CritRate, StatType.CritDamage };
         if (cfg.rarity >= ItemRarity.Uncommon)
-            rarePool.Add(StatType.RegenPerSecond);
+            rarePool.Add(StatType.HPRegenPerSecond);
         if (cfg.rarity >= ItemRarity.Rare)
             rarePool.Add(StatType.AllStats);
 
@@ -292,7 +295,9 @@ public class ItemGenerator : MonoBehaviour
         for (int i = 0; i < commonCount && i < commonPool.Count; i++)
         {
             StatType t     = commonPool[i];
-            Vector2  range = t == StatType.FlatHP ? cfg.hpRange : cfg.commonRange;
+            Vector2  range = t == StatType.FlatHP   ? cfg.hpRange
+                           : t == StatType.FlatMana  ? cfg.manaRange
+                           : cfg.commonRange;
             if (IsRangeEmpty(range)) continue;
             lines.Add(Roll(t, range));
         }
@@ -302,7 +307,7 @@ public class ItemGenerator : MonoBehaviour
             StatType t = rarePool[i];
             Vector2 range = t switch
             {
-                StatType.RegenPerSecond => cfg.regenRange,
+                StatType.HPRegenPerSecond => cfg.regenRange,
                 StatType.AllStats       => cfg.allStatsRange,
                 _                       => cfg.rareRange,
             };
@@ -318,7 +323,7 @@ public class ItemGenerator : MonoBehaviour
         float value = Mathf.Round(Random.Range(range.x, range.y));
 
         // Clamp to a sensible minimum so a stat can never be 0
-        bool isDecimal  = type == StatType.RegenPerSecond;
+        bool isDecimal  = type == StatType.HPRegenPerSecond;
         bool isPercent  = type == StatType.CritRate || type == StatType.CritDamage;
         float minValue  = isDecimal ? 0.5f : isPercent ? 1f : 1f;
         value = Mathf.Max(minValue, value);

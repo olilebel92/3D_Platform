@@ -13,7 +13,7 @@ MonoBehaviour:
   m_Name: HP
   m_EditorClassIdentifier: Assembly-CSharp::SkillTreeNode
   nodeName: Regeneration
-  description: +5 HP/ +0.5 HP Regen
+  description: 
   icon: {fileID: 21300000, guid: 01e9bb574d3c38d4b8110e0afdb341cf, type: 3}
   cost: 1
   prerequisites: []
@@ -24,6 +24,8 @@ MonoBehaviour:
   intBonus: 0
   hpBonus: 5
   hpRegenBonus: 0.5
+  manaBonus: 0
+  manaRegenBonus: 0
   spellDamageBonus: 0
   fireDamageBonus: 0
   healBonus: 0
@@ -32,4 +34,5 @@ MonoBehaviour:
   healPctBonus: 0
   lightningDamageBonus: 0
   lightningDamagePctBonus: 0
+  requiresAnySpell: 0
   unlocksSpell: {fileID: 0}

@@ -75,6 +75,9 @@ def _render_spell_form(prefill: dict, key_prefix: str, lock_asset_name: bool) ->
         chain_count_per_rank = cc1.number_input("Chain Count/Rank",
                                 value=int(prefill.get("chainCountPerRank", 0)),
                                 min_value=0, step=1, key=f"{key_prefix}_ccpr")
+        mana_cost            = cc2.number_input("Mana Cost",
+                                value=float(prefill.get("manaCost", 0.0)),
+                                min_value=0.0, step=5.0, key=f"{key_prefix}_mc")
 
     # Cast Timing
     with st.expander("Cast Timing"):
@@ -203,6 +206,7 @@ def _render_spell_form(prefill: dict, key_prefix: str, lock_asset_name: bool) ->
         "damagePerSkillRank": damage_per_rank,
         "chainCountPerRank":  chain_count_per_rank,
         "cooldown":      cooldown,
+        "manaCost":      mana_cost,
         "castStartDelay": cast_start_delay,
         "castTime":      cast_time,
         "throwAnimLeadTime": throw_lead,

@@ -94,6 +94,18 @@ public static class SettingsManager
     // ─── Apply ────────────────────────────────────────────────────────────────
 
     /// <summary>
+    /// Apply the framerate cap as early as possible, before any scene loads. This guarantees
+    /// the cap is active even when entering Play mode directly on the Game scene (skipping
+    /// the main menu, which is normally what calls Apply()). Audio settings still need a
+    /// Mixer reference, so they wait for MainMenuManager.Start() → Apply().
+    /// </summary>
+    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
+    static void ApplyEarly()
+    {
+        ApplyFramerate(FramerateCap);
+    }
+
+    /// <summary>
     /// Apply all saved settings. Call this once at app start (e.g. from MusicManager.Awake)
     /// and again whenever entering a new scene that needs audio restored.
     /// </summary>

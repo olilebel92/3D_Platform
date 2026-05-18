@@ -531,6 +531,7 @@ public class EnemyAI : NetworkBehaviour
                 h.maxHealth     = scaledMax;
                 h.currentHealth = scaledMax;
                 h.destroyOnDeath = true;   // SO-driven enemies always despawn on death
+                h.keepColliderOnDeath = _data.category == EnemyCategory.Boss;
             }
         }
 

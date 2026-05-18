@@ -24,6 +24,15 @@ public class PlayerUILinker : MonoBehaviour
     [Tooltip("The root panel that shows/hides the stamina bar.")]
     public GameObject staminaBarPanel;
 
+    // ─── Mana UI ──────────────────────────────────────────────────────────────
+
+    [Header("Mana UI — drag from your Canvas")]
+    [Tooltip("The fill Image on the mana bar.")]
+    public Image manaBarFill;
+
+    [Tooltip("The root panel that shows/hides the mana bar.")]
+    public GameObject manaBarPanel;
+
     // ─── XP UI ────────────────────────────────────────────────────────────────
 
     [Header("XP UI — drag from your Canvas")]
@@ -42,17 +51,23 @@ public class PlayerUILinker : MonoBehaviour
     [Tooltip("The SpellCastBarUI component on the HUD Canvas.")]
     public SpellCastBarUI spellCastBarUI;
 
+    // ─── Nameplate UI ─────────────────────────────────────────────────────────
+
+    [Header("Nameplate UI — drag from your Canvas")]
+    [Tooltip("The draggable PlayerNameplateUI panel on the HUD canvas.")]
+    public PlayerNameplateUI nameplate;
+
     // ─── Health UI ────────────────────────────────────────────────────────────
 
     [Header("Health UI — drag from your Canvas")]
-    [Tooltip("Optional TMP text label showing HP as numbers.")]
-    public TMP_Text healthText;
-
     [Tooltip("The fill Image on the HP bar.")]
     public Image hpBarFill;
 
     [Tooltip("The root panel that shows/hides the HP bar.")]
     public GameObject hpBarPanel;
+
+    [Tooltip("HealthBarFeedback component on the HP bar panel (ghost bar / damage delay effect).")]
+    public HealthBarFeedback hpBarFeedback;
 
     // ─── Unity Lifecycle ──────────────────────────────────────────────────────
 
@@ -122,15 +137,27 @@ public class PlayerUILinker : MonoBehaviour
             stamina.RefreshUI();
         }
 
+        // ── Wire Mana ─────────────────────────────────────────────────────────
+        ManaSystem mana = localPlayer.GetComponent<ManaSystem>();
+        if (mana != null)
+        {
+            mana.manaBarFill  = manaBarFill;
+            mana.manaBarPanel = manaBarPanel;
+            mana.RefreshUI();
+        }
+
         // ── Wire Health ───────────────────────────────────────────────────────
         HealthSystem health = localPlayer.GetComponent<HealthSystem>();
         if (health != null)
         {
-            health.healthText = healthText;
             health.hpBarFill  = hpBarFill;
             health.hpBarPanel = hpBarPanel;
             health.RefreshUI();
         }
+
+        // ── Wire Health Bar Feedback ──────────────────────────────────────────
+        if (hpBarFeedback != null && health != null)
+            hpBarFeedback.WireHealthSystem(health);
 
         // ── Wire Spell Cast Bar ───────────────────────────────────────────────
         SpellCaster spellCaster = localPlayer.GetComponent<SpellCaster>();
@@ -160,6 +187,10 @@ public class PlayerUILinker : MonoBehaviour
             inventoryUI.RefreshGrid();
         }
 
+        // ── Wire Nameplate ────────────────────────────────────────────────────
+        if (nameplate != null)
+            nameplate.WirePlayer(localPlayer);
+
         // ── Wire any other scene systems that need the player ─────────────────
         // EnemySpawner no longer needs a player reference — EnemyAI finds
         // the nearest player automatically via RefreshNearestTarget().
@@ -172,6 +203,7 @@ public class PlayerUILinker : MonoBehaviour
         // Force them active now that they are wired to the correct player data.
         if (hpBarPanel      != null) hpBarPanel.SetActive(true);
         if (staminaBarPanel != null) staminaBarPanel.SetActive(true);
+        if (manaBarPanel    != null) manaBarPanel.SetActive(true);
 
         Debug.Log("[PlayerUILinker] All systems wired to local player: " + localPlayer.name);
     }

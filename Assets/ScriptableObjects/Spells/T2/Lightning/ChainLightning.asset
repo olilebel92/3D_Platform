@@ -17,11 +17,12 @@ MonoBehaviour:
   damagePerSkillRank: 1
   chainCountPerRank: 1
   cooldown: 10
+  manaCost: 10
   spellName: Chain Lightning
   description: 'Hurl a bolt of lightning at the target, dealing {total} damage and
     chaining to {chains} enemies nearby. Each arc deals 90% of the previous hit.
 
-    
+
 
     Rank
     up: +{rankBonus} damage, +1 chain.'
