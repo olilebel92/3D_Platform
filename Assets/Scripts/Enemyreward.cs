@@ -55,8 +55,9 @@ public class EnemyReward : NetworkBehaviour
         if (_health != null) _health.OnDeath += GrantRewards;
     }
 
-    void OnDestroy()
+    public override void OnDestroy()
     {
+        base.OnDestroy();
         if (_health != null) _health.OnDeath -= GrantRewards;
     }
 

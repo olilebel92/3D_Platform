@@ -210,16 +210,15 @@ public class LootPickup : NetworkBehaviour
 
             // ── Mana ──────────────────────────────────────────────────────────
             case LootType.ManaPotion:
-                // TODO: uncomment once ManaSystem is implemented
-                // ManaSystem mana = playerObj.GetComponent<ManaSystem>();
-                // if (mana != null)
-                // {
-                //     if (manaRestoreMode == RestoreMode.Flat || manaRestoreMode == RestoreMode.Both)
-                //         mana.RestoreMana(manaReward);
-                //     if (manaRestoreMode == RestoreMode.Percent || manaRestoreMode == RestoreMode.Both)
-                //         mana.RestoreManaPercent(manaRestorePercent / 100f);
-                // }
-                Debug.Log($"[LootPickup] Mana pickup collected ({manaRestoreMode}) — ManaSystem not yet implemented.");
+                ManaSystem mana = playerObj.GetComponent<ManaSystem>();
+                if (mana != null)
+                {
+                    if (manaRestoreMode == RestoreMode.Flat || manaRestoreMode == RestoreMode.Both)
+                        mana.RestoreMana(manaReward);
+                    if (manaRestoreMode == RestoreMode.Percent || manaRestoreMode == RestoreMode.Both)
+                        mana.RestoreManaPercent(manaRestorePercent / 100f);
+                }
+                else Debug.LogWarning("[LootPickup] No ManaSystem on collecting player.");
                 break;
 
             // ── Item / Material ───────────────────────────────────────────────

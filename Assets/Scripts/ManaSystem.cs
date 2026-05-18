@@ -72,6 +72,16 @@ public class ManaSystem : MonoBehaviour
         return true;
     }
 
+    /// <summary>Restores <paramref name="amount"/> mana, capped at maxMana.</summary>
+    public void RestoreMana(float amount)
+    {
+        _currentMana = Mathf.Min(_currentMana + amount, maxMana);
+        UpdateUI();
+    }
+
+    /// <summary>Restores a fraction of maxMana (0–1).</summary>
+    public void RestoreManaPercent(float fraction) => RestoreMana(maxMana * fraction);
+
     /// <summary>Called by ExperienceManager whenever equipment changes to apply mana regen bonuses.</summary>
     public void ApplyEquipmentManaRegen(float regenBonus) => _equipmentManaRegen = regenBonus;
 
