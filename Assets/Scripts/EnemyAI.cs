@@ -79,17 +79,6 @@ public class EnemyAI : NetworkBehaviour
     private bool animHasIdle;
     private bool animHasDeath;
 
-    // ─── Networked Health ─────────────────────────────────────────────────────
-    // Read by EnemyHealthBar on all clients to drive the HP bar UI.
-
-    [HideInInspector]
-    public NetworkVariable<float> NetworkHealth = new NetworkVariable<float>(
-        0, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
-
-    [HideInInspector]
-    public NetworkVariable<float> NetworkMaxHealth = new NetworkVariable<float>(
-        0, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
-
     // ─── State ────────────────────────────────────────────────────────────────
     private enum State { Idle, Chase, Attack }
     private State currentState = State.Idle;
@@ -98,18 +87,9 @@ public class EnemyAI : NetworkBehaviour
 
     public override void OnNetworkSpawn()
     {
-        // Apply EnemyData before syncing HP so NetworkHealth reflects the SO value.
+        // HealthSystem.OnNetworkSpawn seeds the HP NetworkVariables from its own
+        // inspector value. ApplyData (below) overrides them with EnemyData if assigned.
         ApplyData();
-
-        if (IsServer)
-        {
-            HealthSystem h = GetComponent<HealthSystem>();
-            if (h != null)
-            {
-                NetworkHealth.Value    = h.maxHealth;
-                NetworkMaxHealth.Value = h.maxHealth;
-            }
-        }
     }
 
     // ─── Unity Lifecycle ──────────────────────────────────────────────────────
@@ -318,33 +298,33 @@ public class EnemyAI : NetworkBehaviour
             }
 
             // ── Apply damage ──────────────────────────────────────────────────
-            // Solo: call TakeDamage directly on the HealthSystem.
-            // MP:   HealthSystem has no NetworkVariable so a server-side call
-            //       won't update the owning client's HP or UI. Instead, send a
-            //       targeted ClientRpc to the player's owning client so damage
-            //       is applied locally where the UI references live.
-
-            int rolledDamage = Random.Range(attackDamageMin, attackDamageMax + 1);
+            // HealthSystem auto-routes to the server in MP and applies directly in solo.
+            // The NetworkVariable broadcast updates the target client's UI automatically.
+            int   rolledDamage = Random.Range(attackDamageMin, attackDamageMax + 1);
             float stunDuration = (Random.value < attackStunChance) ? attackStunDuration : 0f;
 
-            if (!networkActive)
-            {
-                if (_playerHealth != null)
-                    _playerHealth.TakeDamage(rolledDamage);
+            if (_playerHealth != null)
+                _playerHealth.TakeDamage(rolledDamage);
 
-                if (stunDuration > 0f && player != null)
-                    player.GetComponent<StatusEffectHandler>()?.ApplyStun(stunDuration);
-            }
-            else if (_targetNetObj != null)
+            // Stun is a client-side effect — apply locally in solo, target owner in MP.
+            if (stunDuration > 0f)
             {
-                ClientRpcParams ownerOnly = new ClientRpcParams
+                if (!networkActive)
                 {
-                    Send = new ClientRpcSendParams
+                    if (player != null)
+                        player.GetComponent<StatusEffectHandler>()?.ApplyStun(stunDuration);
+                }
+                else if (_targetNetObj != null)
+                {
+                    ClientRpcParams ownerOnly = new ClientRpcParams
                     {
-                        TargetClientIds = new[] { _targetNetObj.OwnerClientId }
-                    }
-                };
-                DealDamageClientRpc(rolledDamage, stunDuration, ownerOnly);
+                        Send = new ClientRpcSendParams
+                        {
+                            TargetClientIds = new[] { _targetNetObj.OwnerClientId }
+                        }
+                    };
+                    ApplyStunOnOwnerClientRpc(stunDuration, ownerOnly);
+                }
             }
         }
 
@@ -352,22 +332,6 @@ public class EnemyAI : NetworkBehaviour
     }
 
     // ─── Network RPCs ─────────────────────────────────────────────────────────
-
-    /// <summary>
-    /// Called by non-server clients (e.g. PlayerAttack) to deal damage to this enemy.
-    /// RequireOwnership = false because the attacking player does not own the enemy.
-    /// Running damage on the server ensures Destroy() is called from the correct authority.
-    /// </summary>
-    [Rpc(SendTo.Server)]
-    public void TakeDamageServerRpc(int damage, bool isCrit)
-    {
-        HealthSystem health = GetComponent<HealthSystem>();
-        if (health == null) return;
-
-        health.TakeDamage(damage, isCrit);
-        NetworkHealth.Value = health.currentHealth;
-        Debug.Log($"[EnemyAI] NetworkHealth set to {NetworkHealth.Value} on {gameObject.name}");
-    }
 
     // Fires the Attack trigger on every client so the animation plays everywhere.
     [ClientRpc]
@@ -406,30 +370,17 @@ public class EnemyAI : NetworkBehaviour
             animator.SetTrigger(AnimDeath);
     }
 
-    // Sent only to the targeted player's owning client.
-    // Finds the locally-owned player on that machine and applies damage directly,
-    // so HealthSystem.UpdateHealthUI() runs where the UI references actually live.
-    // After applying damage, syncs the new health back to the server so server-side
-    // checks (e.g. HealingWave heal eligibility) see the real value.
+    // Sent only to the targeted player's owning client. Applies stun locally.
+    // HP is replicated server→clients via HealthSystem's NetworkVariable — not in this RPC.
     [ClientRpc]
-    private void DealDamageClientRpc(int damage, float stunDuration, ClientRpcParams clientRpcParams = default)
+    private void ApplyStunOnOwnerClientRpc(float stunDuration, ClientRpcParams clientRpcParams = default)
     {
         foreach (GameObject p in PlayerController.All)
         {
             NetworkObject net = p.GetComponent<NetworkObject>();
             if (net != null && net.IsOwner)
             {
-                HealthSystem health = p.GetComponent<HealthSystem>();
-                if (health != null)
-                {
-                    health.TakeDamage(damage);
-                    PlayerController pc = p.GetComponent<PlayerController>();
-                    pc?.SyncServerHealthServerRpc(health.currentHealth);
-                }
-
-                if (stunDuration > 0f)
-                    p.GetComponent<StatusEffectHandler>()?.ApplyStun(stunDuration);
-
+                p.GetComponent<StatusEffectHandler>()?.ApplyStun(stunDuration);
                 return;
             }
         }
@@ -520,7 +471,7 @@ public class EnemyAI : NetworkBehaviour
         retargetInterval       = _data.retargetInterval;
 
         // Server-authority: only the server (or solo player) writes HealthSystem.
-        // Clients receive HP via NetworkHealth — writing here would race the NV broadcast.
+        // Clients receive HP via HealthSystem's NetworkVariables.
         bool networkActive = NetworkManager.Singleton != null && NetworkManager.Singleton.IsListening;
         if (!networkActive || IsServer)
         {
@@ -528,8 +479,7 @@ public class EnemyAI : NetworkBehaviour
             if (h != null)
             {
                 float scaledMax = Mathf.Max(1f, _data.maxHealth * _hpMult);
-                h.maxHealth     = scaledMax;
-                h.currentHealth = scaledMax;
+                h.InitializeServerHP(scaledMax, scaledMax);
                 h.destroyOnDeath = true;   // SO-driven enemies always despawn on death
                 h.keepColliderOnDeath = _data.category == EnemyCategory.Boss;
             }

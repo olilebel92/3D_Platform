@@ -157,13 +157,8 @@ public class Fireball : NetworkBehaviour
             float dist   = Vector3.Distance(origin, hit.transform.position);
             int   damage = Mathf.RoundToInt(ComputeFalloffDamage(raw, dist));
 
-            // Route through TakeDamageServerRpc so EnemyAI syncs NetworkHealth
-            // to all clients. In singleplayer NGO is inactive, so call TakeDamage directly.
-            EnemyAI enemyAI = hit.GetComponent<EnemyAI>();
-            if (enemyAI != null && networked)
-                enemyAI.TakeDamageServerRpc(damage, false);
-            else
-                health.TakeDamage(damage);
+            // HealthSystem auto-routes to the server in MP and applies directly in solo.
+            health.TakeDamage(damage);
 
             Debug.Log($"[Fireball] Hit '{hit.name}' for {damage} damage.");
         }

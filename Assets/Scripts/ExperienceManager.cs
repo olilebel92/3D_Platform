@@ -231,7 +231,6 @@ public class ExperienceManager : MonoBehaviour
         int flatHP      = _inventory != null ? _inventory.TotalBonusHP : 0;
         int skillTreeHP = SkillTreeManager.Instance != null ? SkillTreeManager.Instance.TotalHpBonus : 0;
         _playerHealth.ApplyEquipmentHP(strHP + flatHP + skillTreeHP);
-        SyncMaxHealthToServer();
 
         if (_playerMana != null)
         {
@@ -246,6 +245,12 @@ public class ExperienceManager : MonoBehaviour
     /// <summary>Called whenever a skill tree node is learned — re-applies HP and regen bonuses.</summary>
     private void OnSkillTreeChanged()
     {
+        // SkillTreeManager.Instance is a scene singleton — on the host, every spawned
+        // player (including remote-player representations) subscribes. Without this gate,
+        // Player 1 buying a node would also bump Player 2's HP/regen since the host's
+        // copy of Player 2's ExperienceManager would react to the same event.
+        if (Instance != this) return;
+
         OnEquipmentChanged();
 
         if (_playerHealth != null)
@@ -259,20 +264,6 @@ public class ExperienceManager : MonoBehaviour
             float skillTreeManaRegen = SkillTreeManager.Instance != null ? SkillTreeManager.Instance.TotalManaRegenBonus : 0f;
             _playerMana.ApplySkillTreeManaRegen(skillTreeManaRegen);
         }
-    }
-
-    /// <summary>
-    /// Pushes the local player's current maxHealth to the server so server-side regen
-    /// and healing checks stay in sync. No-op in singleplayer.
-    /// </summary>
-    private void SyncMaxHealthToServer()
-    {
-        if (_playerHealth == null) return;
-        bool networkActive = NetworkManager.Singleton != null && NetworkManager.Singleton.IsListening;
-        if (!networkActive) return;
-        PlayerController pc = GetComponent<PlayerController>();
-        if (pc == null || !pc.IsOwner) return;
-        pc.SyncMaxHealthServerRpc(_playerHealth.maxHealth);
     }
 
     // ─── Public XP API ───────────────────────────────────────────────────────
@@ -382,8 +373,8 @@ public class ExperienceManager : MonoBehaviour
         strength++;
         if (_playerHealth != null)
         {
+            // HealthSystem.IncreaseMaxHealth auto-routes to the server in MP.
             _playerHealth.IncreaseMaxHealth(hpPerStr);
-            SyncMaxHealthToServer();
         }
         Debug.Log($"[STAT] +1 STR → {strength} (dmg {ComputedMinDamage}-{ComputedMaxDamage}, +{hpPerStr} HP)  |  {statPoints} points remaining");
         UpdateUI();

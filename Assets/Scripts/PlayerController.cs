@@ -301,84 +301,10 @@ public class PlayerController : NetworkBehaviour
             if (networkActive && !IsServer) continue;
 
             float amount = regen;
-            _health.Heal(amount);
+            _health.Heal(amount, suppressPopup: true);
             DebugLogger.Log(DebugLogger.Category.Regen,
                 $"{gameObject.name} regen tick +{amount} — HP: {_health.currentHealth}/{_health.maxHealth}");
-
-            // Mirror the heal on all clients.
-            if (IsSpawned)
-                SyncRegenHealClientRpc(regen);
         }
-    }
-
-    /// <summary>
-    /// Mirrors a server-applied regen heal on every client.
-    /// The server (host) skips it — it already healed above.
-    /// </summary>
-    [ClientRpc]
-    void SyncRegenHealClientRpc(float amount)
-    {
-        if (IsServer) return; // host already healed server-side
-        if (_health != null)
-            _health.Heal(amount);
-    }
-
-    /// <summary>
-    /// Called by the owning client after taking damage locally (via DealDamageClientRpc /
-    /// DamageZone) to keep the server's HealthSystem.currentHealth in sync.
-    /// This lets server-side heal checks (e.g. HealingWave) see the correct value.
-    /// Does NOT call TakeDamage — only sets the raw value — so death logic is not
-    /// re-triggered server-side for a remote client.
-    /// </summary>
-    [ServerRpc]
-    public void SyncServerHealthServerRpc(float clientHealth)
-    {
-        if (_health == null) return;
-        _health.currentHealth = Mathf.Clamp(clientHealth, 0, _health.maxHealth);
-        DebugLogger.Log(DebugLogger.Category.NetworkSync,
-            $"{gameObject.name} server health synced → {_health.currentHealth}/{_health.maxHealth}");
-    }
-
-    /// <summary>
-    /// Called by the owning client whenever maxHealth changes (STR stat spend, equipment).
-    /// Keeps the server's HealthSystem.maxHealth in sync so regen and healing checks
-    /// (which run server-side) use the correct cap instead of the initial prefab value.
-    /// </summary>
-    [ServerRpc]
-    public void SyncMaxHealthServerRpc(float newMaxHealth)
-    {
-        if (_health == null) return;
-        _health.maxHealth = newMaxHealth;
-        _health.currentHealth = Mathf.Clamp(_health.currentHealth, 0, newMaxHealth);
-        DebugLogger.Log(DebugLogger.Category.NetworkSync,
-            $"{gameObject.name} server maxHealth synced → {newMaxHealth}");
-    }
-
-    /// <summary>
-    /// Mirrors a server-applied heal on the owning client and shows the popup.
-    /// Send with ClientRpcParams targeting OwnerClientId so only that client runs it.
-    /// The server (host) skips it — it already healed server-side.
-    /// </summary>
-    [ClientRpc]
-    public void ApplyHealClientRpc(int amount, ClientRpcParams rpcParams = default)
-    {
-        if (IsServer) return; // host already healed server-side
-        if (_health != null)
-            _health.Heal(amount);
-        if (DamagePopupManager.Instance != null)
-            DamagePopupManager.Instance.ShowHeal(transform.position, amount);
-    }
-
-    /// <summary>
-    /// Shows a heal popup on the owning client after a server-side heal (e.g. HealingWave tick).
-    /// Broadcast to all clients but only the owner acts — avoids per-client RPC overhead.
-    /// </summary>
-    [ClientRpc]
-    public void ShowHealPopupClientRpc(int amount)
-    {
-        if (!IsOwner) return;
-        if (DamagePopupManager.Instance != null)
-            DamagePopupManager.Instance.ShowHeal(transform.position, amount);
     }
 
     // ─── Spawn Position (Multiplayer) ─────────────────────────────────────────
@@ -440,11 +366,8 @@ public class PlayerController : NetworkBehaviour
     {
         if (!IsOwner) return;
 
-        // Heal client-side HealthSystem (health is not a NetworkVariable, so both
-        // sides need to be updated independently)
-        HealthSystem health = GetComponent<HealthSystem>();
-        if (health != null)
-            health.Heal(health.maxHealth);
+        // HealthSystem replicates HP via NetworkVariable now — the server already healed
+        // in RespawnServerRpc, so the owner sees full HP via NV broadcast.
 
         // Teleport: disable CharacterController first so we can move the transform
         if (controller != null) controller.enabled = false;

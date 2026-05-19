@@ -275,25 +275,8 @@ public class PlayerAttack : NetworkBehaviour
             HealthSystem health = hit.GetComponent<HealthSystem>();
             if (health != null)
             {
-                bool networkActive = NetworkManager.Singleton != null
-                                  && NetworkManager.Singleton.IsListening;
-
-                if (networkActive)
-                {
-                    // MP: enemies are NetworkObjects — damage must be applied on the
-                    // server so that Die() → Destroy() runs with the correct authority.
-                    EnemyAI enemyAI = hit.GetComponent<EnemyAI>();
-                    if (enemyAI != null)
-                        enemyAI.TakeDamageServerRpc(damage, isCrit);
-                    else
-                        health.TakeDamage(damage, isCrit); // non-AI enemy fallback
-                }
-                else
-                {
-                    // Solo: apply directly — no NetworkObject involved.
-                    health.TakeDamage(damage, isCrit);
-                }
-
+                // HealthSystem auto-routes to the server in MP and applies directly in solo.
+                health.TakeDamage(damage, isCrit);
                 _hitThisSwing.Add(id);
                 Debug.Log($"[PlayerAttack] Hit {hit.gameObject.name} for {damage} damage " +
                           $"(STR={baseDamage}{(isCrit ? " CRIT!" : "")}).");

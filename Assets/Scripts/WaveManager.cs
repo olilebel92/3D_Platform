@@ -195,22 +195,13 @@ public class WaveManager : NetworkBehaviour
 
             SetStatus("Wave " + currentWave + " cleared!");
 
-            // ── Full heal — send to every player's owning client ──────────────
+            // ── Full heal — server-side; HealthSystem broadcasts via NetworkVariable.
             if (fullHealAfterWave)
             {
-                if (!IsNetworkActive())
+                foreach (GameObject p in PlayerController.All)
                 {
-                    foreach (GameObject p in PlayerController.All)
-                    {
-                        HealthSystem h = p.GetComponent<HealthSystem>();
-                        if (h != null) h.Heal(h.maxHealth);
-                    }
-                }
-                else
-                {
-                    // ClientRpc with no params → runs on ALL clients.
-                    // Each client finds its own owned player and heals locally.
-                    HealAllPlayersClientRpc();
+                    HealthSystem h = p.GetComponent<HealthSystem>();
+                    if (h != null) h.Heal(h.maxHealth);
                 }
             }
 
@@ -296,8 +287,7 @@ public class WaveManager : NetworkBehaviour
         if (health != null)
         {
             float scaledMax = Mathf.Max(1f, health.maxHealth * hpMult);
-            health.maxHealth     = scaledMax;
-            health.currentHealth = scaledMax;
+            health.InitializeServerHP(scaledMax, scaledMax);
         }
 
         if (ai != null)
@@ -542,24 +532,6 @@ public class WaveManager : NetworkBehaviour
             {
                 ExperienceManager xpManager = p.GetComponent<ExperienceManager>();
                 if (xpManager != null) xpManager.GainXP(xp);
-                return;
-            }
-        }
-    }
-
-    /// <summary>
-    /// Sent to ALL clients on wave clear. Each client heals its own locally-owned player.
-    /// </summary>
-    [ClientRpc]
-    private void HealAllPlayersClientRpc()
-    {
-        foreach (GameObject p in PlayerController.All)
-        {
-            NetworkObject net = p.GetComponent<NetworkObject>();
-            if (net != null && net.IsOwner)
-            {
-                HealthSystem h = p.GetComponent<HealthSystem>();
-                if (h != null) h.Heal(h.maxHealth);
                 return;
             }
         }

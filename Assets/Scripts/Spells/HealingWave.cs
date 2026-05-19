@@ -132,20 +132,8 @@ public class HealingWave : NetworkBehaviour
 
             if (health.currentHealth >= health.maxHealth) continue;
 
-            health.Heal(amount, suppressPopup: IsSpawned);
-
-            if (IsSpawned && netObj != null)
-            {
-                PlayerController pc = playerObj.GetComponent<PlayerController>();
-                if (pc != null)
-                {
-                    ClientRpcParams ownerOnly = new ClientRpcParams
-                    {
-                        Send = new ClientRpcSendParams { TargetClientIds = new[] { netObj.OwnerClientId } }
-                    };
-                    pc.ApplyHealClientRpc(amount, ownerOnly);
-                }
-            }
+            // HealthSystem.Heal handles NV propagation + owner-targeted popup automatically.
+            health.Heal(amount);
 
             healedCount++;
             totalHealed += amount;

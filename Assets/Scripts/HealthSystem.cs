@@ -1,13 +1,21 @@
-﻿using UnityEngine;
+using System;
+using Unity.Netcode;
+using UnityEngine;
+using UnityEngine.Serialization;
 using UnityEngine.UI;
-using TMPro;
 
-public class HealthSystem : MonoBehaviour
+/// <summary>
+/// Server-authoritative health for any damageable entity (players, enemies, traps).
+/// HP and Max HP live in NetworkVariables when NGO is listening, and in local fields
+/// when running solo. TakeDamage / Heal auto-route to the server via ServerRpc when
+/// called from a client, so existing call sites do not need to know about authority.
+/// </summary>
+public class HealthSystem : NetworkBehaviour
 {
     // ─── Health Settings ──────────────────────────────────────────────────────
     [Header("Health Settings")]
-    public float maxHealth = 5;
-    public float currentHealth;
+    [Tooltip("Initial maximum HP. Set per prefab.")]
+    [SerializeField, FormerlySerializedAs("maxHealth")] private float _inspectorMaxHealth = 5f;
 
     [Tooltip("Base HP restored per second (server-side only). Stacks with equipment regen.")]
     [SerializeField] private float regenPerSecond = 1f;
@@ -45,18 +53,72 @@ public class HealthSystem : MonoBehaviour
     public bool keepColliderOnDeath = false;
 
     // ─── Events ───────────────────────────────────────────────────────────────
-    /// <summary>Fired when currentHealth drops below 0f, before the destroy delay.</summary>
+    /// <summary>Fired when currentHealth drops to 0, before the destroy delay. Server-side only.</summary>
     public System.Action OnDeath;
 
-    // ─── Private State ────────────────────────────────────────────────────────
+    /// <summary>Fired on every machine when HP changes (NV broadcast in MP, direct in solo).</summary>
+    public event Action<float, float> OnHealthChanged;
 
+    // ─── Networked Storage ────────────────────────────────────────────────────
+    private NetworkVariable<float> _netCurrent = new NetworkVariable<float>(
+        0f, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
+
+    private NetworkVariable<float> _netMax = new NetworkVariable<float>(
+        0f, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
+
+    // ─── Solo Storage (no NGO) ────────────────────────────────────────────────
+    private float _soloCurrent;
+    private float _soloMax;
+
+    // ─── State ────────────────────────────────────────────────────────────────
     /// <summary>HP from the Inspector + all STR level-up spends. Never includes equipment.</summary>
     private float _permanentMaxHealth;
 
     private bool _isDead = false;
     private PlayerInventory _inventory;
+    private float _skillTreeRegen = 0f;
+
+    // ─── Facade ───────────────────────────────────────────────────────────────
+    /// <summary>True only after OnNetworkSpawn has run on a live NGO instance.</summary>
+    private bool IsNetworked => NetworkManager.Singleton != null
+                              && NetworkManager.Singleton.IsListening
+                              && IsSpawned;
+
+    public float currentHealth => IsNetworked ? _netCurrent.Value : _soloCurrent;
+    public float maxHealth     => IsNetworked ? _netMax.Value     : _soloMax;
+
+    public float TotalRegenPerSecond =>
+        regenPerSecond + (_inventory != null ? _inventory.TotalBonusHPRegen : 0f) + _skillTreeRegen;
+
+    public float RegenPerSecond => regenPerSecond;
+
+    /// <summary>
+    /// Called by ExperienceManager when the skill tree changes. Sets the local field
+    /// for CharacterWindow display and forwards to the server so HpRegenTick (server-side)
+    /// also applies the bonus.
+    /// </summary>
+    public void ApplySkillTreeRegen(float bonus)
+    {
+        _skillTreeRegen = bonus;
+        if (IsNetworked && !IsServer)
+            ApplySkillTreeRegenRpc(bonus);
+    }
+
+    [Rpc(SendTo.Server)]
+    void ApplySkillTreeRegenRpc(float bonus)
+    {
+        _skillTreeRegen = bonus;
+    }
 
     // ─── Unity Lifecycle ──────────────────────────────────────────────────────
+
+    void Awake()
+    {
+        _soloMax            = _inspectorMaxHealth;
+        _soloCurrent        = _inspectorMaxHealth;
+        _permanentMaxHealth = _inspectorMaxHealth;
+    }
+
     void Start()
     {
         if (audioSource == null)
@@ -64,113 +126,291 @@ public class HealthSystem : MonoBehaviour
         if (audioSource == null)
             audioSource = gameObject.AddComponent<AudioSource>();
 
-        // Cache own PlayerInventory — each player has their own, no singleton needed.
         _inventory = GetComponent<PlayerInventory>();
-
-        _permanentMaxHealth = maxHealth;
-        currentHealth = maxHealth;
         UpdateHealthUI();
-
     }
 
-    // ─── Public API ───────────────────────────────────────────────────────────
+    // ─── NGO Lifecycle ────────────────────────────────────────────────────────
 
-    private float _skillTreeRegen = 0f;
+    public override void OnNetworkSpawn()
+    {
+        base.OnNetworkSpawn();
 
-    /// <summary>Base regen + equipment bonus + skill tree bonus. Read by PlayerController's regen coroutine.</summary>
-    public float TotalRegenPerSecond =>
-        regenPerSecond + (_inventory != null ? _inventory.TotalBonusHPRegen : 0f) + _skillTreeRegen;
+        // Server seeds the NVs from whatever the solo storage currently holds. This
+        // preserves any state mutated between Awake and OnNetworkSpawn (e.g. an
+        // EnemyAI.ApplyData or WaveManager.ApplyDifficultyScaling that fired before
+        // spawn completed).
+        if (IsServer)
+        {
+            _netMax.Value     = _soloMax;
+            _netCurrent.Value = _soloCurrent;
+        }
 
-    /// <summary>Base regen only (no equipment). Used by CharacterWindow to split base vs bonus display.</summary>
-    public float RegenPerSecond => regenPerSecond;
+        _netCurrent.OnValueChanged += OnNetCurrentChanged;
+        _netMax.OnValueChanged     += OnNetMaxChanged;
 
-    /// <summary>Called by ExperienceManager when the skill tree changes.</summary>
-    public void ApplySkillTreeRegen(float bonus) => _skillTreeRegen = bonus;
+        UpdateHealthUI();
+    }
 
+    public override void OnNetworkDespawn()
+    {
+        _netCurrent.OnValueChanged -= OnNetCurrentChanged;
+        _netMax.OnValueChanged     -= OnNetMaxChanged;
+        base.OnNetworkDespawn();
+    }
+
+    void OnNetCurrentChanged(float prev, float current)
+    {
+        UpdateHealthUI();
+        OnHealthChanged?.Invoke(prev, current);
+    }
+
+    void OnNetMaxChanged(float prev, float current)
+    {
+        UpdateHealthUI();
+    }
+
+    // ─── Storage Helpers ──────────────────────────────────────────────────────
+
+    void WriteCurrentHealth(float value)
+    {
+        value = Mathf.Clamp(value, 0f, maxHealth);
+        if (IsNetworked)
+        {
+            _netCurrent.Value = value;
+        }
+        else
+        {
+            float prev   = _soloCurrent;
+            _soloCurrent = value;
+            OnHealthChanged?.Invoke(prev, value);
+            UpdateHealthUI();
+        }
+    }
+
+    void WriteMaxHealth(float value)
+    {
+        value = Mathf.Max(0f, value);
+        if (IsNetworked)
+        {
+            _netMax.Value = value;
+        }
+        else
+        {
+            _soloMax = value;
+            UpdateHealthUI();
+        }
+    }
+
+    // ─── Public API — Damage ──────────────────────────────────────────────────
+
+    /// <summary>
+    /// Apply damage. Auto-routes through ServerRpc when called from a client in MP.
+    /// In solo or on the server, applies immediately and broadcasts feedback.
+    /// </summary>
     public void TakeDamage(int amount, bool isCrit = false)
     {
+        // Client in MP: forward to server. The server-side call broadcasts feedback
+        // back to every machine, including this one — popup and sound arrive ~1 RTT later.
+        if (IsNetworked && !IsServer)
+        {
+            TakeDamageServerRpc(amount, isCrit);
+            return;
+        }
+
         if (_isDead) return;
 
-        currentHealth -= amount;
-        currentHealth = Mathf.Clamp(currentHealth, 0, maxHealth);
-        UpdateHealthUI();
+        float newHealth = Mathf.Clamp(currentHealth - amount, 0f, maxHealth);
+        WriteCurrentHealth(newHealth);
 
         DebugLogger.Log(DebugLogger.Category.Damage,
             $"{gameObject.name} took {amount} damage — HP: {currentHealth}/{maxHealth}");
 
-        // ── Hit Sound ─────────────────────────────────────────────────────────
-        if (audioSource != null && hitSound != null)
-        {
-            audioSource.pitch = Random.Range(hitPitchMin, hitPitchMax);
-            audioSource.PlayOneShot(hitSound);
-        }
-
-        // ── Damage Popup ──────────────────────────────────────────────────────
-        if (DamagePopupManager.Instance != null)
-        {
-            bool isPlayer = CompareTag("Player");
-            DamagePopupManager.Instance.ShowDamage(transform.position, amount, isPlayer, isCrit);
-        }
+        if (IsNetworked)
+            ShowDamageFeedbackClientRpc(amount, isCrit);
+        else
+            ShowDamageFeedbackLocal(amount, isCrit);
 
         if (currentHealth <= 0f)
             Die();
     }
 
+    [Rpc(SendTo.Server)]
+    public void TakeDamageServerRpc(int amount, bool isCrit)
+    {
+        TakeDamage(amount, isCrit);
+    }
+
+    [Rpc(SendTo.ClientsAndHost)]
+    void ShowDamageFeedbackClientRpc(int amount, bool isCrit)
+    {
+        ShowDamageFeedbackLocal(amount, isCrit);
+    }
+
+    void ShowDamageFeedbackLocal(int amount, bool isCrit)
+    {
+        if (audioSource != null && hitSound != null)
+        {
+            audioSource.pitch = UnityEngine.Random.Range(hitPitchMin, hitPitchMax);
+            audioSource.PlayOneShot(hitSound);
+        }
+
+        if (DamagePopupManager.Instance != null)
+        {
+            bool isPlayer = CompareTag("Player");
+            DamagePopupManager.Instance.ShowDamage(transform.position, amount, isPlayer, isCrit);
+        }
+    }
+
+    // ─── Public API — Heal ────────────────────────────────────────────────────
+
     /// <param name="suppressPopup">
-    /// When true, the heal popup is suppressed on this machine.
-    /// Use this from server-authoritative callers (e.g. HealingWave) that send a
-    /// targeted ClientRpc to show the popup on the correct client instead.
+    /// When true, the heal popup is suppressed. Use this from regen ticks or when the
+    /// caller will fire its own popup via a separate ClientRpc.
     /// </param>
     public void Heal(float amount, bool suppressPopup = false)
     {
-        float before = currentHealth;
-        currentHealth += amount;
-        currentHealth = Mathf.Clamp(currentHealth, 0, maxHealth);
-        float gained = currentHealth - before;
+        if (IsNetworked && !IsServer)
+        {
+            HealServerRpc(amount, suppressPopup);
+            return;
+        }
+
+        float before    = currentHealth;
+        float newHealth = Mathf.Clamp(before + amount, 0f, maxHealth);
+        WriteCurrentHealth(newHealth);
+        float gained = newHealth - before;
 
         // Revive dead state — happens when the respawn flow heals the player back
         // above 0. Without this, _isDead stays true after respawn and all subsequent
         // TakeDamage calls are silently ignored.
-        if (_isDead && currentHealth > 0)
+        if (_isDead && newHealth > 0f)
             _isDead = false;
 
-        UpdateHealthUI();
-
-        if (gained > 0)
+        if (gained > 0f)
             DebugLogger.Log(DebugLogger.Category.Heal,
                 $"{gameObject.name} healed +{gained} — HP: {currentHealth}/{maxHealth}");
 
-        if (gained > 0 && !suppressPopup && DamagePopupManager.Instance != null)
-            DamagePopupManager.Instance.ShowHeal(transform.position, Mathf.RoundToInt(gained));
+        if (gained > 0f && !suppressPopup)
+        {
+            int amountInt = Mathf.RoundToInt(gained);
+            if (IsNetworked)
+                ShowHealPopupOwnerRpc(amountInt);
+            else
+                ShowHealPopupLocal(amountInt);
+        }
     }
 
-    /// <summary>Permanently increases max HP (called when spending a STR stat point). Does NOT heal current HP.</summary>
+    [Rpc(SendTo.Server)]
+    public void HealServerRpc(float amount, bool suppressPopup)
+    {
+        Heal(amount, suppressPopup);
+    }
+
+    [Rpc(SendTo.Owner)]
+    void ShowHealPopupOwnerRpc(int amount)
+    {
+        ShowHealPopupLocal(amount);
+    }
+
+    void ShowHealPopupLocal(int amount)
+    {
+        if (DamagePopupManager.Instance != null)
+            DamagePopupManager.Instance.ShowHeal(transform.position, amount);
+    }
+
+    // ─── Server-Only Init / Set Helpers ───────────────────────────────────────
+
+    /// <summary>
+    /// Set both max and current HP in one call. Used by EnemyAI.ApplyData and
+    /// WaveManager.ApplyDifficultyScaling at spawn time, and by GodMode.
+    /// Auto-routes to the server in MP.
+    /// </summary>
+    public void InitializeServerHP(float max, float current)
+    {
+        if (IsNetworked && !IsServer)
+        {
+            InitializeServerHPRpc(max, current);
+            return;
+        }
+        WriteMaxHealth(max);
+        WriteCurrentHealth(Mathf.Clamp(current, 0f, max));
+        _permanentMaxHealth = max;
+    }
+
+    [Rpc(SendTo.Server)]
+    void InitializeServerHPRpc(float max, float current)
+    {
+        InitializeServerHP(max, current);
+    }
+
+    /// <summary>
+    /// Set max HP only (clamping current down if it now exceeds the new cap).
+    /// Server-only — used by GodMode and any future tooling that needs raw max-HP edits.
+    /// </summary>
+    public void SetMaxHealthServer(float newMax)
+    {
+        if (IsNetworked && !IsServer)
+        {
+            Debug.LogWarning($"[HealthSystem] SetMaxHealthServer called on a client for {gameObject.name} — ignored.");
+            return;
+        }
+        WriteMaxHealth(newMax);
+        if (currentHealth > newMax)
+            WriteCurrentHealth(newMax);
+    }
+
+    /// <summary>
+    /// Permanently increases max HP (called when spending a STR stat point). Does NOT heal current HP.
+    /// Auto-routes to the server in MP — ExperienceManager runs on the owner client.
+    /// </summary>
     public void IncreaseMaxHealth(float amount)
     {
+        if (IsNetworked && !IsServer)
+        {
+            IncreaseMaxHealthRpc(amount);
+            return;
+        }
         _permanentMaxHealth += amount;
-        maxHealth           += amount;
-        UpdateHealthUI();
-
+        WriteMaxHealth(maxHealth + amount);
         Debug.Log(gameObject.name + " max HP increased by " + amount + ". HP: " + currentHealth + "/" + maxHealth);
+    }
+
+    [Rpc(SendTo.Server)]
+    void IncreaseMaxHealthRpc(float amount)
+    {
+        IncreaseMaxHealth(amount);
     }
 
     /// <summary>
     /// Recalculates max HP from equipment STR bonus. Called whenever inventory changes.
     /// Does NOT permanently change HP — unequipping restores the previous max.
+    /// Auto-routes to the server in MP — ExperienceManager runs on the owner client.
     /// </summary>
     public void ApplyEquipmentHP(float equipmentBonus)
     {
+        if (IsNetworked && !IsServer)
+        {
+            ApplyEquipmentHPRpc(equipmentBonus);
+            return;
+        }
         float newMax = _permanentMaxHealth + equipmentBonus;
-        maxHealth    = newMax;
-
+        WriteMaxHealth(newMax);
         // Only clamp down if current HP now exceeds the new max (e.g. unequipping a high-HP item)
-        currentHealth = Mathf.Clamp(currentHealth, 1, maxHealth);
-        UpdateHealthUI();
+        if (currentHealth > newMax)
+            WriteCurrentHealth(Mathf.Max(1f, newMax));
 
         Debug.Log($"[HealthSystem] Equipment HP bonus applied: +{equipmentBonus} → maxHP {maxHealth}");
     }
 
-    // ─── Internal ─────────────────────────────────────────────────────────────
+    [Rpc(SendTo.Server)]
+    void ApplyEquipmentHPRpc(float equipmentBonus)
+    {
+        ApplyEquipmentHP(equipmentBonus);
+    }
+
+    // ─── Death ────────────────────────────────────────────────────────────────
+
     void Die()
     {
         if (_isDead) return;
@@ -216,22 +456,38 @@ public class HealthSystem : MonoBehaviour
             if (WaveManager.Instance != null)
                 WaveManager.Instance.OnPlayerDeath();
 
-            if (DeathScreenManager.Instance != null)
+            // Death screen must appear on the dying player's machine — not the host.
+            // In MP, target the owner; in solo, show locally.
+            if (IsNetworked)
+            {
+                ShowDeathScreenOwnerRpc();
+            }
+            else if (DeathScreenManager.Instance != null)
+            {
                 DeathScreenManager.Instance.ShowDeathScreen();
+            }
             else
+            {
                 Debug.LogWarning("[HealthSystem] Player died but no DeathScreenManager found in scene.");
+            }
         }
     }
 
-    /// <summary>
-    /// Called by PlayerUILinker after it wires the UI references at runtime.
-    /// Forces an immediate bar refresh so the first frame shows the correct value.
-    /// </summary>
+    [Rpc(SendTo.Owner)]
+    void ShowDeathScreenOwnerRpc()
+    {
+        if (DeathScreenManager.Instance != null)
+            DeathScreenManager.Instance.ShowDeathScreen();
+        else
+            Debug.LogWarning("[HealthSystem] Player died but no DeathScreenManager found in scene.");
+    }
+
+    /// <summary>Called by PlayerUILinker after it wires the UI references at runtime.</summary>
     public void RefreshUI() => UpdateHealthUI();
 
     void UpdateHealthUI()
     {
         if (hpBarFill != null)
-            hpBarFill.fillAmount = currentHealth / maxHealth;
+            hpBarFill.fillAmount = maxHealth > 0f ? currentHealth / maxHealth : 0f;
     }
 }

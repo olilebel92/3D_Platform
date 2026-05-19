@@ -10,10 +10,8 @@ using UnityEngine.UI;
 /// EnemyHealthBarManager instantiates it as a child of each enemy and
 /// calls Initialize() — no per-enemy prefab setup required.
 ///
-/// Networked mode  : reads EnemyAI.NetworkHealth (NetworkVariable) — synced
-///                   to all clients automatically when the server updates it.
-/// Non-networked   : polls HealthSystem.currentHealth each frame so the bar
-///                   works when testing outside the main menu (no NGO host).
+/// Subscribes to HealthSystem.OnHealthChanged — fires on every machine
+/// (NetworkVariable broadcast in MP, direct invocation in solo).
 ///
 /// Prefab structure:
 ///   HealthBarPrefab_Root  ← EnemyHealthBar lives here
@@ -58,8 +56,6 @@ public class EnemyHealthBar : MonoBehaviour
     private HealthSystem _health;
     private Camera       _cam;
     private float        _hideTimer;
-    private bool         _networked;
-    private float        _lastHealth;
     private Canvas       _canvas;
     private float        _worldHeight;
 
@@ -72,24 +68,13 @@ public class EnemyHealthBar : MonoBehaviour
 
     void OnDestroy()
     {
-        if (_ai != null)
-            _ai.NetworkHealth.OnValueChanged -= OnNetworkHealthChanged;
+        if (_health != null)
+            _health.OnHealthChanged -= OnHealthChanged;
     }
 
     void Update()
     {
         if (_ai == null) return;
-
-        // ── Non-networked polling ─────────────────────────────────────────────
-        if (!_networked)
-        {
-            float current = _health.currentHealth;
-            if (current != _lastHealth)
-            {
-                ShowDamage(_lastHealth, current, _health.maxHealth);
-                _lastHealth = current;
-            }
-        }
 
         // ── Billboard & auto-hide ─────────────────────────────────────────────
         if (_barRoot == null || !_barRoot.activeSelf) return;
@@ -145,18 +130,9 @@ public class EnemyHealthBar : MonoBehaviour
         _ai     = ai;
         _health = health;
 
-        bool networkActive = Unity.Netcode.NetworkManager.Singleton != null
-                          && Unity.Netcode.NetworkManager.Singleton.IsListening;
+        // Fires on every machine: NetworkVariable broadcast in MP, direct invoke in solo.
+        _health.OnHealthChanged += OnHealthChanged;
 
-        // Pure remote clients cannot read HealthSystem.currentHealth reliably —
-        // they must subscribe to NetworkHealth. Server/host and singleplayer poll
-        // HealthSystem directly, which is always up-to-date.
-        _networked = networkActive && !Unity.Netcode.NetworkManager.Singleton.IsServer;
-
-        if (_networked)
-            _ai.NetworkHealth.OnValueChanged += OnNetworkHealthChanged;
-
-        _lastHealth  = _health.currentHealth;
         _worldHeight = transform.position.y - _ai.transform.position.y;
 
         if (_nameTxt != null) _nameTxt.text = ai.EnemyDisplayName;
@@ -185,9 +161,9 @@ public class EnemyHealthBar : MonoBehaviour
 
     // ─── Callbacks ────────────────────────────────────────────────────────────
 
-    private void OnNetworkHealthChanged(float prev, float current)
+    private void OnHealthChanged(float prev, float current)
     {
-        ShowDamage(prev, current, _ai.NetworkMaxHealth.Value);
+        ShowDamage(prev, current, _health.maxHealth);
     }
 
     private void ShowDamage(float prev, float current, float max)

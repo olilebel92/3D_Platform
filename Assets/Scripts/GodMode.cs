@@ -85,8 +85,9 @@ public class GodMode : MonoBehaviour
             BindingFlags.NonPublic | BindingFlags.Instance);
         permanentField?.SetValue(_health, _godHP);
 
-        _health.maxHealth = _godHP;
-        _health.currentHealth = _godHP;
+        // HealthSystem auto-routes to the server in MP. The NetworkVariable broadcast
+        // updates this owner's HUD via OnHealthChanged. RefreshUI keeps in-world HP bars in sync.
+        _health.InitializeServerHP(_godHP, _godHP);
         _health.RefreshUI();
     }
 

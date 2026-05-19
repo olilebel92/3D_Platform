@@ -33,7 +33,7 @@ public class DebugLogger : MonoBehaviour
     [Tooltip("Log every damage hit (TakeDamage calls on players and enemies).")]
     [SerializeField] private bool logDamage = true;
 
-    [Tooltip("Log every heal event (HealingWave, ApplyHealClientRpc, etc.).")]
+    [Tooltip("Log every heal event (HealingWave, HealthSystem.Heal, etc.).")]
     [SerializeField] private bool logHeal = true;
 
     [Tooltip("Log passive HP regen ticks (can be noisy — disabled by default).")]
@@ -51,7 +51,7 @@ public class DebugLogger : MonoBehaviour
     [SerializeField] private bool logXP = false;
 
     [Header("Network")]
-    [Tooltip("Log server↔client health sync RPCs (SyncServerHealthServerRpc, SyncRegenHealClientRpc).")]
+    [Tooltip("Log server↔client sync RPCs (reserved for future use — most HP sync is via NetworkVariable now).")]
     [SerializeField] private bool logNetworkSync = false;
 
     // ─── Unity Lifecycle ──────────────────────────────────────────────────────
