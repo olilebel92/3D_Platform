@@ -145,7 +145,7 @@ public class WaveManager : NetworkBehaviour
         if (PlayerController.All.Count > 0)
             playerTransform = PlayerController.All[0].transform;
         else
-            Debug.LogWarning("[WaveManager] No Player registered at Start — ring spawn will use spawner position until RegisterPlayer() is called.");
+            Debug.Log("[WaveManager] No Player registered at Start — ring spawn will use spawner position until RegisterPlayer() is called.");
 
         StartCoroutine(RunWaves());
     }

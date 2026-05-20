@@ -48,6 +48,9 @@ public class InventoryUI : MonoBehaviour
     [Tooltip("Cancel button inside the confirmation panel.")]
     [SerializeField] private Button batchCancelButton;
 
+    [Tooltip("All RarityData assets to show in the batch-delete dropdown. Drag every rarity asset here, in ascending sortOrder.")]
+    [SerializeField] private List<RarityData> rarityCatalog = new();
+
     // ─── Private State ────────────────────────────────────────────────────────
 
     public static bool IsDragging { get; set; }
@@ -68,16 +71,8 @@ public class InventoryUI : MonoBehaviour
             inventoryPanel.SetActive(false);
     }
 
-    // Rarity colours for TMP rich-text dropdown labels (matches ItemData.RarityHex)
-    private static readonly string[] RarityHex =
-    {
-        "FFFFFF", // Normal
-        "1EFF00", // Uncommon
-        "0070DD", // Rare
-        "A335EE", // Epic
-        "FF8000", // Legendary
-        "FF1A1A", // Godly
-    };
+    // Rarities sorted by sortOrder. Built from rarityCatalog on Start; used to populate the dropdown.
+    private List<RarityData> _sortedRarities = new();
 
     void Start()
     {
@@ -139,15 +134,25 @@ public class InventoryUI : MonoBehaviour
         if (batchConfirmPanel != null)
             batchConfirmPanel.SetActive(false);
 
+        // Build the sorted-rarity list once. Falls back to ItemGenerator's catalog
+        // if rarityCatalog was left empty in the Inspector.
+        _sortedRarities = new List<RarityData>();
+        if (rarityCatalog != null && rarityCatalog.Count > 0)
+            _sortedRarities.AddRange(rarityCatalog);
+        else if (ItemGenerator.Instance != null && ItemGenerator.Instance.rarities != null)
+            _sortedRarities.AddRange(ItemGenerator.Instance.rarities);
+
+        _sortedRarities.RemoveAll(r => r == null);
+        _sortedRarities.Sort((a, b) => a.sortOrder.CompareTo(b.sortOrder));
+
         if (batchRarityDropdown != null)
         {
             batchRarityDropdown.ClearOptions();
             var options = new List<TMP_Dropdown.OptionData>();
-            var rarities = (ItemRarity[])System.Enum.GetValues(typeof(ItemRarity));
-            foreach (ItemRarity r in rarities)
+            foreach (RarityData r in _sortedRarities)
             {
-                string hex = RarityHex[(int)r];
-                options.Add(new TMP_Dropdown.OptionData($"<color=#{hex}>{r}</color>"));
+                string hex = r.Hex;
+                options.Add(new TMP_Dropdown.OptionData($"<color=#{hex}>{r.displayName}</color>"));
             }
             batchRarityDropdown.AddOptions(options);
         }
@@ -162,30 +167,39 @@ public class InventoryUI : MonoBehaviour
             batchCancelButton.onClick.AddListener(OnCancelBatchDelete);
     }
 
+    private RarityData GetDropdownSelectedRarity()
+    {
+        if (batchRarityDropdown == null || _sortedRarities == null) return null;
+        int idx = batchRarityDropdown.value;
+        if (idx < 0 || idx >= _sortedRarities.Count) return null;
+        return _sortedRarities[idx];
+    }
+
     private void OnBatchDeleteClicked()
     {
         if (batchRarityDropdown == null || batchConfirmPanel == null || batchConfirmLabel == null) return;
         if (PlayerInventory.Instance == null) return;
 
-        ItemRarity maxRarity = (ItemRarity)batchRarityDropdown.value;
+        RarityData maxRarity = GetDropdownSelectedRarity();
+        if (maxRarity == null) return;
+
         int count = PlayerInventory.Instance.CountDeletable(maxRarity);
-        string hex = RarityHex[(int)maxRarity];
+        string hex = maxRarity.Hex;
 
         if (count == 0)
         {
-            batchConfirmLabel.text = $"No non-equipped items of <color=#{hex}>{maxRarity}</color> or below to delete.";
+            batchConfirmLabel.text = $"No non-equipped items of <color=#{hex}>{maxRarity.displayName}</color> or below to delete.";
         }
         else
         {
             batchConfirmLabel.text =
-                $"Delete all <color=#{hex}>{maxRarity}</color> and below?\n" +
+                $"Delete all <color=#{hex}>{maxRarity.displayName}</color> and below?\n" +
                 $"<b>{count} item{(count == 1 ? "" : "s")}</b> will be removed.\n" +
                 "<size=80%>Equipped items are safe.</size>";
         }
 
         batchConfirmPanel.SetActive(true);
 
-        // Only enable confirm if there's something to delete
         if (batchConfirmButton != null)
             batchConfirmButton.interactable = count > 0;
     }
@@ -194,13 +208,15 @@ public class InventoryUI : MonoBehaviour
     {
         if (PlayerInventory.Instance == null) return;
 
-        ItemRarity maxRarity = (ItemRarity)batchRarityDropdown.value;
+        RarityData maxRarity = GetDropdownSelectedRarity();
+        if (maxRarity == null) return;
+
         int deleted = PlayerInventory.Instance.DeleteByMaxRarity(maxRarity);
 
         if (batchConfirmPanel != null)
             batchConfirmPanel.SetActive(false);
 
-        Debug.Log($"[InventoryUI] Batch deleted {deleted} item(s) ≤ {maxRarity}.");
+        Debug.Log($"[InventoryUI] Batch deleted {deleted} item(s) ≤ {maxRarity.displayName}.");
     }
 
     private void OnCancelBatchDelete()

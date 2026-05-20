@@ -1,0 +1,25 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 0d3fdcd2f84d21742914d855e2a0d76f, type: 3}
+  m_Name: Uncommon
+  m_EditorClassIdentifier: Assembly-CSharp::RarityData
+  displayName: Uncommon
+  sortOrder: 1
+  color: {r: 0.1176, g: 1, b: 0, a: 1}
+  glowColor: {r: 0.1176, g: 1, b: 0, a: 1}
+  glowIntensity: 1.5
+  particlePrefab: {fileID: 0}
+  dropWeight: 6
+  waveUnlockThreshold: 2
+  statLineCountMin: 2
+  statLineCountMax: 3
+  statValueMultiplier: 1.25

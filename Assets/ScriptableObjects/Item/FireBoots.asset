@@ -19,8 +19,8 @@ MonoBehaviour:
   rarity: 5
   statLines:
   - type: 8
-    value: 50
+    value: 50.0
   - type: 2
-    value: 50
+    value: 50.0
   - type: 9
-    value: 20
+    value: 20.0

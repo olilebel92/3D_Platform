@@ -133,7 +133,10 @@ public class Fireball : NetworkBehaviour
     // ─── Explosion ────────────────────────────────────────────────────────────
 
     // Static reuse buffer keeps AOE queries GC-free across all fireballs.
-    private static readonly Collider[] s_explosionBuffer = new Collider[32];
+    // Sized for late-wave dense clusters (boss + minions + props). OverlapSphereNonAlloc
+    // silently drops hits beyond the buffer length so the size needs to comfortably
+    // exceed any plausible enemy count inside falloffRadius.
+    private static readonly Collider[] s_explosionBuffer = new Collider[64];
 
     void Explode(Vector3 origin)
     {

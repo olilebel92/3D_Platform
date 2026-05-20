@@ -89,16 +89,20 @@ public class DraggableItem : MonoBehaviour,
         }
 
         // ── Filled state ──────────────────────────────────────────────────────
+        Sprite resolvedIcon = item.ResolvedIcon;
         if (iconImage != null)
         {
-            iconImage.sprite = item.icon;
-            iconImage.color  = item.icon != null ? Color.white : new Color(1f, 1f, 1f, 0.3f);
+            iconImage.sprite = resolvedIcon;
+            iconImage.color  = resolvedIcon != null ? Color.white : new Color(1f, 1f, 1f, 0.3f);
         }
 
         if (nameLabel != null)
+        {
+            string slotLabel = item.subType != null ? item.subType.displayName : item.EquipSlot.ToString();
             nameLabel.text =
-                $"<size=75%><color=#AAAAAA>{item.slot}</color></size>\n" +
+                $"<size=75%><color=#AAAAAA>{slotLabel}</color></size>\n" +
                 $"<color=#{item.RarityHex}>{item.itemName}</color>";
+        }
 
         if (statsLabel != null)
             statsLabel.gameObject.SetActive(false);
@@ -137,7 +141,6 @@ public class DraggableItem : MonoBehaviour,
         // Destroy any leftover visual from a previous drag
         if (_dragVisual != null) Destroy(_dragVisual);
 
-        // Create a floating visual that follows the pointer
         _dragVisual = new GameObject("DragVisual", typeof(RectTransform));
         _dragVisual.transform.SetParent(_rootCanvas.transform, false);
         _dragVisual.transform.SetAsLastSibling();
@@ -149,7 +152,7 @@ public class DraggableItem : MonoBehaviour,
         rt.pivot      = Vector2.one * 0.5f;
 
         Image img = _dragVisual.AddComponent<Image>();
-        img.sprite        = iconImage != null ? iconImage.sprite : null;
+        img.sprite        = iconImage != null ? iconImage.sprite : Item.ResolvedIcon;
         img.raycastTarget = false;
 
         CanvasGroup cg = _dragVisual.AddComponent<CanvasGroup>();
@@ -187,7 +190,7 @@ public class DraggableItem : MonoBehaviour,
         _canvasGroup.alpha          = 1f;
         _canvasGroup.blocksRaycasts = true;
 
-        if (Item != null) EquipSlotUI.SetHighlight(Item.slot, false);
+        if (Item != null) EquipSlotUI.SetHighlight(Item.EquipSlot, false);
     }
 
     // ─── IDropHandler — swap with another inventory slot ─────────────────────
@@ -229,25 +232,22 @@ public class DraggableItem : MonoBehaviour,
     {
         if (Item == null || InventoryUI.IsDragging) return;
         ItemTooltip.Instance?.Show(Item, _rectTransform);
-        EquipSlotUI.SetHighlight(Item.slot, true);
+        EquipSlotUI.SetHighlight(Item.EquipSlot, true);
     }
 
     public void OnPointerExit(PointerEventData eventData)
     {
         ItemTooltip.Instance?.Hide();
-        // Keep the slot highlighted while the item is being dragged
         if (!InventoryUI.IsDragging && Item != null)
-            EquipSlotUI.SetHighlight(Item.slot, false);
+            EquipSlotUI.SetHighlight(Item.EquipSlot, false);
     }
 
     private void RefreshEquippedVisual()
     {
         if (equippedIndicator == null || Item == null) return;
 
-        // Compare by reference — whichever bag slot holds the exact ItemData object
-        // that is currently equipped will light up, regardless of its index position.
         equippedIndicator.SetActive(
             PlayerInventory.Instance != null &&
-            PlayerInventory.Instance.GetEquipped(Item.slot) == Item);
+            PlayerInventory.Instance.GetEquipped(Item.EquipSlot) == Item);
     }
 }

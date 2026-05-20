@@ -2,16 +2,25 @@ from pathlib import Path
 
 from cs_parser import parse_cs_file
 
-PROJECT_ROOT = Path(__file__).parent.parent
-ITEMS_DIR    = PROJECT_ROOT / "Assets/ScriptableObjects/Item"
-SPELLS_DIR   = PROJECT_ROOT / "Assets/ScriptableObjects/Spells"
-ENEMIES_DIR  = PROJECT_ROOT / "Assets/ScriptableObjects/Enemies"
+PROJECT_ROOT  = Path(__file__).parent.parent
+ITEMS_DIR     = PROJECT_ROOT / "Assets/ScriptableObjects/Item"
+SPELLS_DIR    = PROJECT_ROOT / "Assets/ScriptableObjects/Spells"
+ENEMIES_DIR   = PROJECT_ROOT / "Assets/ScriptableObjects/Enemies"
+RARITIES_DIR  = PROJECT_ROOT / "Assets/ScriptableObjects/Items/Rarities"
+MAINTYPES_DIR = PROJECT_ROOT / "Assets/ScriptableObjects/Items/MainTypes"
+SUBTYPES_DIR  = PROJECT_ROOT / "Assets/ScriptableObjects/Items/SubTypes"
 
 # Confirmed from .cs.meta files
-ITEM_SCRIPT_GUID  = "9c5f8a9e4be4b6c42a10ba05afe871e9"
-SPELL_SCRIPT_GUID = "4378247a87f53c34aa130d1b75a0dc31"
-ITEM_CLASS_ID     = "Assembly-CSharp::ItemData"
-SPELL_CLASS_ID    = "Assembly-CSharp::SpellData"
+ITEM_SCRIPT_GUID     = "9c5f8a9e4be4b6c42a10ba05afe871e9"
+SPELL_SCRIPT_GUID    = "4378247a87f53c34aa130d1b75a0dc31"
+RARITY_SCRIPT_GUID   = "0d3fdcd2f84d21742914d855e2a0d76f"
+MAINTYPE_SCRIPT_GUID = "9130c021614217c4f84ec2b733690a05"
+SUBTYPE_SCRIPT_GUID  = "9a4fd08e94d3be2428fbfcefbac94459"
+ITEM_CLASS_ID        = "Assembly-CSharp::ItemData"
+SPELL_CLASS_ID       = "Assembly-CSharp::SpellData"
+RARITY_CLASS_ID      = "Assembly-CSharp::RarityData"
+MAINTYPE_CLASS_ID    = "Assembly-CSharp::MainTypeData"
+SUBTYPE_CLASS_ID     = "Assembly-CSharp::SubTypeData"
 
 # Filled automatically after Unity imports EnemyData.cs — see step 9 of setup
 ENEMY_SCRIPT_GUID = "3dbeaa33d044b3849959fdc32f1563ee"

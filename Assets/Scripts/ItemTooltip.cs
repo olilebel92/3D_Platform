@@ -68,7 +68,7 @@ public class ItemTooltip : MonoBehaviour
 
         if (rarityLabel != null)
         {
-            rarityLabel.text  = item.rarity.ToString();
+            rarityLabel.text  = item.rarity != null ? item.rarity.displayName : "";
             rarityLabel.color = item.RarityColor;
         }
 

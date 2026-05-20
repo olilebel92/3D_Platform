@@ -69,6 +69,17 @@ def _write_meta(asset_path: Path, guid: str, folder: bool = False) -> None:
     meta_path.write_text(template.format(guid=guid), encoding="utf-8")
 
 
+def _read_meta_guid(asset_path: Path) -> str | None:
+    """Read the `guid:` field from `<asset>.meta`. Returns None if missing/malformed."""
+    meta_path = Path(str(asset_path) + ".meta")
+    try:
+        text = meta_path.read_text(encoding="utf-8")
+    except (FileNotFoundError, OSError):
+        return None
+    m = re.search(r"^guid:\s*([0-9a-fA-F]+)\s*$", text, flags=re.MULTILINE)
+    return m.group(1) if m else None
+
+
 def _ensure_dir_with_meta(directory: Path) -> None:
     """Create a directory and its Unity .meta if it didn't exist."""
     if not directory.exists():
@@ -93,9 +104,15 @@ def sanitize_asset_name(name: str) -> str:
 # rewrite the .meta on edit, so Unity references survive across saves.
 
 def _update_scalar_fields(text: str, updates: dict[str, str]) -> str:
-    """Replace each `  key: <existing>` line with `  key: <new>`. Single occurrence per key."""
+    """
+    Replace each `  key: <existing>` line with `  key: <new>`. Single occurrence per key.
+
+    Uses [ \\t] (horizontal whitespace only) — not \\s — between the colon and end-of-line
+    so the match cannot span newlines. Without this, an empty scalar line (e.g.
+    `attachBone:` with no value) would greedily eat into the next line and delete it.
+    """
     for key, value in updates.items():
-        pattern = rf"^(?P<indent>\s+){re.escape(key)}:\s*[^\n\r]*$"
+        pattern = rf"^(?P<indent>[ \t]+){re.escape(key)}:[ \t]*[^\n\r]*$"
         replacement = rf"\g<indent>{key}: {value}"
         text, n = re.subn(pattern, replacement, text, count=1, flags=re.MULTILINE)
         if n == 0:
@@ -143,17 +160,25 @@ def _replace_yaml_list_block(text: str, key: str, values: list, insert_after: st
             i += 1
     if found:
         return "".join(out)
-    # Missing: insert after `insert_after` line if provided, else append at end
+    # Missing: insert after the entire `insert_after` BLOCK (anchor header + any `- ` items
+    # beneath it). Inserting just after the anchor line would split the anchor's own list.
     if insert_after:
         anchor_pattern = re.compile(rf"^(\s+){re.escape(insert_after)}:")
         out2: list[str] = []
         inserted = False
-        for line in out:
+        i2 = 0
+        while i2 < len(out):
+            line = out[i2]
             out2.append(line)
+            i2 += 1
             if not inserted:
                 am = anchor_pattern.match(line)
                 if am:
                     indent = am.group(1)
+                    # Copy any `- ` items that belong to the anchor's block first.
+                    while i2 < len(out) and item_pattern.match(out[i2]):
+                        out2.append(out[i2])
+                        i2 += 1
                     out2.append(f"{indent}{key}:\n")
                     for v in values:
                         out2.append(f"{indent}- {v}\n")
@@ -170,6 +195,21 @@ def _remove_yaml_line(text: str, key: str) -> str:
     """Remove any single `  key: ...` scalar line from the YAML body."""
     pattern = rf"^\s+{re.escape(key)}:\s*[^\n\r]*\r?\n"
     return re.sub(pattern, "", text, count=1, flags=re.MULTILINE)
+
+
+def _remove_yaml_inline_line(text: str, key: str) -> str:
+    """
+    Remove only `  key: <value>` lines where there IS a value after the colon
+    (e.g. inline `key: 0b000000` left by Unity). Block-style headers like
+    bare `  key:` are NOT removed — those belong to a list block.
+    Call this before inserting a list block to clean up stale inline forms
+    Unity may have written.
+
+    Uses [ \\t] (horizontal whitespace only) — not \\s — so the match cannot
+    span newlines and eat the following line by accident.
+    """
+    pattern = rf"^[ \t]+{re.escape(key)}:[ \t]+\S[^\n\r]*\r?\n"
+    return re.sub(pattern, "", text, count=0, flags=re.MULTILINE)
 
 
 # ─── C# Enum Editing ─────────────────────────────────────────────────────────
@@ -334,6 +374,422 @@ def update_item_asset(asset_file: str, data: dict) -> tuple[bool, str]:
     else:
         stat_lines_yaml += "  []\n"
     text = _replace_block_to_eof(text, "statLines", stat_lines_yaml)
+
+    path.write_text(text, encoding="utf-8")
+    return True, f"Updated '{asset_file}.asset'."
+
+
+# ─── Read Rarities ───
+
+def scan_rarities() -> list[dict]:
+    """Return list of parsed RarityData dicts from the Rarities directory, sorted by sortOrder."""
+    rarities = []
+    for path in sorted(config.RARITIES_DIR.glob("*.asset")):
+        mb = _load_unity_yaml(path)
+        if not mb:
+            continue
+        script = mb.get("m_Script", {})
+        if script.get("guid") != config.RARITY_SCRIPT_GUID:
+            continue
+
+        def gf(key, default=0.0):
+            v = mb.get(key, default)
+            return float(v) if v is not None else default
+
+        def gi(key, default=0):
+            v = mb.get(key, default)
+            return int(v) if v is not None else default
+
+        color = mb.get("color") or {}
+        glow  = mb.get("glowColor") or {}
+
+        raw_banned = mb.get("bannedStats")
+        if isinstance(raw_banned, list):
+            banned_labels = [config.STAT_TYPE.get(int(v), "STR") for v in raw_banned]
+        else:
+            banned_labels = []
+
+        rarities.append({
+            "asset_file":          path.stem,
+            "displayName":         mb.get("displayName", path.stem),
+            "sortOrder":           gi("sortOrder", 0),
+            "color":               {"r": float(color.get("r", 1.0)), "g": float(color.get("g", 1.0)),
+                                    "b": float(color.get("b", 1.0)), "a": float(color.get("a", 1.0))},
+            "glowColor":           {"r": float(glow.get("r", 1.0)),  "g": float(glow.get("g", 1.0)),
+                                    "b": float(glow.get("b", 1.0)),  "a": float(glow.get("a", 1.0))},
+            "glowIntensity":       gf("glowIntensity", 1.0),
+            "dropWeight":          gf("dropWeight", 10.0),
+            "waveUnlockThreshold": gi("waveUnlockThreshold", 1),
+            "statLineCountMin":    gi("statLineCountMin", 1),
+            "statLineCountMax":    gi("statLineCountMax", 2),
+            "statValueMultiplier": gf("statValueMultiplier", 1.0),
+            "bannedStats":         banned_labels,
+        })
+    return sorted(rarities, key=lambda r: r["sortOrder"])
+
+
+# ─── Write Rarities ───
+
+_RARITY_ASSET_TEMPLATE = """\
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {{fileID: 0}}
+  m_PrefabInstance: {{fileID: 0}}
+  m_PrefabAsset: {{fileID: 0}}
+  m_GameObject: {{fileID: 0}}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {{fileID: 11500000, guid: {script_guid}, type: 3}}
+  m_Name: {asset_name}
+  m_EditorClassIdentifier: {class_id}
+  displayName: {display_name}
+  sortOrder: {sort_order}
+  color: {{r: {cr}, g: {cg}, b: {cb}, a: {ca}}}
+  glowColor: {{r: {gr}, g: {gg}, b: {gb}, a: {ga}}}
+  glowIntensity: {glow_intensity}
+  particlePrefab: {{fileID: 0}}
+  dropWeight: {drop_weight}
+  waveUnlockThreshold: {wave_unlock}
+  statLineCountMin: {stat_min}
+  statLineCountMax: {stat_max}
+  statValueMultiplier: {stat_mult}
+  bannedStats:{banned_stats_block}
+"""
+
+
+def write_rarity_asset(data: dict) -> tuple[bool, str]:
+    """Write a new RarityData .asset + .meta. Returns (success, message)."""
+    asset_name = sanitize_asset_name(data["asset_name"])
+    if not asset_name:
+        return False, "Asset name is empty after sanitization."
+
+    _ensure_dir_with_meta(config.RARITIES_DIR)
+    dest = config.RARITIES_DIR / f"{asset_name}.asset"
+    if dest.exists():
+        return False, f"Asset '{asset_name}.asset' already exists."
+
+    def f4(v): return round(float(v), 6)
+
+    color = data.get("color", {"r": 1.0, "g": 1.0, "b": 1.0, "a": 1.0})
+    glow  = data.get("glow_color", color)
+
+    banned_labels = data.get("banned_stats") or []
+    banned_ints = [config.STAT_TYPE_INV.get(label, 0) for label in banned_labels]
+    banned_block = ("\n" + "\n".join(f"  - {i}" for i in banned_ints)) if banned_ints else " []"
+
+    content = _RARITY_ASSET_TEMPLATE.format(
+        script_guid=config.RARITY_SCRIPT_GUID,
+        asset_name=asset_name,
+        class_id=config.RARITY_CLASS_ID,
+        display_name=_yaml_str(data.get("display_name", asset_name)),
+        sort_order=int(data.get("sort_order", 0)),
+        cr=f4(color.get("r", 1.0)), cg=f4(color.get("g", 1.0)),
+        cb=f4(color.get("b", 1.0)), ca=f4(color.get("a", 1.0)),
+        gr=f4(glow.get("r", 1.0)),  gg=f4(glow.get("g", 1.0)),
+        gb=f4(glow.get("b", 1.0)),  ga=f4(glow.get("a", 1.0)),
+        glow_intensity=f4(data.get("glow_intensity", 1.0)),
+        drop_weight=f4(data.get("drop_weight", 10.0)),
+        wave_unlock=int(data.get("wave_unlock", 1)),
+        stat_min=int(data.get("stat_min", 1)),
+        stat_max=int(data.get("stat_max", 2)),
+        stat_mult=f4(data.get("stat_mult", 1.0)),
+        banned_stats_block=banned_block,
+    )
+
+    dest.write_text(content, encoding="utf-8")
+    _write_meta(dest, _new_guid())
+    return True, f"Created '{asset_name}.asset' in Rarities/."
+
+
+def update_rarity_asset(asset_file: str, data: dict) -> tuple[bool, str]:
+    """Edit an existing RarityData .asset in place. Preserves particlePrefab ref and .meta GUID."""
+    path = config.RARITIES_DIR / f"{asset_file}.asset"
+    if not path.exists():
+        return False, f"Asset '{asset_file}.asset' not found."
+
+    text = path.read_text(encoding="utf-8")
+
+    def f4(v): return f"{round(float(v), 6)}"
+
+    color = data.get("color", {"r": 1.0, "g": 1.0, "b": 1.0, "a": 1.0})
+    glow  = data.get("glow_color", color)
+    color_inline = f"{{r: {f4(color.get('r', 1.0))}, g: {f4(color.get('g', 1.0))}, b: {f4(color.get('b', 1.0))}, a: {f4(color.get('a', 1.0))}}}"
+    glow_inline  = f"{{r: {f4(glow.get('r', 1.0))}, g: {f4(glow.get('g', 1.0))}, b: {f4(glow.get('b', 1.0))}, a: {f4(glow.get('a', 1.0))}}}"
+
+    updates = {
+        "displayName":          _yaml_str(data.get("display_name", asset_file)),
+        "sortOrder":            str(int(data.get("sort_order", 0))),
+        "color":                color_inline,
+        "glowColor":            glow_inline,
+        "glowIntensity":        f4(data.get("glow_intensity", 1.0)),
+        "dropWeight":           f4(data.get("drop_weight", 10.0)),
+        "waveUnlockThreshold":  str(int(data.get("wave_unlock", 1))),
+        "statLineCountMin":     str(int(data.get("stat_min", 1))),
+        "statLineCountMax":     str(int(data.get("stat_max", 2))),
+        "statValueMultiplier":  f4(data.get("stat_mult", 1.0)),
+    }
+    text = _update_scalar_fields(text, updates)
+
+    banned_labels = data.get("banned_stats") or []
+    banned_ints = [config.STAT_TYPE_INV.get(label, 0) for label in banned_labels]
+    text = _remove_yaml_inline_line(text, "bannedStats")
+    text = _replace_yaml_list_block(text, "bannedStats", banned_ints, insert_after="statValueMultiplier")
+
+    path.write_text(text, encoding="utf-8")
+    return True, f"Updated '{asset_file}.asset'."
+
+
+# ─── Read MainTypes ───
+
+def scan_main_types() -> list[dict]:
+    """Return list of parsed MainTypeData dicts from the MainTypes directory."""
+    items = []
+    for path in sorted(config.MAINTYPES_DIR.glob("*.asset")):
+        mb = _load_unity_yaml(path)
+        if not mb:
+            continue
+        if mb.get("m_Script", {}).get("guid") != config.MAINTYPE_SCRIPT_GUID:
+            continue
+        items.append({
+            "asset_file":  path.stem,
+            "displayName": mb.get("displayName", path.stem),
+            "isWeapon":    bool(int(mb.get("isWeapon", 0) or 0)),
+            "guid":        _read_meta_guid(path),
+        })
+    return items
+
+
+# ─── Write MainTypes ───
+
+_MAINTYPE_ASSET_TEMPLATE = """\
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {{fileID: 0}}
+  m_PrefabInstance: {{fileID: 0}}
+  m_PrefabAsset: {{fileID: 0}}
+  m_GameObject: {{fileID: 0}}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {{fileID: 11500000, guid: {script_guid}, type: 3}}
+  m_Name: {asset_name}
+  m_EditorClassIdentifier: {class_id}
+  displayName: {display_name}
+  icon: {{fileID: 0}}
+  isWeapon: {is_weapon}
+"""
+
+
+def write_main_type_asset(data: dict) -> tuple[bool, str]:
+    """Write a new MainTypeData .asset + .meta. Returns (success, message)."""
+    asset_name = sanitize_asset_name(data["asset_name"])
+    if not asset_name:
+        return False, "Asset name is empty after sanitization."
+
+    _ensure_dir_with_meta(config.MAINTYPES_DIR)
+    dest = config.MAINTYPES_DIR / f"{asset_name}.asset"
+    if dest.exists():
+        return False, f"Asset '{asset_name}.asset' already exists."
+
+    content = _MAINTYPE_ASSET_TEMPLATE.format(
+        script_guid=config.MAINTYPE_SCRIPT_GUID,
+        asset_name=asset_name,
+        class_id=config.MAINTYPE_CLASS_ID,
+        display_name=_yaml_str(data.get("display_name", asset_name)),
+        is_weapon=1 if data.get("is_weapon") else 0,
+    )
+    dest.write_text(content, encoding="utf-8")
+    _write_meta(dest, _new_guid())
+    return True, f"Created '{asset_name}.asset' in MainTypes/."
+
+
+def update_main_type_asset(asset_file: str, data: dict) -> tuple[bool, str]:
+    """Edit an existing MainTypeData .asset in place. Preserves icon ref and .meta GUID."""
+    path = config.MAINTYPES_DIR / f"{asset_file}.asset"
+    if not path.exists():
+        return False, f"Asset '{asset_file}.asset' not found."
+
+    text = path.read_text(encoding="utf-8")
+    updates = {
+        "displayName": _yaml_str(data.get("display_name", asset_file)),
+        "isWeapon":    "1" if data.get("is_weapon") else "0",
+    }
+    text = _update_scalar_fields(text, updates)
+    path.write_text(text, encoding="utf-8")
+    return True, f"Updated '{asset_file}.asset'."
+
+
+# ─── Read SubTypes ───
+
+def scan_sub_types() -> list[dict]:
+    """Return list of parsed SubTypeData dicts from the SubTypes directory."""
+    # Build a guid -> MainType displayName map so we can resolve mainType refs.
+    main_by_guid = {mt["guid"]: mt["displayName"] for mt in scan_main_types() if mt["guid"]}
+
+    items = []
+    for path in sorted(config.SUBTYPES_DIR.glob("*.asset")):
+        mb = _load_unity_yaml(path)
+        if not mb:
+            continue
+        if mb.get("m_Script", {}).get("guid") != config.SUBTYPE_SCRIPT_GUID:
+            continue
+
+        mt_ref = mb.get("mainType") or {}
+        mt_guid = mt_ref.get("guid") if isinstance(mt_ref, dict) else None
+        mt_name = main_by_guid.get(mt_guid, "(missing)")
+
+        def _stats(key: str) -> list[str]:
+            raw = mb.get(key)
+            if isinstance(raw, list):
+                return [config.STAT_TYPE.get(int(v), "STR") for v in raw]
+            return []
+
+        allowed_labels  = _stats("allowedStats")
+        reserved_labels = _stats("reservedStats")
+
+        materials = mb.get("nameMaterials")
+        materials = list(materials) if isinstance(materials, list) else []
+
+        items.append({
+            "asset_file":     path.stem,
+            "displayName":    mb.get("displayName", path.stem),
+            "mainTypeName":   mt_name,
+            "mainTypeGuid":   mt_guid,
+            "equipSlot":      config.EQUIPMENT_SLOT.get(int(mb.get("equipSlot", 0) or 0), "Boots"),
+            "attachBone":     mb.get("attachBone", "") or "",
+            "allowedStats":   allowed_labels,
+            "reservedStats":  reserved_labels,
+            "nameMaterials":  materials,
+        })
+    return items
+
+
+# ─── Write SubTypes ───
+
+_SUBTYPE_ASSET_TEMPLATE = """\
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {{fileID: 0}}
+  m_PrefabInstance: {{fileID: 0}}
+  m_PrefabAsset: {{fileID: 0}}
+  m_GameObject: {{fileID: 0}}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {{fileID: 11500000, guid: {script_guid}, type: 3}}
+  m_Name: {asset_name}
+  m_EditorClassIdentifier: {class_id}
+  displayName: {display_name}
+  mainType: {{fileID: 11400000, guid: {main_type_guid}, type: 2}}
+  equipSlot: {equip_slot}
+  attachBone: {attach_bone}
+  worldModelPrefab: {{fileID: 0}}
+  defaultIcon: {{fileID: 0}}
+  iconPool: []
+  allowedStats:{allowed_stats_block}
+  reservedStats:{reserved_stats_block}
+  nameMaterials:{name_materials_block}
+"""
+
+
+def _stat_list_block(labels: list[str]) -> str:
+    """Format a stat-int list as a YAML block. Empty → ' []' so the line stays on the parent."""
+    ints = [config.STAT_TYPE_INV.get(label, 0) for label in (labels or [])]
+    return ("\n" + "\n".join(f"  - {i}" for i in ints)) if ints else " []"
+
+
+def write_sub_type_asset(data: dict) -> tuple[bool, str]:
+    """Write a new SubTypeData .asset + .meta. Requires a valid MainType GUID."""
+    asset_name = sanitize_asset_name(data["asset_name"])
+    if not asset_name:
+        return False, "Asset name is empty after sanitization."
+
+    main_type_guid = (data.get("main_type_guid") or "").strip()
+    if not main_type_guid:
+        return False, "MainType is required — create a MainType first."
+
+    _ensure_dir_with_meta(config.SUBTYPES_DIR)
+    dest = config.SUBTYPES_DIR / f"{asset_name}.asset"
+    if dest.exists():
+        return False, f"Asset '{asset_name}.asset' already exists."
+
+    allowed_block  = _stat_list_block(data.get("allowed_stats"))
+    reserved_block = _stat_list_block(data.get("reserved_stats"))
+
+    materials = [m.strip() for m in (data.get("name_materials") or []) if m and m.strip()]
+    if materials:
+        materials_block = "\n" + "\n".join(f"  - {_yaml_str(m)}" for m in materials)
+    else:
+        materials_block = " []"
+
+    attach_bone = data.get("attach_bone", "") or ""
+    attach_bone_yaml = _yaml_str(attach_bone) if attach_bone else ""
+
+    content = _SUBTYPE_ASSET_TEMPLATE.format(
+        script_guid=config.SUBTYPE_SCRIPT_GUID,
+        asset_name=asset_name,
+        class_id=config.SUBTYPE_CLASS_ID,
+        display_name=_yaml_str(data.get("display_name", asset_name)),
+        main_type_guid=main_type_guid,
+        equip_slot=config.EQUIPMENT_SLOT_INV.get(data.get("equip_slot", "Boots"), 0),
+        attach_bone=attach_bone_yaml,
+        allowed_stats_block=allowed_block,
+        reserved_stats_block=reserved_block,
+        name_materials_block=materials_block,
+    )
+    dest.write_text(content, encoding="utf-8")
+    _write_meta(dest, _new_guid())
+    return True, f"Created '{asset_name}.asset' in SubTypes/."
+
+
+def update_sub_type_asset(asset_file: str, data: dict) -> tuple[bool, str]:
+    """
+    Edit an existing SubTypeData .asset in place. Preserves worldModelPrefab/defaultIcon/iconPool
+    refs and the .meta GUID. mainType can be reassigned by passing a new GUID.
+    """
+    path = config.SUBTYPES_DIR / f"{asset_file}.asset"
+    if not path.exists():
+        return False, f"Asset '{asset_file}.asset' not found."
+
+    main_type_guid = (data.get("main_type_guid") or "").strip()
+    if not main_type_guid:
+        return False, "MainType is required."
+
+    text = path.read_text(encoding="utf-8")
+
+    attach_bone = data.get("attach_bone", "") or ""
+    attach_bone_yaml = _yaml_str(attach_bone) if attach_bone else ""
+
+    updates = {
+        "displayName": _yaml_str(data.get("display_name", asset_file)),
+        "mainType":    f"{{fileID: 11400000, guid: {main_type_guid}, type: 2}}",
+        "equipSlot":   str(config.EQUIPMENT_SLOT_INV.get(data.get("equip_slot", "Boots"), 0)),
+        "attachBone":  attach_bone_yaml,
+    }
+    text = _update_scalar_fields(text, updates)
+
+    allowed_labels  = data.get("allowed_stats") or []
+    reserved_labels = data.get("reserved_stats") or []
+    allowed_ints  = [config.STAT_TYPE_INV.get(label, 0) for label in allowed_labels]
+    reserved_ints = [config.STAT_TYPE_INV.get(label, 0) for label in reserved_labels]
+    # Strip any inline-form leftovers (e.g. Unity-written `reservedStats: 0b000000`) so the
+    # block insert is the only copy in the file.
+    text = _remove_yaml_inline_line(text, "allowedStats")
+    text = _remove_yaml_inline_line(text, "reservedStats")
+    text = _remove_yaml_inline_line(text, "nameMaterials")
+    text = _replace_yaml_list_block(text, "allowedStats",  allowed_ints,  insert_after="iconPool")
+    text = _replace_yaml_list_block(text, "reservedStats", reserved_ints, insert_after="allowedStats")
+
+    materials = [m.strip() for m in (data.get("name_materials") or []) if m and m.strip()]
+    materials_yaml = [_yaml_str(m) for m in materials]
+    text = _replace_yaml_list_block(text, "nameMaterials", materials_yaml, insert_after="reservedStats")
 
     path.write_text(text, encoding="utf-8")
     return True, f"Updated '{asset_file}.asset'."

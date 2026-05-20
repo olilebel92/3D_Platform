@@ -2,12 +2,8 @@ using System.Collections.Generic;
 using UnityEngine;
 
 // ─── Enums ────────────────────────────────────────────────────────────────────
-
-/// <summary>Equipment slots available. Add new entries here as slots are added.</summary>
-public enum EquipmentSlot { Boots, Helm, Pants, Chest }
-
-/// <summary>Item rarity tier — controls stat count, values, and UI colour.</summary>
-public enum ItemRarity { Normal, Uncommon, Rare, Epic, Legendary, Godly }
+// EquipmentSlot lives in Items/EquipmentSlot.cs.
+// ItemRarity is gone — rarity is now a RarityData ScriptableObject reference.
 
 /// <summary>All stat types a generated item can roll.</summary>
 public enum StatType
@@ -15,16 +11,16 @@ public enum StatType
     STR,
     AGI,
     INT,
-    FlatHP,          // flat bonus hit points (available from Normal rarity)
+    FlatHP,          // flat bonus hit points
     FlatMana,        // flat bonus mana added to max mana pool
-    HPRegenPerSecond,   // HP regeneration per second (Uncommon+ only)
-    ManaRegenPerSecond, // Mana regeneration per second
-    AllStats,        // adds to STR, AGI, and INT simultaneously (Rare+ only)
-    CritRate,    // stored as whole percentage points  (5 → +5 % crit rate)
-    CritDamage,  // stored as whole percentage points  (25 → +25 % crit dmg)
-    FireDamage,  // flat bonus fire damage added to fire spells
-    MovementSpeed, // stored as whole percentage points  (20 → +20 % move speed)
-    SpellPower,  // flat bonus added to all spell damage
+    HPRegenPerSecond,
+    ManaRegenPerSecond,
+    AllStats,        // adds to STR, AGI, and INT simultaneously
+    CritRate,    // percentage points (5 → +5 % crit rate)
+    CritDamage,  // percentage points (25 → +25 % crit dmg)
+    FireDamage,
+    MovementSpeed, // percentage points (20 → +20 % move speed)
+    SpellPower,
 }
 
 // ─── Stat Line ────────────────────────────────────────────────────────────────
@@ -33,17 +29,19 @@ public enum StatType
 public struct StatLine
 {
     public StatType type;
-    [Tooltip("Raw value. For CritRate/CritDamage this is percentage points (e.g. 5 = +5%).")]
+    [Tooltip("Raw value. For CritRate/CritDamage/MovementSpeed this is percentage points (e.g. 5 = +5%).")]
     public float value;
 }
 
 // ─── Item Data ────────────────────────────────────────────────────────────────
 
 /// <summary>
-/// Describes one equippable item. Can be created as a ScriptableObject asset
-/// (right-click → Create → RPG → Item Data) or generated at runtime by ItemGenerator.
+/// Describes one equippable item. Slot, rarity colour, and 3D model are owned by
+/// the referenced SubTypeData / RarityData ScriptableObjects — no hardcoded tables here.
+/// Create as a ScriptableObject asset (Create → RPG → Items → Item Data) or generated
+/// at runtime by ItemGenerator.
 /// </summary>
-[CreateAssetMenu(fileName = "NewItem", menuName = "RPG/Item Data")]
+[CreateAssetMenu(fileName = "NewItem", menuName = "RPG/Items/Item Data")]
 public class ItemData : ScriptableObject
 {
     // ─── Identity ─────────────────────────────────────────────────────────────
@@ -51,62 +49,80 @@ public class ItemData : ScriptableObject
     [Header("Identity")]
     public string itemName = "New Item";
     [TextArea(2, 4)] public string description;
+    [Tooltip("Per-item icon override. If null, falls back to SubType.defaultIcon / iconPool.")]
     public Sprite icon;
-    public EquipmentSlot slot   = EquipmentSlot.Boots;
-    public ItemRarity    rarity = ItemRarity.Normal;
+
+    [Header("Categorization")]
+    [Tooltip("SubType drives equip slot, 3D model, and allowed stats.")]
+    public SubTypeData subType;
+
+    [Tooltip("Rarity drives drop weight, glow color, stat-line count, and value multiplier.")]
+    public RarityData rarity;
+
+    // ─── Identity (network-stable) ────────────────────────────────────────────
+
+    [SerializeField, HideInInspector] private string assetGuid;
+    /// <summary>Stable asset GUID populated from the .meta file in Editor. Empty for runtime-generated items. Use to identify pool entries over the network.</summary>
+    public string AssetGuid => assetGuid;
+
+#if UNITY_EDITOR
+    protected virtual void OnValidate()
+    {
+        string path = UnityEditor.AssetDatabase.GetAssetPath(this);
+        if (string.IsNullOrEmpty(path)) return;
+        string guid = UnityEditor.AssetDatabase.AssetPathToGUID(path);
+        if (string.IsNullOrEmpty(guid) || guid == assetGuid) return;
+        assetGuid = guid;
+        UnityEditor.EditorUtility.SetDirty(this);
+    }
+#endif
 
     // ─── Stat Lines ───────────────────────────────────────────────────────────
 
     [Header("Stat Lines")]
     public List<StatLine> statLines = new();
 
+    // ─── Computed Accessors ───────────────────────────────────────────────────
+
+    /// <summary>EquipmentSlot resolved through SubType. Falls back to Boots if SubType is missing.</summary>
+    public EquipmentSlot EquipSlot => subType != null ? subType.equipSlot : EquipmentSlot.Boots;
+
+    /// <summary>Parent MainType resolved through SubType, or null if not configured.</summary>
+    public MainTypeData MainType => subType != null ? subType.mainType : null;
+
+    /// <summary>Resolved icon — per-item override, then SubType pool/default, then null.</summary>
+    public Sprite ResolvedIcon
+    {
+        get
+        {
+            if (icon != null) return icon;
+            if (subType != null && subType.defaultIcon != null) return subType.defaultIcon;
+            return null;
+        }
+    }
+
     // ─── Computed Bonuses ─────────────────────────────────────────────────────
 
-    /// <summary>AllStats contributes to each of the three primary stats.</summary>
     public int   BonusSTR        => GetInt(StatType.STR) + GetInt(StatType.AllStats);
     public int   BonusAGI        => GetInt(StatType.AGI) + GetInt(StatType.AllStats);
     public int   BonusINT        => GetInt(StatType.INT) + GetInt(StatType.AllStats);
-    /// <summary>Flat bonus hit points added to max HP.</summary>
     public int   BonusHP              => GetInt(StatType.FlatHP);
-    /// <summary>Flat bonus mana added to max mana pool.</summary>
     public int   BonusMana            => GetInt(StatType.FlatMana);
-    /// <summary>HP regenerated per second from equipment.</summary>
     public float BonusHPRegenPerSecond   => GetFloat(StatType.HPRegenPerSecond);
     public float BonusManaRegenPerSecond => GetFloat(StatType.ManaRegenPerSecond);
-    /// <summary>Crit rate bonus as a 0-1 fraction (e.g. 0.05 = +5%).</summary>
     public float BonusCritRate   => GetFloat(StatType.CritRate)   / 100f;
-    /// <summary>Crit damage bonus as a 0-1 fraction (e.g. 0.25 = +25%).</summary>
     public float BonusCritDamage   => GetFloat(StatType.CritDamage)   / 100f;
-    /// <summary>Flat fire damage bonus added to fire spells.</summary>
     public float BonusFireDamage   => GetFloat(StatType.FireDamage);
-    /// <summary>Movement speed bonus as a 0-1 fraction (e.g. 0.20 = +20%).</summary>
     public float BonusMovementSpeed => GetFloat(StatType.MovementSpeed) / 100f;
-    /// <summary>Flat spell power bonus added to all spell damage.</summary>
     public float BonusSpellPower   => GetFloat(StatType.SpellPower);
 
     // ─── Rarity Colours ───────────────────────────────────────────────────────
 
-    /// <summary>Unity Color matching this item's rarity.</summary>
-    public Color RarityColor => rarity switch
-    {
-        ItemRarity.Uncommon  => new Color(0.12f, 1.00f, 0.00f),   // Green
-        ItemRarity.Rare      => new Color(0.00f, 0.44f, 0.87f),   // Blue
-        ItemRarity.Epic      => new Color(0.64f, 0.21f, 0.93f),   // Purple
-        ItemRarity.Legendary => new Color(1.00f, 0.50f, 0.00f),   // Orange
-        ItemRarity.Godly     => new Color(1.00f, 0.10f, 0.10f),   // Red
-        _                    => Color.white,                        // Normal = White
-    };
+    /// <summary>UI color for this item's rarity. White when no rarity is assigned.</summary>
+    public Color RarityColor => rarity != null ? rarity.color : Color.white;
 
-    /// <summary>Hex colour string for use inside TMP rich-text tags.</summary>
-    public string RarityHex => rarity switch
-    {
-        ItemRarity.Uncommon  => "1EFF00",
-        ItemRarity.Rare      => "0070DD",
-        ItemRarity.Epic      => "A335EE",
-        ItemRarity.Legendary => "FF8000",
-        ItemRarity.Godly     => "FF1A1A",
-        _                    => "FFFFFF",
-    };
+    /// <summary>Hex string for use inside TMP rich-text tags. White when no rarity is assigned.</summary>
+    public string RarityHex => rarity != null ? rarity.Hex : "FFFFFF";
 
     // ─── Helpers ──────────────────────────────────────────────────────────────
 

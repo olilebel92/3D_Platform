@@ -33,6 +33,13 @@ def _idx(options: list, value, fallback: int = 0) -> int:
     return options.index(value) if value in options else fallback
 
 
+def _clear_edit_widget_state(asset_file: str) -> None:
+    """Drop any persisted widget state for the edit form so a fresh prefill applies."""
+    prefix = f"spell_edit_{asset_file}_"
+    for k in [k for k in list(st.session_state.keys()) if k.startswith(prefix)]:
+        del st.session_state[k]
+
+
 # ─── Form Renderer ───
 # Shared by create + edit. `prefill` supplies defaults; `key_prefix` namespaces widgets.
 def _render_spell_form(prefill: dict, key_prefix: str, lock_asset_name: bool) -> dict:
@@ -238,6 +245,43 @@ def _render_spell_form(prefill: dict, key_prefix: str, lock_asset_name: bool) ->
     }
 
 
+# ─── Edit Panel ───
+# Hidden by default. Opened by clicking an "Edit" button in the library table.
+# Closes itself on Save or Cancel, clearing widget state so a fresh prefill loads next time.
+def _render_edit_panel(spells: list[dict]) -> None:
+    target = st.session_state.get("spell_editing")
+    if not target:
+        return
+    prefill = next((sp for sp in spells if sp["asset_file"] == target), None)
+    if prefill is None:
+        st.session_state["spell_editing"] = None
+        return
+
+    st.divider()
+    st.subheader(f"Edit: {target}")
+    with st.form(f"edit_spell_{target}"):
+        form_data = _render_spell_form(prefill, key_prefix=f"spell_edit_{target}",
+                                       lock_asset_name=True)
+        bc1, bc2, _ = st.columns([1, 1, 4])
+        save = bc1.form_submit_button("Save Changes", type="primary")
+        cancel = bc2.form_submit_button("Cancel")
+
+    if save:
+        ok, msg = asset_io.update_spell_asset(target, form_data)
+        if ok:
+            st.session_state["spell_editing"] = None
+            _clear_edit_widget_state(target)
+            st.cache_data.clear()
+            st.success(msg)
+            st.rerun()
+        else:
+            st.error(msg)
+    elif cancel:
+        st.session_state["spell_editing"] = None
+        _clear_edit_widget_state(target)
+        st.rerun()
+
+
 def render():
     col_left, col_right = st.columns([3, 1])
     with col_right:
@@ -250,59 +294,31 @@ def render():
     # ─── Library Table ───
     st.subheader(f"Spells ({len(spells)})")
     if not spells:
-        st.info("No SpellData assets found.")
+        st.info("No SpellData assets found. Create one below.")
     else:
-        table_html = (
-            "<table style='width:100%;border-collapse:collapse'>"
-            "<thead><tr style='border-bottom:1px solid #444;text-align:left'>"
-            "<th style='padding:6px'>Asset File</th>"
-            "<th style='padding:6px'>Spell Name</th>"
-            "<th style='padding:6px'>School</th>"
-            "<th style='padding:6px'>Type</th>"
-            "<th style='padding:6px'>Base Dmg</th>"
-            "<th style='padding:6px'>Cooldown</th>"
-            "<th style='padding:6px'>Telegraph</th>"
-            "</tr></thead><tbody>"
-            + "".join(
-                f"<tr style='border-bottom:1px solid #333'>"
-                f"<td style='padding:5px'>{sp['asset_file']}</td>"
-                f"<td style='padding:5px'>{sp['spellName']}</td>"
-                f"<td style='padding:5px'>{_school_badge(sp['school'])}</td>"
-                f"<td style='padding:5px'>{sp['spellType']}</td>"
-                f"<td style='padding:5px'>{sp['baseDamage']}</td>"
-                f"<td style='padding:5px'>{sp['cooldown']}s</td>"
-                f"<td style='padding:5px'>{sp['telegraphShape']}</td>"
-                f"</tr>"
-                for sp in spells
-            )
-            + "</tbody></table>"
-        )
-        st.markdown(table_html, unsafe_allow_html=True)
-
-    st.divider()
-
-    # ─── Edit Existing ───
-    st.subheader("Edit Existing Spell")
-    if not spells:
-        st.caption("No spells to edit yet.")
-    else:
-        asset_files = [sp["asset_file"] for sp in spells]
-        selected = st.selectbox("Select a spell to edit", asset_files, key="spell_edit_select")
-        prefill = next(sp for sp in spells if sp["asset_file"] == selected)
-
-        with st.form(f"edit_spell_{selected}"):
-            form_data = _render_spell_form(prefill, key_prefix=f"spell_edit_{selected}",
-                                           lock_asset_name=True)
-            save = st.form_submit_button("Save Changes", type="primary")
-
-        if save:
-            ok, msg = asset_io.update_spell_asset(selected, form_data)
-            if ok:
-                st.success(msg)
-                st.cache_data.clear()
+        weights = [2.0, 2.2, 1.2, 1.2, 0.9, 1.0, 1.2, 0.8]
+        headers = ["Asset File", "Spell Name", "School", "Type", "Base Dmg", "Cooldown", "Telegraph", ""]
+        hcols = st.columns(weights, gap="small")
+        for hc, label in zip(hcols, headers):
+            hc.markdown(f"**{label}**")
+        st.markdown("<hr style='margin:2px 0;border-color:#444'>",
+                    unsafe_allow_html=True)
+        for sp in spells:
+            cols = st.columns(weights, gap="small")
+            cols[0].write(sp["asset_file"])
+            cols[1].write(sp["spellName"])
+            cols[2].markdown(_school_badge(sp["school"]), unsafe_allow_html=True)
+            cols[3].write(sp["spellType"])
+            cols[4].write(f"{sp['baseDamage']:g}")
+            cols[5].write(f"{sp['cooldown']:g}s")
+            cols[6].write(sp["telegraphShape"])
+            if cols[7].button("Edit", key=f"spell_edit_btn_{sp['asset_file']}"):
+                _clear_edit_widget_state(sp["asset_file"])
+                st.session_state["spell_editing"] = sp["asset_file"]
                 st.rerun()
-            else:
-                st.error(msg)
+
+    # ─── Edit Panel (conditional) ───
+    _render_edit_panel(spells)
 
     st.divider()
 

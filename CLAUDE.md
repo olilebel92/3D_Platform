@@ -20,7 +20,7 @@
 - For any networking task, read `.claude/rules/networking.md` before writing code.
 
 ## Key Systems
-- `HealthSystem`: `TakeDamage(amount, isCrit)` / `Heal(amount)` / `ApplyEquipmentHP(bonus)`. Plain MonoBehaviour — damage must be applied server-side only. `destroyOnDeath = true` for enemies; `Die()` has an `IsServer` guard — preserve it.
+- `HealthSystem`: `NetworkBehaviour` with `NetworkVariable<float>` `currentHealth`/`maxHealth` synced server→clients. `TakeDamage(amount, isCrit)` / `Heal(amount)` / `IncreaseMaxHealth(amount)` / `ApplyEquipmentHP(bonus)` / `InitializeServerHP(...)` auto-forward to the server via ServerRpc when called from a client — call them unconditionally from any context (no `IsServer` guard needed at the call site). `destroyOnDeath = true` for enemies; `Die()` still has an `IsServer` guard for the despawn path — preserve it.
 - `ExperienceManager.Instance`: **Per-player singleton** — `SetAsLocalInstance()` must be called after spawn. Never call `.Instance` before `OnNetworkSpawn()` completes. `GainXP(amount)` — handles XP, leveling, STR/AGI/INT/Crit stats.
 - `SpellBarManager.Instance`: 10 spell slots, hotkeys 1–0.
 - `DamagePopupManager.Instance`: `ShowDamage()` / `ShowHeal()` / `ShowXP()`.

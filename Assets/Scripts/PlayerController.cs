@@ -182,7 +182,7 @@ public class PlayerController : NetworkBehaviour
 
         CameraModeSwitcher switcher = FindFirstObjectByType<CameraModeSwitcher>();
         if (switcher != null) switcher.SetTarget(transform);
-        else Debug.LogWarning("[PlayerController] No CameraModeSwitcher found in scene.");
+        else Debug.Log("[PlayerController] No CameraModeSwitcher found in scene.");
 
         // ── Set singletons for this owner's player ────────────────────────────
         // NOTE: _xp is cached in Start() which hasn't run yet at this point in NGO.

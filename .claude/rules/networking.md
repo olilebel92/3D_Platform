@@ -19,9 +19,9 @@
 - **OwnerNetworkTransform** (not vanilla `NetworkTransform`) is used for player movement — it is client-authoritative. The server cannot call `Teleport()` on it directly; use a targeted `ClientRpc` to the owner instead (see `PlayerSpawner.ApplySpawnPositionClientRpc`).
 
 ## Project-Specific Authority Rules
-- **HealthSystem is a MonoBehaviour**, not a NetworkBehaviour. `TakeDamage()` has no built-in server guard — callers must ensure it is only invoked on the server/host. The `Die()` method has an `IsServer` guard for `destroyOnDeath` — always preserve this pattern when modifying death logic.
+- **HealthSystem is a `NetworkBehaviour`** with `NetworkVariable<float>` `currentHealth`/`maxHealth`. `TakeDamage()` / `Heal()` / `IncreaseMaxHealth()` / `ApplyEquipmentHP()` / `InitializeServerHP()` auto-route to the server via ServerRpc when called from a client — call them unconditionally from any context. **Do not add MP/solo branches at the call site.** `Die()` still has an `IsServer` guard for the despawn path (`destroyOnDeath`) — always preserve it when modifying death logic.
 - **ExperienceManager.Instance is per-player**, not global. `SetAsLocalInstance()` assigns the singleton after `OnNetworkSpawn()`. Remote clients have their own instances — never assume `Instance` is the local player from a non-owner context.
-- **Damage must flow server → client**: never apply gameplay state changes (health, XP, death) from client-side code directly. Route through a `ServerRpc` or host-authoritative call.
+- **XP / death / per-player rewards still flow server → owning-client**: never apply per-player gameplay state from a non-owning client. Route through `ServerRpc` → owner-targeted `ClientRpc`. (HP is exempt because HealthSystem now self-routes — the rule still applies to managers that are *not* NetworkBehaviours, e.g. `ExperienceManager`.)
 
 ## Singleplayer vs Multiplayer Sync
 - After any change, mentally verify:

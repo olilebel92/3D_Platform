@@ -50,13 +50,10 @@ public class UITheme : ScriptableObject
     public Color rarityLegendary = new Color(1.000f, 0.500f, 0.000f);
     public Color rarityGodly     = new Color(1.000f, 0.100f, 0.100f);
 
-    public Color GetRarityColor(ItemRarity rarity) => rarity switch
-    {
-        ItemRarity.Uncommon  => rarityUncommon,
-        ItemRarity.Rare      => rarityRare,
-        ItemRarity.Epic      => rarityEpic,
-        ItemRarity.Legendary => rarityLegendary,
-        ItemRarity.Godly     => rarityGodly,
-        _                    => rarityNormal
-    };
+    /// <summary>
+    /// Returns the theme's preferred colour for a rarity. Prefers RarityData.color directly;
+    /// the per-tier fields below remain as fallback palette references for legacy UI.
+    /// </summary>
+    public Color GetRarityColor(RarityData rarity)
+        => rarity != null ? rarity.color : rarityNormal;
 }

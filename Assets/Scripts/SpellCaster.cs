@@ -504,9 +504,10 @@ public class SpellCaster : NetworkBehaviour
 
     void BeginCast(SpellData spell)
     {
-        if (spell == null || spell.prefab == null)
+        if (spell == null) return;
+        if (spell.prefab == null)
         {
-            Debug.LogWarning("[SpellCaster] No spell or prefab to cast.");
+            Debug.LogWarning($"[SpellCaster] {spell.spellName} has no prefab assigned.");
             return;
         }
 

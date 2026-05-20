@@ -1,3 +1,5 @@
+using System.Collections.Generic;
+using Unity.Collections;
 using UnityEngine;
 using Unity.Netcode;
 
@@ -10,8 +12,10 @@ public enum LootType
 {
     XPReward,
     HPPotion,
-    ManaPotion,   // WIP — ready for when ManaSystem is implemented
-    Material      // WIP — adds an ItemData to the player's inventory
+    ManaPotion,
+    Material,     // adds a specific ItemData to the player's inventory
+    Items,        // Random pick from a curated ItemData pool — server-authoritative roll
+    RandomItem    // Procedurally rolled ItemData from ItemGenerator — server-authoritative
 }
 
 // ─── Restore Mode ─────────────────────────────────────────────────────────────
@@ -23,15 +27,50 @@ public enum LootType
 /// </summary>
 public enum RestoreMode { Flat, Percent, Both }
 
+// ─── Rolled Loot ──────────────────────────────────────────────────────────────
+/// <summary>
+/// Single atomic payload describing the server's roll for a pickup. Keeps subType +
+/// rarity (RandomItem) or the pool item (Items) in one NetworkVariable so clients
+/// rebuild the visual exactly once. GUIDs are used instead of catalog indices so
+/// designer reordering of ItemGenerator.subTypes / .rarities cannot remap in-flight
+/// pickups to the wrong asset.
+/// </summary>
+public struct RolledLoot : INetworkSerializable, System.IEquatable<RolledLoot>
+{
+    public FixedString64Bytes itemGuid;     // LootType.Items     — chosen ItemData GUID
+    public FixedString64Bytes subTypeGuid;  // LootType.RandomItem — chosen SubTypeData GUID
+    public FixedString64Bytes rarityGuid;   // LootType.RandomItem — chosen RarityData GUID
+
+    public void NetworkSerialize<T>(BufferSerializer<T> serializer) where T : IReaderWriter
+    {
+        serializer.SerializeValue(ref itemGuid);
+        serializer.SerializeValue(ref subTypeGuid);
+        serializer.SerializeValue(ref rarityGuid);
+    }
+
+    public bool Equals(RolledLoot other)
+        => itemGuid.Equals(other.itemGuid)
+        && subTypeGuid.Equals(other.subTypeGuid)
+        && rarityGuid.Equals(other.rarityGuid);
+
+    public override bool Equals(object obj) => obj is RolledLoot r && Equals(r);
+    public override int GetHashCode() => System.HashCode.Combine(itemGuid, subTypeGuid, rarityGuid);
+}
+
 /// <summary>
 /// General-purpose ground pickup. Select a LootType in the Inspector
 /// to configure only the fields that apply to that reward.
 ///
+/// For Material/Items/RandomItem pickups the SubType.worldModelPrefab is instanced on top
+/// of this pickup and the Rarity drives the glow colour via PickupVisual.
+///
 /// Multiplayer flow:
-///   1. OnTriggerEnter fires on the local client whose player touched the pickup.
-///   2. That client calls CollectServerRpc — server validates and processes rewards once.
-///   3. Server despawns the object so it disappears for everyone.
-///   4. FX (particles/sound) are triggered on all clients via ClientRpc.
+///   1. Server rolls the loot in OnNetworkSpawn and writes a single NetworkVariable&lt;RolledLoot&gt;
+///      so all clients render the same model/glow in one visual pass.
+///   2. OnTriggerEnter fires on the local client whose player touched the pickup.
+///   3. That client calls CollectServerRpc — server validates and processes rewards once.
+///   4. Server despawns the object so it disappears for everyone.
+///   5. FX (particles/sound) are triggered on all clients via ClientRpc.
 /// </summary>
 public class LootPickup : NetworkBehaviour
 {
@@ -74,6 +113,15 @@ public class LootPickup : NetworkBehaviour
     [Tooltip("The ItemData ScriptableObject to add to the collecting player's inventory.")]
     public ItemData itemReward;
 
+    // ─── Items Pool ───────────────────────────────────────────────────────────
+    [Tooltip("Pool of ItemData. One entry is chosen at random on spawn and added to the player's inventory. " +
+             "The random pick is rolled on the server in multiplayer so every client agrees on the outcome.")]
+    public List<ItemData> itemPool = new();
+
+    // ─── Random Item ──────────────────────────────────────────────────────────
+    [Tooltip("RandomItem only: overrides the wave used for rarity scaling. Set < 1 to use WaveManager.CurrentWave.")]
+    public int randomItemWaveOverride = 0;
+
     // ─── Collider ─────────────────────────────────────────────────────────────
     [Header("Collider")]
     [Tooltip("Auto-sets the trigger SphereCollider radius on Awake. Increase if players miss the pickup by walking over it.")]
@@ -103,18 +151,125 @@ public class LootPickup : NetworkBehaviour
     // ─── Internal ─────────────────────────────────────────────────────────────
     private bool _collected = false;
 
+    // Single atomic NetworkVariable carrying the server's roll. Subscribing once and
+    // reading on every change avoids the double-Instantiate/Destroy flicker that the
+    // previous 3-NV layout produced for RandomItem pickups.
+    private readonly NetworkVariable<RolledLoot> _rolledLoot =
+        new(default, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
+
+    // Solo-mode mirror. The NetworkVariable.Value setter must not be touched before
+    // OnNetworkSpawn, so in singleplayer we route through this plain field instead.
+    private RolledLoot _soloRolledLoot;
+
+    // Current roll, routed to the right source depending on network state.
+    private RolledLoot CurrentRoll => IsNetworkActive() ? _rolledLoot.Value : _soloRolledLoot;
+
+    private PickupVisual _visual;
+
     // ─── Unity Lifecycle ──────────────────────────────────────────────────────
     void Awake()
     {
         SphereCollider sc = GetComponent<SphereCollider>();
         if (sc != null) sc.radius = pickupRadius;
+
+        _visual = GetComponent<PickupVisual>();
+        if (_visual == null && (lootType == LootType.Items || lootType == LootType.RandomItem))
+            Debug.LogWarning($"[LootPickup] '{name}' has lootType {lootType} but no PickupVisual component — the pickup will be invisible.");
+    }
+
+    void Start()
+    {
+        // Solo (no NGO) — roll and apply visuals immediately. In MP this is deferred
+        // until OnNetworkSpawn so the server can roll first and sync.
+        if (!IsNetworkActive())
+        {
+            _soloRolledLoot = RollLootLocally();
+            ApplyVisualForCurrentItem();
+        }
     }
 
     // ─── Network Lifecycle ────────────────────────────────────────────────────
     public override void OnNetworkSpawn()
     {
-        if (IsServer && lifetime > 0f)
-            Invoke(nameof(ExpirePickup), lifetime);
+        if (IsServer)
+        {
+            _rolledLoot.Value = RollLootLocally();
+            if (lifetime > 0f) Invoke(nameof(ExpirePickup), lifetime);
+        }
+
+        _rolledLoot.OnValueChanged += OnRolledLootChanged;
+        ApplyVisualForCurrentItem();
+    }
+
+    public override void OnNetworkDespawn()
+    {
+        _rolledLoot.OnValueChanged -= OnRolledLootChanged;
+    }
+
+    // Performs the per-type roll. Pure-local: returns the rolled struct without
+    // touching any NetworkVariable. The caller decides where to store it.
+    private RolledLoot RollLootLocally()
+    {
+        RolledLoot roll = default;
+
+        if (lootType == LootType.Items)
+        {
+            int idx = RollItemsIndex();
+            if (idx >= 0 && itemPool[idx] != null)
+                roll.itemGuid = itemPool[idx].AssetGuid ?? "";
+        }
+        else if (lootType == LootType.RandomItem)
+        {
+            if (ItemGenerator.Instance == null)
+            {
+                Debug.LogWarning("[LootPickup] RandomItem: ItemGenerator.Instance is null — visuals will be empty.");
+                return roll;
+            }
+            int wave = randomItemWaveOverride > 0
+                ? randomItemWaveOverride
+                : (WaveManager.Instance != null ? WaveManager.Instance.CurrentWave : 1);
+
+            if (ItemGenerator.Instance.RollWaveAppearance(wave, out string subGuid, out string rarGuid))
+            {
+                roll.subTypeGuid = subGuid ?? "";
+                roll.rarityGuid  = rarGuid ?? "";
+            }
+        }
+
+        return roll;
+    }
+
+    private void OnRolledLootChanged(RolledLoot prev, RolledLoot next) => ApplyVisualForCurrentItem();
+
+    private void ApplyVisualForCurrentItem()
+    {
+        if (_visual == null) return;
+
+        // Resolve subType + rarity from the appropriate source for this LootType.
+        SubTypeData sub = null;
+        RarityData  rar = null;
+
+        switch (lootType)
+        {
+            case LootType.Material:
+                if (itemReward != null) { sub = itemReward.subType; rar = itemReward.rarity; }
+                break;
+
+            case LootType.Items:
+                ItemData pooled = FindItemInPoolByGuid(CurrentRoll.itemGuid);
+                if (pooled != null) { sub = pooled.subType; rar = pooled.rarity; }
+                break;
+
+            case LootType.RandomItem:
+                if (ItemGenerator.Instance != null)
+                {
+                    sub = ItemGenerator.Instance.GetSubTypeByGuid(CurrentRoll.subTypeGuid.ToString());
+                    rar = ItemGenerator.Instance.GetRarityByGuid(CurrentRoll.rarityGuid.ToString());
+                }
+                break;
+        }
+
+        _visual.ApplyItemVisuals(sub, rar);
     }
 
     // ─── Trigger ──────────────────────────────────────────────────────────────
@@ -127,7 +282,7 @@ public class LootPickup : NetworkBehaviour
         if (!IsNetworkActive())
         {
             _collected = true;
-            ApplyReward(other.gameObject);
+            ApplyReward(other.gameObject, _soloRolledLoot);
             if (spawner != null) spawner.ItemCollected();
             PlayFX();
             Destroy(gameObject);
@@ -147,14 +302,15 @@ public class LootPickup : NetworkBehaviour
         if (_collected) return;
         _collected = true;
 
+        RolledLoot snapshot = _rolledLoot.Value;
+
         // Send reward to the collecting client only — HealthSystem / ExperienceManager
-        // are plain MonoBehaviours with no NetworkVariables, so rewards must be applied
-        // on the owning client rather than on the server's copy of the player.
+        // are per-player and live on the owning client's machine.
         ClientRpcParams ownerOnly = new ClientRpcParams
         {
             Send = new ClientRpcSendParams { TargetClientIds = new[] { collectorClientId } }
         };
-        ApplyRewardClientRpc(ownerOnly);
+        ApplyRewardClientRpc(snapshot, ownerOnly);
 
         if (spawner != null) spawner.ItemCollected();
 
@@ -165,24 +321,38 @@ public class LootPickup : NetworkBehaviour
     }
 
     // ─── Apply Reward Client RPC ──────────────────────────────────────────────
-    // Runs only on the collecting player's machine. Finds the locally-owned player
-    // GameObject and applies the reward directly to its components.
     [ClientRpc]
-    private void ApplyRewardClientRpc(ClientRpcParams clientRpcParams = default)
+    private void ApplyRewardClientRpc(RolledLoot roll, ClientRpcParams clientRpcParams = default)
     {
         GameObject playerObj = FindLocalPlayer();
         if (playerObj != null)
-            ApplyReward(playerObj);
+            ApplyReward(playerObj, roll);
         else
             Debug.LogWarning("[LootPickup] ApplyRewardClientRpc: could not find local owned player.");
     }
 
+    // ─── Items Roll Helper ────────────────────────────────────────────────────
+    private int RollItemsIndex()
+    {
+        if (lootType != LootType.Items) return -1;
+        if (itemPool == null || itemPool.Count == 0) return -1;
+        return Random.Range(0, itemPool.Count);
+    }
+
+    private ItemData FindItemInPoolByGuid(FixedString64Bytes guid)
+    {
+        if (itemPool == null || itemPool.Count == 0 || guid.Length == 0) return null;
+        string g = guid.ToString();
+        foreach (var it in itemPool)
+            if (it != null && it.AssetGuid == g) return it;
+        return null;
+    }
+
     // ─── Reward Logic (shared between solo and MP paths) ──────────────────────
-    private void ApplyReward(GameObject playerObj)
+    private void ApplyReward(GameObject playerObj, RolledLoot roll)
     {
         switch (lootType)
         {
-            // ── XP ────────────────────────────────────────────────────────────
             case LootType.XPReward:
                 ExperienceManager xp = playerObj.GetComponent<ExperienceManager>();
                 if (xp != null)
@@ -195,7 +365,6 @@ public class LootPickup : NetworkBehaviour
                 else Debug.LogWarning("[LootPickup] No ExperienceManager on collecting player.");
                 break;
 
-            // ── HP ────────────────────────────────────────────────────────────
             case LootType.HPPotion:
                 HealthSystem health = playerObj.GetComponent<HealthSystem>();
                 if (health != null)
@@ -208,7 +377,6 @@ public class LootPickup : NetworkBehaviour
                 else Debug.LogWarning("[LootPickup] No HealthSystem on collecting player.");
                 break;
 
-            // ── Mana ──────────────────────────────────────────────────────────
             case LootType.ManaPotion:
                 ManaSystem mana = playerObj.GetComponent<ManaSystem>();
                 if (mana != null)
@@ -221,7 +389,6 @@ public class LootPickup : NetworkBehaviour
                 else Debug.LogWarning("[LootPickup] No ManaSystem on collecting player.");
                 break;
 
-            // ── Item / Material ───────────────────────────────────────────────
             case LootType.Material:
                 if (itemReward != null)
                 {
@@ -230,6 +397,42 @@ public class LootPickup : NetworkBehaviour
                     else Debug.LogWarning("[LootPickup] No PlayerInventory on collecting player.");
                 }
                 else Debug.LogWarning("[LootPickup] Material pickup has no ItemData assigned.");
+                break;
+
+            case LootType.Items:
+                if (itemPool == null || itemPool.Count == 0)
+                {
+                    Debug.LogWarning("[LootPickup] Items pickup has an empty itemPool.");
+                    break;
+                }
+                ItemData chosen = FindItemInPoolByGuid(roll.itemGuid);
+                if (chosen == null)
+                {
+                    Debug.LogWarning($"[LootPickup] Items pickup could not resolve GUID '{roll.itemGuid}' inside its itemPool.");
+                    break;
+                }
+                PlayerInventory poolInventory = playerObj.GetComponent<PlayerInventory>();
+                if (poolInventory != null) poolInventory.AddItem(chosen);
+                else Debug.LogWarning("[LootPickup] No PlayerInventory on collecting player.");
+                break;
+
+            case LootType.RandomItem:
+                if (ItemGenerator.Instance == null)
+                {
+                    Debug.LogWarning("[LootPickup] RandomItem: ItemGenerator.Instance is null on collecting client.");
+                    break;
+                }
+                SubTypeData sub = ItemGenerator.Instance.GetSubTypeByGuid(roll.subTypeGuid.ToString());
+                RarityData  rar = ItemGenerator.Instance.GetRarityByGuid(roll.rarityGuid.ToString());
+                if (sub == null || rar == null)
+                {
+                    Debug.LogWarning($"[LootPickup] RandomItem: server-synced GUIDs not in catalog (sub='{roll.subTypeGuid}', rar='{roll.rarityGuid}').");
+                    break;
+                }
+                ItemData rolled = ItemGenerator.Instance.GenerateItem(sub, rar);
+                PlayerInventory randInv = playerObj.GetComponent<PlayerInventory>();
+                if (randInv != null) randInv.AddItem(rolled);
+                else Debug.LogWarning("[LootPickup] No PlayerInventory on collecting player.");
                 break;
         }
     }
@@ -248,8 +451,6 @@ public class LootPickup : NetworkBehaviour
     }
 
     // ─── Player Lookup Helpers ────────────────────────────────────────────────
-    // Finds a player by NGO OwnerClientId. Safer than client.PlayerObject
-    // which requires SpawnAsPlayerObject (PlayerSpawner uses SpawnWithOwnership).
     private GameObject FindPlayerByClientId(ulong clientId)
     {
         foreach (GameObject p in PlayerController.All)
@@ -261,8 +462,6 @@ public class LootPickup : NetworkBehaviour
         return null;
     }
 
-    // Returns the player GameObject owned by the local client.
-    // Used inside ClientRpcs so the receiving machine can find its own player.
     private GameObject FindLocalPlayer()
     {
         foreach (GameObject p in PlayerController.All)

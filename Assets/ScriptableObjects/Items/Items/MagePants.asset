@@ -10,12 +10,13 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 9c5f8a9e4be4b6c42a10ba05afe871e9, type: 3}
-  m_Name: SwiftBoots
+  m_Name: MagePants
   m_EditorClassIdentifier: Assembly-CSharp::ItemData
-  itemName: SwiftBoots
-  description: fast
-  icon: {fileID: 21300000, guid: f109510c19a7fc64893048eaaffe86a8, type: 3}
-  slot: 0
-  bonusSTR: 0
-  bonusAGI: 5
-  bonusINT: 0
+  itemName: MagePants
+  description: 
+  icon: {fileID: 0}
+  subType: {fileID: 11400000, guid: 53d51f1d4957df54da93418ce7c64e43, type: 2}
+  rarity: {fileID: 11400000, guid: fe138143737862b44a3ee736a9be1ca4, type: 2}
+  statLines:
+  - type: 2
+    value: 50

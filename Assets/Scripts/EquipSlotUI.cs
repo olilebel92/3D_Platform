@@ -108,9 +108,9 @@ public class EquipSlotUI : MonoBehaviour, IDropHandler, IPointerEnterHandler, IP
         DraggableItem dragged = eventData.pointerDrag?.GetComponent<DraggableItem>();
         if (dragged == null || dragged.Item == null) return;
 
-        if (dragged.Item.slot != slotType)
+        if (dragged.Item.EquipSlot != slotType)
         {
-            Debug.Log($"[EquipSlot] Wrong slot type — expected {slotType}, got {dragged.Item.slot}");
+            Debug.Log($"[EquipSlot] Wrong slot type — expected {slotType}, got {dragged.Item.EquipSlot}");
             return;
         }
 
@@ -131,8 +131,9 @@ public class EquipSlotUI : MonoBehaviour, IDropHandler, IPointerEnterHandler, IP
 
         if (slotIconImage != null)
         {
-            bool hasIcon = hasItem && equipped != null && equipped.icon != null;
-            slotIconImage.sprite = hasIcon ? equipped.icon : null;
+            Sprite icon = hasItem ? equipped.ResolvedIcon : null;
+            bool hasIcon = icon != null;
+            slotIconImage.sprite = hasIcon ? icon : null;
             // Equipped but no icon → transparent so no white-square artifact
             // Equipped with icon   → full equippedColor (normally Color.white)
             // Empty slot           → emptyColor (normally dim/translucent)

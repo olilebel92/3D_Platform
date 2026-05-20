@@ -70,8 +70,8 @@ public static class ItemCsvImporter
 
             item.itemName    = GetString(cols, 1);
             item.description = GetString(cols, 2);
-            item.slot        = ParseSlot(GetString(cols, 3), assetFileName);
-            item.rarity      = ParseRarity(GetString(cols, 4), assetFileName);
+            item.subType     = LookupSubType(GetString(cols, 3), assetFileName);
+            item.rarity      = LookupRarity(GetString(cols, 4), assetFileName);
 
             item.statLines.Clear();
             TryAddStat(item, StatType.STR,            cols, 5);
@@ -115,18 +115,36 @@ public static class ItemCsvImporter
     private static string GetString(string[] cols, int index)
         => index < cols.Length ? cols[index].Trim() : string.Empty;
 
-    private static EquipmentSlot ParseSlot(string s, string assetName)
+    private static SubTypeData LookupSubType(string s, string assetName)
     {
-        if (Enum.TryParse(s, true, out EquipmentSlot result)) return result;
-        Debug.LogWarning($"[ItemCsvImporter] '{assetName}' — unknown slot '{s}', defaulting to Boots.");
-        return EquipmentSlot.Boots;
+        if (string.IsNullOrEmpty(s)) return null;
+        string[] guids = AssetDatabase.FindAssets("t:SubTypeData");
+        foreach (string g in guids)
+        {
+            string path = AssetDatabase.GUIDToAssetPath(g);
+            SubTypeData st = AssetDatabase.LoadAssetAtPath<SubTypeData>(path);
+            if (st == null) continue;
+            if (string.Equals(st.displayName, s, StringComparison.OrdinalIgnoreCase)) return st;
+            if (string.Equals(st.name, s, StringComparison.OrdinalIgnoreCase)) return st;
+        }
+        Debug.LogWarning($"[ItemCsvImporter] '{assetName}' — no SubTypeData named '{s}', leaving subType null.");
+        return null;
     }
 
-    private static ItemRarity ParseRarity(string s, string assetName)
+    private static RarityData LookupRarity(string s, string assetName)
     {
-        if (Enum.TryParse(s, true, out ItemRarity result)) return result;
-        Debug.LogWarning($"[ItemCsvImporter] '{assetName}' — unknown rarity '{s}', defaulting to Normal.");
-        return ItemRarity.Normal;
+        if (string.IsNullOrEmpty(s)) return null;
+        string[] guids = AssetDatabase.FindAssets("t:RarityData");
+        foreach (string g in guids)
+        {
+            string path = AssetDatabase.GUIDToAssetPath(g);
+            RarityData r = AssetDatabase.LoadAssetAtPath<RarityData>(path);
+            if (r == null) continue;
+            if (string.Equals(r.displayName, s, StringComparison.OrdinalIgnoreCase)) return r;
+            if (string.Equals(r.name, s, StringComparison.OrdinalIgnoreCase)) return r;
+        }
+        Debug.LogWarning($"[ItemCsvImporter] '{assetName}' — no RarityData named '{s}', leaving rarity null.");
+        return null;
     }
 
     /// <summary>Handles quoted fields with commas and escaped quotes.</summary>

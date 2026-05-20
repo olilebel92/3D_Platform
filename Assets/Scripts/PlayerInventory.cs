@@ -19,7 +19,7 @@ public class PlayerInventory : MonoBehaviour
     [Tooltip("Items added to the inventory at game start. Useful for testing.")]
     [SerializeField] private List<ItemData> startingItems = new();
 
-    [Tooltip("Generate this many random boots on start (for testing ItemGenerator).")]
+    [Tooltip("Generate this many random items on start (for testing ItemGenerator).")]
     [SerializeField] private int generateRandomItemsOnStart = 0;
 
     // ─── Private State ────────────────────────────────────────────────────────
@@ -51,12 +51,9 @@ public class PlayerInventory : MonoBehaviour
         Instance = this;
         Debug.Log("[PlayerInventory] Set as local instance.");
 
-        // Notify InventoryUI (bag grid subscription).
         InventoryUI inventoryUI = UnityEngine.Object.FindFirstObjectByType<InventoryUI>();
         if (inventoryUI != null) inventoryUI.SubscribeToInventoryIfNeeded();
 
-        // Notify every EquipSlotUI — FindObjectsByType with FindObjectsInactive.Include
-        // reaches slots inside the inventory panel even while it is hidden.
         foreach (EquipSlotUI slot in UnityEngine.Object.FindObjectsByType<EquipSlotUI>(
             FindObjectsInactive.Include, FindObjectsSortMode.None))
         {
@@ -71,11 +68,9 @@ public class PlayerInventory : MonoBehaviour
 
         if (generateRandomItemsOnStart > 0 && ItemGenerator.Instance != null)
         {
-            // Build a shuffled copy of every slot so the first N items are guaranteed
-            // one-per-slot with no duplicates. Items beyond that fall back to random.
-            var slots = new System.Collections.Generic.List<EquipmentSlot>(
-                (EquipmentSlot[])System.Enum.GetValues(typeof(EquipmentSlot)));
-
+            // Shuffle every EquipmentSlot once so the first N items are guaranteed
+            // one-per-slot with no duplicates. Items beyond that pick a random slot.
+            var slots = new List<EquipmentSlot>((EquipmentSlot[])System.Enum.GetValues(typeof(EquipmentSlot)));
             for (int i = slots.Count - 1; i > 0; i--)
             {
                 int j = UnityEngine.Random.Range(0, i + 1);
@@ -128,43 +123,45 @@ public class PlayerInventory : MonoBehaviour
         ItemData item = _items[inventoryIndex];
         if (item == null) return;
 
-        // Unequip first if this specific index is currently equipped
-        if (_equippedIndex.TryGetValue(item.slot, out int equippedIdx) && equippedIdx == inventoryIndex)
+        EquipmentSlot slot = item.EquipSlot;
+        if (_equippedIndex.TryGetValue(slot, out int equippedIdx) && equippedIdx == inventoryIndex)
         {
-            _equipped.Remove(item.slot);
-            _equippedIndex.Remove(item.slot);
+            _equipped.Remove(slot);
+            _equippedIndex.Remove(slot);
         }
 
         Debug.Log($"[Inventory] Removed: {item.itemName}");
-        _items[inventoryIndex] = null;   // null instead of RemoveAt — keeps all other indices stable
+        _items[inventoryIndex] = null;
         if (!_suppressEvents) OnInventoryChanged?.Invoke();
     }
 
     /// <summary>
-    /// Returns the number of non-equipped items whose rarity is ≤ maxRarity.
-    /// Used to populate the batch-delete confirmation dialog.
+    /// Returns the number of non-equipped items whose rarity sortOrder is ≤ maxRarity.sortOrder.
+    /// Items with no rarity are always counted as deletable.
     /// </summary>
-    public int CountDeletable(ItemRarity maxRarity)
+    public int CountDeletable(RarityData maxRarity)
     {
+        int max = maxRarity != null ? maxRarity.sortOrder : int.MaxValue;
         int count = 0;
         for (int i = 0; i < _items.Count; i++)
         {
             ItemData item = _items[i];
             if (item == null) continue;
-            if ((int)item.rarity > (int)maxRarity) continue;
-            if (IsEquippedAtIndex(item.slot, i)) continue;
+            int itemSort = item.rarity != null ? item.rarity.sortOrder : -1;
+            if (itemSort > max) continue;
+            if (IsEquippedAtIndex(item.EquipSlot, i)) continue;
             count++;
         }
         return count;
     }
 
     /// <summary>
-    /// Deletes all non-equipped items whose rarity is ≤ maxRarity.
-    /// Fires OnInventoryChanged once after all deletions.
-    /// Returns the number of items deleted.
+    /// Deletes all non-equipped items whose rarity sortOrder is ≤ maxRarity.sortOrder.
+    /// Fires OnInventoryChanged once after all deletions. Returns the number deleted.
     /// </summary>
-    public int DeleteByMaxRarity(ItemRarity maxRarity)
+    public int DeleteByMaxRarity(RarityData maxRarity)
     {
+        int max = maxRarity != null ? maxRarity.sortOrder : int.MaxValue;
         int deleted = 0;
         _suppressEvents = true;
         try
@@ -173,11 +170,13 @@ public class PlayerInventory : MonoBehaviour
             {
                 ItemData item = _items[i];
                 if (item == null) continue;
-                if ((int)item.rarity > (int)maxRarity) continue;
-                if (IsEquippedAtIndex(item.slot, i)) continue;
+                int itemSort = item.rarity != null ? item.rarity.sortOrder : -1;
+                if (itemSort > max) continue;
+                if (IsEquippedAtIndex(item.EquipSlot, i)) continue;
+                string rarityName = item.rarity != null ? item.rarity.displayName : "no-rarity";
                 _items[i] = null;
                 deleted++;
-                Debug.Log($"[Inventory] Batch deleted: {item.itemName} ({item.rarity})");
+                Debug.Log($"[Inventory] Batch deleted: {item.itemName} ({rarityName})");
             }
         }
         finally
@@ -188,7 +187,8 @@ public class PlayerInventory : MonoBehaviour
         if (deleted > 0)
             OnInventoryChanged?.Invoke();
 
-        Debug.Log($"[Inventory] Batch delete complete — {deleted} item(s) removed (≤ {maxRarity}).");
+        string maxName = maxRarity != null ? maxRarity.displayName : "any";
+        Debug.Log($"[Inventory] Batch delete complete — {deleted} item(s) removed (≤ {maxName}).");
         return deleted;
     }
 
@@ -197,7 +197,7 @@ public class PlayerInventory : MonoBehaviour
 
     /// <summary>Returns owned items that fit a specific slot.</summary>
     public List<ItemData> GetItemsForSlot(EquipmentSlot slot)
-        => _items.Where(i => i != null && i.slot == slot).ToList();
+        => _items.Where(i => i != null && i.EquipSlot == slot).ToList();
 
     /// <summary>Swap two items by index. Handles equipped index updates automatically.</summary>
     public void SwapItems(int indexA, int indexB)
@@ -209,13 +209,11 @@ public class PlayerInventory : MonoBehaviour
         ItemData itemA = _items[indexA];
         ItemData itemB = _items[indexB];
 
-        // If itemA was equipped at indexA, point it to indexB after the swap
-        if (itemA != null && _equippedIndex.TryGetValue(itemA.slot, out int eA) && eA == indexA)
-            _equippedIndex[itemA.slot] = indexB;
+        if (itemA != null && _equippedIndex.TryGetValue(itemA.EquipSlot, out int eA) && eA == indexA)
+            _equippedIndex[itemA.EquipSlot] = indexB;
 
-        // If itemB was equipped at indexB, point it to indexA after the swap
-        if (itemB != null && _equippedIndex.TryGetValue(itemB.slot, out int eB) && eB == indexB)
-            _equippedIndex[itemB.slot] = indexA;
+        if (itemB != null && _equippedIndex.TryGetValue(itemB.EquipSlot, out int eB) && eB == indexB)
+            _equippedIndex[itemB.EquipSlot] = indexA;
 
         (_items[indexA], _items[indexB]) = (_items[indexB], _items[indexA]);
         Debug.Log($"[Inventory] Swapped index {indexA} ↔ {indexB}");
@@ -235,8 +233,9 @@ public class PlayerInventory : MonoBehaviour
     public void Equip(ItemData item, int inventoryIndex)
     {
         if (item == null) return;
-        _equipped[item.slot]      = item;
-        _equippedIndex[item.slot] = inventoryIndex;
+        EquipmentSlot slot = item.EquipSlot;
+        _equipped[slot]      = item;
+        _equippedIndex[slot] = inventoryIndex;
         Debug.Log($"[Inventory] Equipped: {item.itemName} (index {inventoryIndex})");
         OnInventoryChanged?.Invoke();
     }
@@ -262,46 +261,23 @@ public class PlayerInventory : MonoBehaviour
     public int FirstUnequippedIndex(EquipmentSlot slot)
     {
         for (int i = 0; i < _items.Count; i++)
-            if (_items[i] != null && _items[i].slot == slot && !IsEquippedAtIndex(slot, i))
+            if (_items[i] != null && _items[i].EquipSlot == slot && !IsEquippedAtIndex(slot, i))
                 return i;
         return -1;
     }
 
     // ─── Equipment Bonus Aggregation ──────────────────────────────────────────
 
-    /// <summary>Total STR bonus from all equipped items.</summary>
     public int   TotalBonusSTR        => _equipped.Values.Sum(i => i.BonusSTR);
-
-    /// <summary>Total AGI bonus from all equipped items.</summary>
     public int   TotalBonusAGI        => _equipped.Values.Sum(i => i.BonusAGI);
-
-    /// <summary>Total INT bonus from all equipped items.</summary>
     public int   TotalBonusINT        => _equipped.Values.Sum(i => i.BonusINT);
-
-    /// <summary>Total flat HP bonus from all equipped items.</summary>
     public int   TotalBonusHP         => _equipped.Values.Sum(i => i.BonusHP);
-
-    /// <summary>Total flat Mana bonus from all equipped items.</summary>
     public int   TotalBonusMana        => _equipped.Values.Sum(i => i.BonusMana);
-
-    /// <summary>Total HP regeneration per second from all equipped items.</summary>
     public float TotalBonusHPRegen     => _equipped.Values.Sum(i => i.BonusHPRegenPerSecond);
-
-    /// <summary>Total Mana regeneration per second from all equipped items.</summary>
     public float TotalBonusManaRegen   => _equipped.Values.Sum(i => i.BonusManaRegenPerSecond);
-
-    /// <summary>Total Crit Rate bonus (0-1) from all equipped items.</summary>
     public float TotalBonusCritRate   => _equipped.Values.Sum(i => i.BonusCritRate);
-
-    /// <summary>Total Crit Damage bonus (0-1) from all equipped items.</summary>
     public float TotalBonusCritDamage   => _equipped.Values.Sum(i => i.BonusCritDamage);
-
-    /// <summary>Total flat movement speed bonus (0-1 fraction) from all equipped items.</summary>
     public float TotalBonusMovementSpeed => _equipped.Values.Sum(i => i.BonusMovementSpeed);
-
-    /// <summary>Total flat fire damage bonus from all equipped items.</summary>
     public float TotalBonusFireDamage    => _equipped.Values.Sum(i => i.BonusFireDamage);
-
-    /// <summary>Total flat spell power bonus from all equipped items.</summary>
     public float TotalBonusSpellPower    => _equipped.Values.Sum(i => i.BonusSpellPower);
 }
