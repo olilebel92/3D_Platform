@@ -1,7 +1,9 @@
 using System.Collections.Generic;
 using Unity.Collections;
 using UnityEngine;
+using UnityEngine.InputSystem;
 using Unity.Netcode;
+using TMPro;
 
 // ─── Loot Type Enum ───────────────────────────────────────────────────────────
 /// <summary>
@@ -37,24 +39,30 @@ public enum RestoreMode { Flat, Percent, Both }
 /// </summary>
 public struct RolledLoot : INetworkSerializable, System.IEquatable<RolledLoot>
 {
-    public FixedString64Bytes itemGuid;     // LootType.Items     — chosen ItemData GUID
-    public FixedString64Bytes subTypeGuid;  // LootType.RandomItem — chosen SubTypeData GUID
-    public FixedString64Bytes rarityGuid;   // LootType.RandomItem — chosen RarityData GUID
+    public FixedString64Bytes  itemGuid;         // LootType.Items      — chosen ItemData GUID
+    public FixedString64Bytes  subTypeGuid;      // LootType.RandomItem — chosen SubTypeData GUID
+    public FixedString64Bytes  rarityGuid;       // LootType.RandomItem — chosen RarityData GUID
+    public FixedString128Bytes itemName;         // LootType.RandomItem — pre-generated display name
+    public FixedString512Bytes statsSerialized;  // LootType.RandomItem — "statTypeInt:value|..." pairs
 
     public void NetworkSerialize<T>(BufferSerializer<T> serializer) where T : IReaderWriter
     {
         serializer.SerializeValue(ref itemGuid);
         serializer.SerializeValue(ref subTypeGuid);
         serializer.SerializeValue(ref rarityGuid);
+        serializer.SerializeValue(ref itemName);
+        serializer.SerializeValue(ref statsSerialized);
     }
 
     public bool Equals(RolledLoot other)
         => itemGuid.Equals(other.itemGuid)
         && subTypeGuid.Equals(other.subTypeGuid)
-        && rarityGuid.Equals(other.rarityGuid);
+        && rarityGuid.Equals(other.rarityGuid)
+        && itemName.Equals(other.itemName)
+        && statsSerialized.Equals(other.statsSerialized);
 
     public override bool Equals(object obj) => obj is RolledLoot r && Equals(r);
-    public override int GetHashCode() => System.HashCode.Combine(itemGuid, subTypeGuid, rarityGuid);
+    public override int GetHashCode() => System.HashCode.Combine(itemGuid, subTypeGuid, rarityGuid, statsSerialized);
 }
 
 /// <summary>
@@ -148,13 +156,65 @@ public class LootPickup : NetworkBehaviour
     [Tooltip("Set automatically by ItemSpawner. Notified when this pickup is collected.")]
     public ItemSpawner spawner;
 
+    // ─── Interaction Prompt (LootType.Items only) ─────────────────────────────
+    [Header("Interaction Prompt (Items only)")]
+    [Tooltip("World-vertical offset for the 'Press F to pick up' label above the item.")]
+    public float interactionLabelHeight = 1.4f;
+
+    [Tooltip("World-space font size of the interaction label.")]
+    public float interactionLabelFontSize = 1.2f;
+
+    [Tooltip("Tint of the interaction label text.")]
+    public Color interactionLabelColor = Color.white;
+
+    // ─── Tooltip (LootType.Items only) ────────────────────────────────────────
+    [Header("Stats Tooltip (Items only)")]
+    [Tooltip("World-vertical offset for the stats tooltip label below the interaction prompt.")]
+    public float tooltipLabelHeight = 0.6f;
+
+    [Tooltip("World-space font size of the stats tooltip.")]
+    public float tooltipLabelFontSize = 0.9f;
+
+    [Tooltip("Tint of the stats tooltip text.")]
+    public Color tooltipLabelColor = new Color(0.85f, 0.85f, 0.85f, 1f);
+
+    // ─── Pre-Init (inventory drop support) ───────────────────────────────────
+    // Set via PreInitDroppedItem before Spawn so dropped items work in both SP and MP.
+    private RolledLoot _preInitRoll;
+    private ItemData   _soloPreInitItem; // SP fallback: direct reference, no ItemGenerator needed
+
     // ─── Internal ─────────────────────────────────────────────────────────────
     private bool _collected = false;
+
+    // RandomItem: fully generated at spawn so the tooltip shows real stats.
+    // Set on server in RollLootLocally(); reconstructed on clients from synced RolledLoot data.
+    private ItemData _generatedItem;
+
+    // ─── One-at-a-time Focus (static, per-client) ─────────────────────────────
+    // Only the focused pickup shows its interaction prompt. When the player enters
+    // range of multiple items, only the nearest one is focused at a time.
+    // Tab cycles through overlapping pickups in the order they were added.
+    private static readonly HashSet<LootPickup> _localNearby  = new();
+    private static          LootPickup           _localFocused = null;
+
+    // Items and RandomItem loot are interactable — player must press F to collect.
+    private bool RequiresInteraction => lootType == LootType.Items || lootType == LootType.RandomItem;
+
+    private TextMeshPro _interactionLabel;
+    private TextMeshPro _tooltipLabel;
+    private GameObject  _localOwnerInRange;
+    private InputAction _interactAction;
 
     // Single atomic NetworkVariable carrying the server's roll. Subscribing once and
     // reading on every change avoids the double-Instantiate/Destroy flicker that the
     // previous 3-NV layout produced for RandomItem pickups.
     private readonly NetworkVariable<RolledLoot> _rolledLoot =
+        new(default, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
+
+    // lootType is a plain field, so server-side changes (player drops, enemy ItemPool drops)
+    // never replicate — remote clients keep the prefab default. Sync it explicitly so clients
+    // resolve visuals, interaction prompts and tooltips for the correct type.
+    private readonly NetworkVariable<LootType> _netLootType =
         new(default, NetworkVariableReadPermission.Everyone, NetworkVariableWritePermission.Server);
 
     // Solo-mode mirror. The NetworkVariable.Value setter must not be touched before
@@ -175,6 +235,12 @@ public class LootPickup : NetworkBehaviour
         _visual = GetComponent<PickupVisual>();
         if (_visual == null && (lootType == LootType.Items || lootType == LootType.RandomItem))
             Debug.LogWarning($"[LootPickup] '{name}' has lootType {lootType} but no PickupVisual component — the pickup will be invisible.");
+
+        if (RequiresInteraction)
+        {
+            CreateInteractionLabel();
+            CreateTooltipLabel();
+        }
     }
 
     void Start()
@@ -183,7 +249,12 @@ public class LootPickup : NetworkBehaviour
         // until OnNetworkSpawn so the server can roll first and sync.
         if (!IsNetworkActive())
         {
-            _soloRolledLoot = RollLootLocally();
+            bool hasPreInit = _preInitRoll.itemName.Length > 0 || _preInitRoll.statsSerialized.Length > 0;
+            _soloRolledLoot = hasPreInit ? _preInitRoll : RollLootLocally();
+            if (lootType == LootType.RandomItem && hasPreInit && _generatedItem == null)
+                ReconstructGeneratedItem(_soloRolledLoot);
+            if (_generatedItem == null && _soloPreInitItem != null)
+                _generatedItem = _soloPreInitItem;
             ApplyVisualForCurrentItem();
         }
     }
@@ -193,8 +264,34 @@ public class LootPickup : NetworkBehaviour
     {
         if (IsServer)
         {
-            _rolledLoot.Value = RollLootLocally();
+            _netLootType.Value = lootType;
+
+            bool hasPreInit = _preInitRoll.itemName.Length > 0 || _preInitRoll.statsSerialized.Length > 0;
+            _rolledLoot.Value = hasPreInit ? _preInitRoll : RollLootLocally();
+            // Resolve _generatedItem for visuals — needed on host-client which renders the scene.
+            if (hasPreInit && lootType == LootType.RandomItem && _generatedItem == null)
+                ReconstructGeneratedItem(_rolledLoot.Value);
+            if (_generatedItem == null && _soloPreInitItem != null)
+                _generatedItem = _soloPreInitItem;
             if (lifetime > 0f) Invoke(nameof(ExpirePickup), lifetime);
+        }
+        else
+        {
+            // lootType is a plain field — sync it from the server so server-configured
+            // pickups (player drops, enemy ItemPool drops) behave correctly on clients.
+            lootType = _netLootType.Value;
+
+            // Awake ran with the prefab-default lootType — create interaction labels now if needed.
+            if (RequiresInteraction)
+            {
+                if (_interactionLabel == null) CreateInteractionLabel();
+                if (_tooltipLabel == null)     CreateTooltipLabel();
+            }
+
+            // Initial NetworkVariable state is already populated on the client by the time
+            // OnNetworkSpawn runs — reconstruct _generatedItem before showing visuals/tooltip.
+            if (lootType == LootType.RandomItem)
+                ReconstructGeneratedItem(_rolledLoot.Value);
         }
 
         _rolledLoot.OnValueChanged += OnRolledLootChanged;
@@ -233,13 +330,30 @@ public class LootPickup : NetworkBehaviour
             {
                 roll.subTypeGuid = subGuid ?? "";
                 roll.rarityGuid  = rarGuid ?? "";
+
+                // Generate the full item now so stats are known before pickup.
+                SubTypeData sub = ItemGenerator.Instance.GetSubTypeByGuid(subGuid);
+                RarityData  rar = ItemGenerator.Instance.GetRarityByGuid(rarGuid);
+                _generatedItem  = ItemGenerator.Instance.GenerateItem(sub, rar);
+
+                if (_generatedItem != null)
+                {
+                    roll.itemName        = _generatedItem.itemName ?? "";
+                    roll.statsSerialized = SerializeStats(_generatedItem.statLines);
+                }
             }
         }
 
         return roll;
     }
 
-    private void OnRolledLootChanged(RolledLoot prev, RolledLoot next) => ApplyVisualForCurrentItem();
+    private void OnRolledLootChanged(RolledLoot prev, RolledLoot next)
+    {
+        // Reconstruct on clients if not already done in OnNetworkSpawn (safety fallback).
+        if (!IsServer && lootType == LootType.RandomItem && _generatedItem == null)
+            ReconstructGeneratedItem(next);
+        ApplyVisualForCurrentItem();
+    }
 
     private void ApplyVisualForCurrentItem()
     {
@@ -266,10 +380,135 @@ public class LootPickup : NetworkBehaviour
                     sub = ItemGenerator.Instance.GetSubTypeByGuid(CurrentRoll.subTypeGuid.ToString());
                     rar = ItemGenerator.Instance.GetRarityByGuid(CurrentRoll.rarityGuid.ToString());
                 }
+                // Fallback for player-dropped items whose subType/rarity aren't in the ItemGenerator catalog.
+                if (sub == null && _generatedItem != null) sub = _generatedItem.subType;
+                if (rar == null && _generatedItem != null) rar = _generatedItem.rarity;
                 break;
         }
 
         _visual.ApplyItemVisuals(sub, rar);
+
+        // Keep labels in sync with the rolled item if the player is already in range.
+        if (RequiresInteraction && _localOwnerInRange != null)
+        {
+            if (_interactionLabel != null) _interactionLabel.text = BuildInteractionText();
+            if (_tooltipLabel != null)     _tooltipLabel.text     = BuildTooltipText();
+        }
+    }
+
+    // ─── Interaction Prompt ───────────────────────────────────────────────────
+    private void CreateInteractionLabel()
+    {
+        GameObject obj = new GameObject("InteractionPrompt");
+        obj.transform.SetParent(transform, worldPositionStays: false);
+        obj.transform.localPosition = new Vector3(0f, interactionLabelHeight, 0f);
+        obj.transform.localRotation = Quaternion.identity;
+
+        _interactionLabel = obj.AddComponent<TextMeshPro>();
+        _interactionLabel.fontSize  = interactionLabelFontSize;
+        _interactionLabel.color     = interactionLabelColor;
+        _interactionLabel.alignment = TextAlignmentOptions.Center;
+        _interactionLabel.fontStyle = FontStyles.Bold;
+        _interactionLabel.text      = "";
+
+        MeshRenderer mr = _interactionLabel.GetComponent<MeshRenderer>();
+        if (mr != null) mr.sortingOrder = 20000;
+
+        int hudLayer = LayerMask.NameToLayer("HudOverlay");
+        if (hudLayer >= 0) obj.layer = hudLayer;
+
+        obj.SetActive(false);
+    }
+
+    private void CreateTooltipLabel()
+    {
+        GameObject obj = new GameObject("StatsTooltip");
+        obj.transform.SetParent(transform, worldPositionStays: false);
+        obj.transform.localPosition = new Vector3(0f, tooltipLabelHeight, 0f);
+        obj.transform.localRotation = Quaternion.identity;
+
+        _tooltipLabel = obj.AddComponent<TextMeshPro>();
+        _tooltipLabel.fontSize  = tooltipLabelFontSize;
+        _tooltipLabel.color     = tooltipLabelColor;
+        _tooltipLabel.alignment = TextAlignmentOptions.Center;
+        _tooltipLabel.text      = "";
+
+        MeshRenderer mr = _tooltipLabel.GetComponent<MeshRenderer>();
+        if (mr != null) mr.sortingOrder = 20000;
+
+        int hudLayer = LayerMask.NameToLayer("HudOverlay");
+        if (hudLayer >= 0) obj.layer = hudLayer;
+
+        obj.SetActive(false);
+    }
+
+    private void ShowInteractionPrompt()
+    {
+        if (_interactionLabel != null)
+        {
+            _interactionLabel.text = BuildInteractionText();
+            _interactionLabel.gameObject.SetActive(true);
+        }
+        if (_tooltipLabel != null)
+        {
+            _tooltipLabel.text = BuildTooltipText();
+            _tooltipLabel.gameObject.SetActive(true);
+        }
+    }
+
+    private void HideInteractionPrompt()
+    {
+        if (_interactionLabel != null) _interactionLabel.gameObject.SetActive(false);
+        if (_tooltipLabel != null)     _tooltipLabel.gameObject.SetActive(false);
+    }
+
+    private string BuildInteractionText()
+    {
+        if (lootType == LootType.RandomItem)
+        {
+            if (_generatedItem != null)
+            {
+                string rarHex  = _generatedItem.rarity != null ? _generatedItem.rarity.Hex : "FFFFFF";
+                string rarName = _generatedItem.rarity != null
+                    ? $"<color=#{rarHex}>{_generatedItem.rarity.displayName}</color> "
+                    : "";
+                return $"[F] Pick up\n{rarName}{_generatedItem.itemName}";
+            }
+            return "[F] Pick up\nRandom Item";
+        }
+
+        ItemData pooled = FindItemInPoolByGuid(CurrentRoll.itemGuid);
+        if (pooled != null)
+        {
+            string rarHex  = pooled.rarity != null ? pooled.rarity.Hex : "FFFFFF";
+            string rarName = pooled.rarity != null
+                ? $"<color=#{rarHex}>{pooled.rarity.displayName}</color> "
+                : "";
+            return $"[F] Pick up\n{rarName}{pooled.itemName}";
+        }
+        return "[F] Pick up\nItem";
+    }
+
+    private string BuildTooltipText()
+    {
+        if (lootType == LootType.RandomItem)
+            return _generatedItem != null ? _generatedItem.BuildStatSummary() : "";
+
+        ItemData pooled = FindItemInPoolByGuid(CurrentRoll.itemGuid);
+        return pooled != null ? pooled.BuildStatSummary() : "";
+    }
+
+    void LateUpdate()
+    {
+        // Billboard both labels toward the local camera.
+        Camera cam = Camera.main;
+        if (cam == null) return;
+        Quaternion rot = Quaternion.LookRotation(cam.transform.forward);
+
+        if (_interactionLabel != null && _interactionLabel.gameObject.activeSelf)
+            _interactionLabel.transform.rotation = rot;
+        if (_tooltipLabel != null && _tooltipLabel.gameObject.activeSelf)
+            _tooltipLabel.transform.rotation = rot;
     }
 
     // ─── Trigger ──────────────────────────────────────────────────────────────
@@ -278,8 +517,30 @@ public class LootPickup : NetworkBehaviour
         if (!other.CompareTag(playerTag)) return;
         if (_collected) return;
 
-        // Solo / offline — collect directly, no NGO needed
-        if (!IsNetworkActive())
+        // Items / RandomItem loot: show the interaction prompt for the local owner only.
+        // Only the nearest pickup in range is focused at a time.
+        if (RequiresInteraction)
+        {
+            // In MP, only the local owner sees the prompt and can interact.
+            if (IsNetworkActive())
+            {
+                NetworkObject playerNet = other.GetComponent<NetworkObject>();
+                if (playerNet == null || !playerNet.IsOwner) return;
+            }
+
+            _localOwnerInRange = other.gameObject;
+            PlayerController pc = other.GetComponent<PlayerController>();
+            if (pc != null && pc.InputActions != null)
+                _interactAction = pc.InputActions.FindAction("Interact");
+
+            _localNearby.Add(this);
+            RefreshLocalFocus(other.gameObject);
+            return;
+        }
+
+        // Solo / offline — or a non-networked pickup (e.g. LootVisualTester preview):
+        // collect directly without an RPC, which would NRE on an unspawned object.
+        if (!IsNetworkActive() || !IsSpawned)
         {
             _collected = true;
             ApplyReward(other.gameObject, _soloRolledLoot);
@@ -290,9 +551,73 @@ public class LootPickup : NetworkBehaviour
         }
 
         // Multiplayer — only the local owner of the player triggers collection
-        NetworkObject playerNet = other.GetComponent<NetworkObject>();
-        if (playerNet == null || !playerNet.IsOwner) return;
-        CollectServerRpc(playerNet.OwnerClientId);
+        NetworkObject net = other.GetComponent<NetworkObject>();
+        if (net == null || !net.IsOwner) return;
+        CollectServerRpc(net.OwnerClientId);
+    }
+
+    private void OnTriggerExit(Collider other)
+    {
+        if (!RequiresInteraction) return;
+        if (other.gameObject != _localOwnerInRange) return;
+
+        _localNearby.Remove(this);
+        if (_localFocused == this)
+        {
+            HideInteractionPrompt();
+            _localFocused = null;
+        }
+
+        _localOwnerInRange = null;
+        _interactAction    = null;
+
+        // Refocus on the next closest pickup still in range (if any).
+        RefreshLocalFocus(other.gameObject);
+    }
+
+    void Update()
+    {
+        // Only the focused pickup listens for the Interact input.
+        if (!RequiresInteraction || _collected) return;
+        if (_localFocused != this) return;
+
+        // Tab cycles to the next nearby pickup when multiple items overlap.
+        if (_localNearby.Count > 1 && Keyboard.current != null && Keyboard.current.tabKey.wasPressedThisFrame)
+        {
+            CycleLocalFocus();
+            return;
+        }
+
+        if (_interactAction == null || !_interactAction.enabled) return;
+        if (!_interactAction.WasPressedThisFrame()) return;
+        TryInteractCollect();
+    }
+
+    private void TryInteractCollect()
+    {
+        if (_collected) return;
+
+        // Release focus so the next nearest pickup can become active immediately.
+        _localNearby.Remove(this);
+        if (_localFocused == this) _localFocused = null;
+        HideInteractionPrompt();
+        RefreshLocalFocus(_localOwnerInRange);
+
+        // Solo / offline — or a non-networked pickup (e.g. LootVisualTester preview):
+        // collect directly without an RPC, which would NRE on an unspawned object.
+        if (!IsNetworkActive() || !IsSpawned)
+        {
+            _collected = true;
+            ApplyReward(_localOwnerInRange, _soloRolledLoot);
+            if (spawner != null) spawner.ItemCollected();
+            PlayFX();
+            Destroy(gameObject);
+            return;
+        }
+
+        NetworkObject net = _localOwnerInRange.GetComponent<NetworkObject>();
+        if (net == null || !net.IsOwner) return;
+        CollectServerRpc(net.OwnerClientId);
     }
 
     // ─── Server RPC ───────────────────────────────────────────────────────────
@@ -417,24 +742,175 @@ public class LootPickup : NetworkBehaviour
                 break;
 
             case LootType.RandomItem:
-                if (ItemGenerator.Instance == null)
+                // Use the item generated at spawn time so stats match the tooltip.
+                // Fall back to a fresh roll only if _generatedItem is somehow missing.
+                ItemData randomItem = _generatedItem ?? _soloPreInitItem;
+                if (randomItem == null)
                 {
-                    Debug.LogWarning("[LootPickup] RandomItem: ItemGenerator.Instance is null on collecting client.");
-                    break;
+                    Debug.LogWarning("[LootPickup] RandomItem: _generatedItem is null at collection — regenerating from synced GUIDs.");
+                    if (ItemGenerator.Instance == null) break;
+                    SubTypeData sub = ItemGenerator.Instance.GetSubTypeByGuid(roll.subTypeGuid.ToString());
+                    RarityData  rar = ItemGenerator.Instance.GetRarityByGuid(roll.rarityGuid.ToString());
+                    if (sub == null || rar == null)
+                    {
+                        Debug.LogWarning($"[LootPickup] RandomItem: server-synced GUIDs not in catalog (sub='{roll.subTypeGuid}', rar='{roll.rarityGuid}').");
+                        break;
+                    }
+                    randomItem = ItemGenerator.Instance.GenerateItem(sub, rar);
                 }
-                SubTypeData sub = ItemGenerator.Instance.GetSubTypeByGuid(roll.subTypeGuid.ToString());
-                RarityData  rar = ItemGenerator.Instance.GetRarityByGuid(roll.rarityGuid.ToString());
-                if (sub == null || rar == null)
-                {
-                    Debug.LogWarning($"[LootPickup] RandomItem: server-synced GUIDs not in catalog (sub='{roll.subTypeGuid}', rar='{roll.rarityGuid}').");
-                    break;
-                }
-                ItemData rolled = ItemGenerator.Instance.GenerateItem(sub, rar);
+                if (randomItem == null) break;
                 PlayerInventory randInv = playerObj.GetComponent<PlayerInventory>();
-                if (randInv != null) randInv.AddItem(rolled);
+                if (randInv != null) randInv.AddItem(randomItem);
                 else Debug.LogWarning("[LootPickup] No PlayerInventory on collecting player.");
                 break;
         }
+    }
+
+    // ─── Focus Helper ─────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Finds the nearest RequiresInteraction pickup in _localNearby and makes it the
+    /// sole focused pickup. The previously focused one hides its prompt; the new one
+    /// shows its prompt. Pass the player GameObject for distance comparison.
+    /// </summary>
+    private static void RefreshLocalFocus(GameObject player)
+    {
+        if (player == null) return;
+
+        LootPickup closest     = null;
+        float      closestDist = float.MaxValue;
+
+        foreach (LootPickup p in _localNearby)
+        {
+            if (p == null || p._collected) continue;
+            float d = Vector3.Distance(p.transform.position, player.transform.position);
+            if (d < closestDist) { closestDist = d; closest = p; }
+        }
+
+        if (closest == _localFocused) return; // no change
+
+        // Hand off the prompt.
+        _localFocused?.HideInteractionPrompt();
+        _localFocused = closest;
+        _localFocused?.ShowInteractionPrompt();
+    }
+
+    private static void CycleLocalFocus()
+    {
+        var list = new System.Collections.Generic.List<LootPickup>();
+        foreach (LootPickup p in _localNearby)
+            if (p != null && !p._collected) list.Add(p);
+        if (list.Count == 0) return;
+
+        // Sort by distance so Tab always walks nearest → farthest, never bouncing.
+        GameObject player = null;
+        foreach (LootPickup p in list)
+            if (p._localOwnerInRange != null) { player = p._localOwnerInRange; break; }
+
+        if (player != null)
+            list.Sort((a, b) =>
+                Vector3.Distance(a.transform.position, player.transform.position)
+                    .CompareTo(Vector3.Distance(b.transform.position, player.transform.position)));
+
+        int currentIndex = _localFocused != null ? list.IndexOf(_localFocused) : -1;
+        int nextIndex    = (currentIndex + 1) % list.Count;
+
+        _localFocused?.HideInteractionPrompt();
+        _localFocused = list[nextIndex];
+        _localFocused?.ShowInteractionPrompt();
+    }
+
+    // ─── RandomItem Helpers ───────────────────────────────────────────────────
+
+    /// <summary>
+    /// Rebuilds _generatedItem on non-server clients from the synced RolledLoot data.
+    /// Called in OnNetworkSpawn and OnRolledLootChanged.
+    /// </summary>
+    private void ReconstructGeneratedItem(RolledLoot roll)
+    {
+        if (roll.statsSerialized.Length == 0) return;
+        if (ItemGenerator.Instance == null) return;
+
+        SubTypeData sub = ItemGenerator.Instance.GetSubTypeByGuid(roll.subTypeGuid.ToString());
+        RarityData  rar = ItemGenerator.Instance.GetRarityByGuid(roll.rarityGuid.ToString());
+        if (sub == null) return;
+
+        bool isWeapon = sub.mainType != null && sub.mainType.isWeapon;
+        _generatedItem = isWeapon
+            ? ScriptableObject.CreateInstance<WeaponItemData>()
+            : ScriptableObject.CreateInstance<ItemData>();
+
+        _generatedItem.subType   = sub;
+        _generatedItem.rarity    = rar;
+        _generatedItem.itemName  = roll.itemName.ToString();
+        _generatedItem.name      = _generatedItem.itemName;
+        _generatedItem.statLines = DeserializeStats(roll.statsSerialized.ToString());
+    }
+
+    // ─── Inventory Drop API ───────────────────────────────────────────────────
+
+    /// <summary>
+    /// Configure this pickup as a player-dropped inventory item before instantiation or NGO Spawn.
+    /// Uses the RandomItem serialization path so item data syncs to all clients via NetworkVariable.
+    /// Pass soloFallback to guarantee the item survives without ItemGenerator (singleplayer only).
+    /// </summary>
+    public void PreInitDroppedItem(RolledLoot roll, ItemData soloFallback = null)
+    {
+        lootType         = LootType.RandomItem;
+        _preInitRoll     = roll;
+        _soloPreInitItem = soloFallback;
+
+        // Awake() ran before lootType was set, so labels weren't created — create them now.
+        if (_interactionLabel == null) CreateInteractionLabel();
+        if (_tooltipLabel     == null) CreateTooltipLabel();
+    }
+
+    /// <summary>
+    /// Builds a RolledLoot from an ItemData so it can be serialized for PreInitDroppedItem or a ServerRpc.
+    /// </summary>
+    public static RolledLoot BuildRolledLootForItem(ItemData item)
+    {
+        if (item == null) return default;
+        return new RolledLoot
+        {
+            subTypeGuid     = item.subType?.AssetGuid ?? "",
+            rarityGuid      = item.rarity?.AssetGuid  ?? "",
+            itemName        = item.itemName             ?? "",
+            statsSerialized = SerializeStats(item.statLines),
+        };
+    }
+
+    /// <summary>Encodes a stat line list as "typeInt:value|typeInt:value|..." for NetworkVariable sync.</summary>
+    private static string SerializeStats(List<StatLine> lines)
+    {
+        if (lines == null || lines.Count == 0) return "";
+        var sb = new System.Text.StringBuilder();
+        for (int i = 0; i < lines.Count; i++)
+        {
+            if (i > 0) sb.Append('|');
+            sb.Append((int)lines[i].type);
+            sb.Append(':');
+            sb.Append(lines[i].value.ToString("F2", System.Globalization.CultureInfo.InvariantCulture));
+        }
+        return sb.ToString();
+    }
+
+    /// <summary>Decodes a stat line list from the format produced by SerializeStats.</summary>
+    private static List<StatLine> DeserializeStats(string s)
+    {
+        var lines = new List<StatLine>();
+        if (string.IsNullOrEmpty(s)) return lines;
+        foreach (string part in s.Split('|'))
+        {
+            int colon = part.IndexOf(':');
+            if (colon < 0) continue;
+            if (!int.TryParse(part.Substring(0, colon), out int typeInt)) continue;
+            if (!float.TryParse(part.Substring(colon + 1),
+                    System.Globalization.NumberStyles.Float,
+                    System.Globalization.CultureInfo.InvariantCulture, out float val)) continue;
+            lines.Add(new StatLine { type = (StatType)typeInt, value = val });
+        }
+        return lines;
     }
 
     // ─── Network State Helper ─────────────────────────────────────────────────

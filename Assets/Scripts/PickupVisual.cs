@@ -24,6 +24,11 @@ public class PickupVisual : MonoBehaviour
              "If null, the model is parented directly to this transform.")]
     public Transform modelAnchor;
 
+    [Tooltip("Optional placeholder mesh shown when no SubType model has been applied yet " +
+             "(e.g. the default sword.001 on the prefab). Automatically hidden when a real " +
+             "SubType model is spawned, and restored when visuals are cleared.")]
+    public GameObject placeholderModel;
+
     [Header("Glow")]
     [Tooltip("Optional Renderer whose emissive colour is tinted by rarity. Leave null to skip.")]
     public Renderer glowRenderer;
@@ -36,19 +41,29 @@ public class PickupVisual : MonoBehaviour
 
     // ─── Internal ─────────────────────────────────────────────────────────────
     private Vector3 _startPosition;
+    private bool _bobOriginCaptured;
     private GameObject _spawnedModel;
     private GameObject _spawnedRarityParticles;
     private MaterialPropertyBlock _mpb;
     private static readonly int EmissionColorId = Shader.PropertyToID("_EmissionColor");
 
     // ─── Unity Lifecycle ──────────────────────────────────────────────────────
-    void Start()
+    void OnEnable()
     {
-        _startPosition = transform.position;
+        // Capture the bob origin lazily on the first Update, NOT here: on networked
+        // clients NGO applies the spawn transform AFTER OnEnable, so reading position
+        // now pins the bob to the prefab default and sinks the pickup underground.
+        _bobOriginCaptured = false;
     }
 
     void Update()
     {
+        if (!_bobOriginCaptured)
+        {
+            _startPosition = transform.position;
+            _bobOriginCaptured = true;
+        }
+
         transform.Rotate(0f, rotateSpeed * Time.deltaTime, 0f);
         float newY = _startPosition.y + Mathf.Sin(Time.time * bobSpeed) * bobHeight;
         transform.position = new Vector3(transform.position.x, newY, transform.position.z);
@@ -74,10 +89,16 @@ public class PickupVisual : MonoBehaviour
         // ── 3D model ──────────────────────────────────────────────────────────
         if (subType != null && subType.worldModelPrefab != null)
         {
+            if (placeholderModel != null) placeholderModel.SetActive(false);
             Transform parent = modelAnchor != null ? modelAnchor : transform;
             _spawnedModel = Instantiate(subType.worldModelPrefab, parent);
-            _spawnedModel.transform.localPosition = Vector3.zero;
-            _spawnedModel.transform.localRotation = Quaternion.identity;
+            _spawnedModel.transform.localPosition = subType.worldModelPrefab.transform.localPosition;
+            _spawnedModel.transform.localRotation = subType.worldModelPrefab.transform.localRotation;
+        }
+        else
+        {
+            // No subtype model available — fall back to the placeholder.
+            if (placeholderModel != null) placeholderModel.SetActive(true);
         }
 
         // ── Rarity glow ───────────────────────────────────────────────────────
@@ -109,8 +130,9 @@ public class PickupVisual : MonoBehaviour
         {
             Transform parent = modelAnchor != null ? modelAnchor : transform;
             _spawnedRarityParticles = Instantiate(rarity.particlePrefab, parent);
-            _spawnedRarityParticles.transform.localPosition = Vector3.zero;
+            _spawnedRarityParticles.transform.localPosition = new Vector3(0f, rarity.particleYOffset, 0f);
             _spawnedRarityParticles.transform.localRotation = Quaternion.identity;
+            _spawnedRarityParticles.transform.localScale = Vector3.one * Mathf.Max(0.01f, rarity.particleScale);
         }
     }
 
@@ -120,5 +142,6 @@ public class PickupVisual : MonoBehaviour
         if (_spawnedRarityParticles != null) Destroy(_spawnedRarityParticles);
         _spawnedModel = null;
         _spawnedRarityParticles = null;
+        if (placeholderModel != null) placeholderModel.SetActive(true);
     }
 }

@@ -137,6 +137,7 @@ public class DraggableItem : MonoBehaviour,
 
         InventoryUI.IsDragging = true;
         ItemTooltip.Instance?.Hide();
+        ItemContextMenu.Instance?.Hide();
 
         // Destroy any leftover visual from a previous drag
         if (_dragVisual != null) Destroy(_dragVisual);
@@ -208,8 +209,16 @@ public class DraggableItem : MonoBehaviour,
 
     public void OnPointerClick(PointerEventData eventData)
     {
-        if (eventData.button != PointerEventData.InputButton.Left) return;
         if (Item == null || PlayerInventory.Instance == null) return;
+
+        // Right-click: open context menu (Equip / Drop / Delete).
+        if (eventData.button == PointerEventData.InputButton.Right)
+        {
+            ItemContextMenu.Instance?.Show(Item, InventoryIndex, eventData.position);
+            return;
+        }
+
+        if (eventData.button != PointerEventData.InputButton.Left) return;
 
         float now = Time.unscaledTime;
         if (now - _lastClickTime < DoubleClickThreshold)

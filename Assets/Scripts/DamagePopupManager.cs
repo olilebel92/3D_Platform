@@ -33,6 +33,9 @@ public class DamagePopupManager : MonoBehaviour
     [Tooltip("Color for XP gained.")]
     public Color xpColor = new Color(1f, 0.85f, 0f);       // yellow
 
+    [Tooltip("Color for the Level Up popup.")]
+    public Color levelUpColor = new Color(1f, 0.85f, 0f);  // gold
+
     [Header("Text Size")]
     [Tooltip("Font size for damage dealt by the player.")]
     public float dealFontSize = 6f;
@@ -48,6 +51,9 @@ public class DamagePopupManager : MonoBehaviour
 
     [Tooltip("Font size for XP gained.")]
     public float xpFontSize = 5f;
+
+    [Tooltip("Font size for the Level Up popup.")]
+    public float levelUpFontSize = 10f;
 
     [Header("Spawn Offset")]
     [Tooltip("Height above the damaged object's origin where the popup appears.")]
@@ -169,6 +175,24 @@ public class DamagePopupManager : MonoBehaviour
         if (popup != null)
             popup.Initialize(amount, xpColor, xpFontSize, suffix: " EXP",
                 font: popupFont, moveDelay: moveDelay, holdDuration: holdDuration, fadeDuration: fadeDuration,
+                outlineColor: outlineColor, outlineWidth: outlineWidth);
+    }
+
+    /// <summary>
+    /// Spawns a floating "LEVEL UP!" label above the target position.
+    /// </summary>
+    public void ShowLevelUp(Vector3 worldPosition)
+    {
+        if (popupPrefab == null) return;
+
+        Vector3 spawnPos = worldPosition + Vector3.up * (heightOffset + 1f);
+        GameObject obj = Instantiate(popupPrefab, spawnPos, Quaternion.identity);
+        if (_hudOverlayLayer >= 0) obj.layer = _hudOverlayLayer;
+
+        DamagePopup popup = obj.GetComponent<DamagePopup>();
+        if (popup != null)
+            popup.InitializeText("LEVEL UP!", levelUpColor, levelUpFontSize,
+                font: popupFont, moveDelay: moveDelay, holdDuration: 1.5f, fadeDuration: 0.8f,
                 outlineColor: outlineColor, outlineWidth: outlineWidth);
     }
 

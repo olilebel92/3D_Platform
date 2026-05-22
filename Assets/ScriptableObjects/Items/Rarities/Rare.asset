@@ -17,9 +17,13 @@ MonoBehaviour:
   color: {r: 0, g: 0.4392, b: 0.8667, a: 1}
   glowColor: {r: 0, g: 0.4392, b: 0.8667, a: 1}
   glowIntensity: 2
-  particlePrefab: {fileID: 0}
+  particlePrefab: {fileID: 1615091283473137273, guid: c3f4377dabdc6bb449d9132ac86a8748, type: 3}
+  particleScale: 0.35
+  particleYOffset: 0.05
   dropWeight: 3
   waveUnlockThreshold: 4
   statLineCountMin: 3
   statLineCountMax: 4
   statValueMultiplier: 1.5
+  bannedStats: 070000000a000000
+  assetGuid: 82a648c00b8bdf149a04aa30e19491cd

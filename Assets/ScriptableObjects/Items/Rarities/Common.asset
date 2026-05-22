@@ -14,13 +14,14 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::RarityData
   displayName: Normal
   sortOrder: 0
-  color: {r: 1.0, g: 1.0, b: 1.0, a: 1.0}
-  glowColor: {r: 1.0, g: 1.0, b: 1.0, a: 1.0}
-  glowIntensity: 1.0
+  color: {r: 1, g: 1, b: 1, a: 1}
+  glowColor: {r: 1, g: 1, b: 1, a: 1}
+  glowIntensity: 1
   particlePrefab: {fileID: 0}
-  dropWeight: 10.0
+  dropWeight: 10
   waveUnlockThreshold: 1
   statLineCountMin: 1
   statLineCountMax: 2
-  statValueMultiplier: 1.0
-  bannedStats:
+  statValueMultiplier: 1
+  bannedStats: 05000000060000000900000008000000070000000c0000000a000000
+  assetGuid: fe138143737862b44a3ee736a9be1ca4

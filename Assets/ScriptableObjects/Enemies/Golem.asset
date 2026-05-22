@@ -13,11 +13,13 @@ MonoBehaviour:
   m_Name: Golem
   m_EditorClassIdentifier: Assembly-CSharp::EnemyData
   enemyName: Golem
-  description: ''
+  description: null
   icon: {fileID: 0}
   creatureTypes:
-  - 0
+  - 4
+  creatureTypes: 04000000
   category: 0
+  level: 1
   prefab: {fileID: 1077356408, guid: 4f8cdd193bc7e2b4693dd14d1164c030, type: 3}
   maxHealth: 10.0
   moveSpeed: 3.0
@@ -32,7 +34,7 @@ MonoBehaviour:
   retargetInterval: 1.0
   angularSpeed: 200.0
   rotationSpeed: 200.0
-  xpReward: 50
+  xpReward: 3
   giveHPOnDeath: 0
   hpRewardOnDeath: 0
-  level: 1
+  lootTable: {fileID: 11400000, guid: 76a41e14d01fdfb47892c314a65fff07, type: 2}

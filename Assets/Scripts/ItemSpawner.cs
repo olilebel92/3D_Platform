@@ -58,19 +58,33 @@ public class ItemSpawner : MonoBehaviour
         float randomX = Random.Range(-areaWidth,  areaWidth);
         float randomZ = Random.Range(-areaLength, areaLength);
 
-        Vector3 rayOrigin = new Vector3(
+        Vector3 candidate = new Vector3(
             transform.position.x + randomX,
-            raycastOriginY,
+            0f,
             transform.position.z + randomZ);
 
-        if (!Physics.Raycast(rayOrigin, Vector3.down, out RaycastHit hit, raycastOriginY * 2f))
+        // ── Priority 1: Terrain heightmap (fast, trigger-immune) ──────────────
+        Terrain terrain = Terrain.activeTerrain;
+        if (terrain != null)
         {
-            Debug.LogWarning("[ItemSpawner] Raycast missed terrain — increase Raycast Origin Y.");
-            return;
+            candidate.y = terrain.SampleHeight(candidate) + terrain.transform.position.y;
+        }
+        else
+        {
+            // ── Priority 2: Downward raycast — ignore triggers so enemies,
+            //    spell AOEs, and item SphereColliders don't give a false hit. ──
+            Vector3 rayOrigin = new Vector3(candidate.x, raycastOriginY, candidate.z);
+            if (!Physics.Raycast(rayOrigin, Vector3.down, out RaycastHit hit, raycastOriginY * 2f,
+                                 Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore))
+            {
+                Debug.LogWarning("[ItemSpawner] Raycast missed terrain — increase Raycast Origin Y.");
+                return;
+            }
+            candidate.y = hit.point.y;
         }
 
-        Vector3 spawnPos = hit.point + Vector3.up * 0.5f;
-        GameObject item  = Instantiate(itemPrefab, spawnPos, Quaternion.identity);
+        Vector3 spawnPos = candidate + Vector3.up * Mathf.Max(itemPrefab.transform.position.y, 0.05f);
+        GameObject item  = Instantiate(itemPrefab, spawnPos, itemPrefab.transform.rotation);
 
         LootPickup loot = item.GetComponent<LootPickup>();
         if (loot != null) loot.spawner = this;

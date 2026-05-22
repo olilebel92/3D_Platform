@@ -3,7 +3,7 @@ from pathlib import Path
 from cs_parser import parse_cs_file
 
 PROJECT_ROOT  = Path(__file__).parent.parent
-ITEMS_DIR     = PROJECT_ROOT / "Assets/ScriptableObjects/Item"
+ITEMS_DIR     = PROJECT_ROOT / "Assets/ScriptableObjects/Items/Items"
 SPELLS_DIR    = PROJECT_ROOT / "Assets/ScriptableObjects/Spells"
 ENEMIES_DIR   = PROJECT_ROOT / "Assets/ScriptableObjects/Enemies"
 RARITIES_DIR  = PROJECT_ROOT / "Assets/ScriptableObjects/Items/Rarities"

@@ -1,5 +1,6 @@
 using UnityEngine;
 using UnityEngine.UI;
+using UnityEngine.VFX;
 using TMPro;
 using Unity.Netcode;
 
@@ -128,8 +129,17 @@ public class ExperienceManager : MonoBehaviour
     public AudioClip levelUpClip;
 
     [Header("VFX")]
-    [Tooltip("Prefab instantiated at the player's position when the player levels up.")]
-    public GameObject levelUpVFXPrefab;
+    [Tooltip("Drag the level-up VFX child object here (must be a child of this prefab with SkinnedMeshRenderer and Transform already assigned on the VisualEffect component).")]
+    public VisualEffect levelUpVFX;
+
+    [Tooltip("Additive glow material (URP/Unlit, Transparent, Additive). Added to all character meshes on level-up then faded out.")]
+    public Material levelUpGlowMaterial;
+
+    [Tooltip("Seconds the glow stays at full intensity.")]
+    public float glowHoldDuration = 1.5f;
+
+    [Tooltip("Seconds the glow takes to fade out.")]
+    public float glowFadeDuration = 1.0f;
 
     private AudioSource _audioSource;
 
@@ -146,14 +156,20 @@ public class ExperienceManager : MonoBehaviour
     private HealthSystem _playerHealth;
     private ManaSystem _playerMana;
     private PlayerInventory _inventory;
+    private readonly System.Collections.Generic.List<GameObject> _glowShells = new();
+    private Material _glowInstance;
 
     // ─── Unity Lifecycle ──────────────────────────────────────────────────────
 
     void Start()
     {
-        _audioSource = GetComponent<AudioSource>();
-        if (_audioSource == null)
-            _audioSource = gameObject.AddComponent<AudioSource>();
+        _audioSource = gameObject.AddComponent<AudioSource>();
+        _audioSource.playOnAwake = false;
+
+        BuildGlowShell();
+
+        if (levelUpVFX != null)
+            levelUpVFX.Stop();
 
         _playerHealth = GetComponent<HealthSystem>();
         if (_playerHealth == null)
@@ -206,6 +222,9 @@ public class ExperienceManager : MonoBehaviour
 
         if (SkillTreeManager.Instance != null)
             SkillTreeManager.Instance.OnTreeChanged -= OnSkillTreeChanged;
+
+        foreach (var s in _glowShells) if (s != null) Destroy(s);
+        if (_glowInstance != null) Destroy(_glowInstance);
 
         // Clear singleton if this was the local instance
         if (Instance == this) Instance = null;
@@ -354,13 +373,66 @@ public class ExperienceManager : MonoBehaviour
             _audioSource.PlayOneShot(levelUpClip);
         }
 
-        if (levelUpVFXPrefab != null)
-            Instantiate(levelUpVFXPrefab, transform.position, Quaternion.identity);
+        if (levelUpVFX != null)
+            levelUpVFX.Play();
+
+        if (DamagePopupManager.Instance != null)
+            DamagePopupManager.Instance.ShowLevelUp(transform.position);
+
+        if (levelUpGlowMaterial != null)
+            StartCoroutine(GlowCoroutine());
 
         if (SkillTreeManager.Instance != null)
             SkillTreeManager.Instance.AddSkillPoint();
         else
             Debug.LogWarning("[ExperienceManager] SkillTreeManager not found — skill point not awarded.");
+    }
+
+    private void BuildGlowShell()
+    {
+        if (levelUpGlowMaterial == null) return;
+
+        _glowInstance = new Material(levelUpGlowMaterial);
+
+        foreach (var smr in GetComponentsInChildren<SkinnedMeshRenderer>(true))
+        {
+            if (smr.sharedMesh == null) continue;
+
+            var shell = new GameObject("GlowShell");
+            shell.transform.SetParent(smr.transform.parent);
+            shell.transform.localPosition = smr.transform.localPosition;
+            shell.transform.localRotation = smr.transform.localRotation;
+            shell.transform.localScale    = smr.transform.localScale;
+
+            var shellSmr              = shell.AddComponent<SkinnedMeshRenderer>();
+            shellSmr.sharedMesh       = smr.sharedMesh;
+            shellSmr.bones            = smr.bones;
+            shellSmr.rootBone         = smr.rootBone;
+            shellSmr.sharedMaterials  = new[] { _glowInstance };
+            shell.SetActive(false);
+            _glowShells.Add(shell);
+        }
+    }
+
+    private System.Collections.IEnumerator GlowCoroutine()
+    {
+        if (_glowShells.Count == 0) yield break;
+
+        Color col = _glowInstance.color;
+        _glowInstance.color = new Color(col.r, col.g, col.b, 1f);
+        foreach (var s in _glowShells) s.SetActive(true);
+
+        yield return new WaitForSeconds(glowHoldDuration);
+
+        float t = 0f;
+        while (t < glowFadeDuration)
+        {
+            t += Time.deltaTime;
+            _glowInstance.color = new Color(col.r, col.g, col.b, Mathf.Lerp(1f, 0f, t / glowFadeDuration));
+            yield return null;
+        }
+
+        foreach (var s in _glowShells) if (s != null) s.SetActive(false);
     }
 
     // ─── Stat Spend API (called by CharacterWindow buttons) ──────────────────

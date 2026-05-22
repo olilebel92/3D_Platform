@@ -10,20 +10,14 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 9c5f8a9e4be4b6c42a10ba05afe871e9, type: 3}
-  m_Name: Thor_Boots
+  m_Name: TestItem_Common
   m_EditorClassIdentifier: Assembly-CSharp::ItemData
-  itemName: Stormstriders
-  description: Blessed by the Allfather. Those who wear them run as fast as lightning
-    falls.
-  icon: {fileID: 21300000, guid: a5d002ebeb4a9094f98d039a3a73a087, type: 3}
-  slot: 0
-  rarity: 5
+  itemName: Tattered Boots
+  description: A worn-out pair of boots found by the roadside.
+  icon: {fileID: 0}
+  subType: {fileID: 11400000, guid: 866c0cacc589de448aabe08a3414e2af, type: 2}
+  rarity: {fileID: 11400000, guid: fe138143737862b44a3ee736a9be1ca4, type: 2}
+  assetGuid:
   statLines:
-  - type: 1
-    value: 25
-  - type: 6
-    value: 12
-  - type: 9
-    value: 20
-  - type: 10
-    value: 35
+  - type: 0
+    value: 2

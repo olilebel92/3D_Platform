@@ -33,6 +33,12 @@ public class RarityData : ScriptableObject
     [Tooltip("Optional particle prefab spawned on top of pickups of this rarity. Leave null to skip.")]
     public GameObject particlePrefab;
 
+    [Tooltip("Uniform scale applied to the spawned particle prefab. 1 = prefab default.")]
+    public float particleScale = 1f;
+
+    [Tooltip("Local Y offset applied to the spawned particle prefab. Raise slightly (e.g. 0.05–0.1) to prevent clipping underground.")]
+    public float particleYOffset = 0.05f;
+
     // ─── Drop Tuning ──────────────────────────────────────────────────────────
 
     [Header("Drop Tuning")]

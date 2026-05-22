@@ -27,6 +27,9 @@ public class HudMessageUI : MonoBehaviour
         if (Instance != null && Instance != this) { Destroy(gameObject); return; }
         Instance = this;
         if (_label != null) _label.alpha = 0f;
+
+        int hudLayer = LayerMask.NameToLayer("HudOverlay");
+        if (hudLayer >= 0 && _label != null) _label.gameObject.layer = hudLayer;
     }
 
     public void ShowNoMana() => Show("No Mana", _noManaColor);

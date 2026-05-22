@@ -43,8 +43,9 @@ public class EnemyReward : NetworkBehaviour
     [Tooltip("Each entry is rolled independently on death. Multiple entries can drop at once.")]
     public List<DropEntry> dropTable = new();
 
-    [Tooltip("Radius around the death position in which drops are scattered.")]
-    public float dropScatterRadius = 0.8f;
+    [Tooltip("Radius around the death position in which drops are scattered and burst outward. " +
+             "Match to the enemy's physical size — 2 m is right for a human-sized enemy.")]
+    public float dropScatterRadius = 2f;
 
     // ─── Lifecycle ────────────────────────────────────────────────────────────
     private HealthSystem _health;
@@ -160,28 +161,135 @@ public class EnemyReward : NetworkBehaviour
     // Prefabs without NetworkObject are instantiated server-side only (local debug/FX).
     private void RollDrops()
     {
-        if (dropTable == null || dropTable.Count == 0) return;
+        // ── Gather all results first so we know the total drop count ──────────
+        var allResults = new System.Collections.Generic.List<LootRollResult>();
 
-        foreach (DropEntry entry in dropTable)
+        if (_data != null && _data.lootTable != null)
         {
-            if (entry.prefab == null) continue;
-            if (Random.value > entry.dropChance) continue;
-
-            int count = Random.Range(entry.minCount, entry.maxCount + 1);
-            for (int i = 0; i < count; i++)
+            allResults.AddRange(_data.lootTable.Roll());
+        }
+        else
+        {
+            if (dropTable == null || dropTable.Count == 0) return;
+            foreach (DropEntry entry in dropTable)
             {
-                Vector3 scatter = Random.insideUnitSphere * dropScatterRadius;
-                scatter.y = 0f;
-
-                GameObject dropped = Instantiate(entry.prefab, transform.position + scatter, Quaternion.identity);
-
-                // Spawn via NGO in multiplayer so drops appear on all clients.
-                // In solo mode, plain Instantiate is enough.
-                NetworkObject netObj = dropped.GetComponent<NetworkObject>();
-                bool networkActive = NetworkManager.Singleton != null && NetworkManager.Singleton.IsListening;
-                if (netObj != null && networkActive)
-                    netObj.Spawn();
+                if (entry.prefab == null) continue;
+                if (Random.value > entry.dropChance) continue;
+                allResults.Add(new LootRollResult
+                {
+                    entryType = LootEntryType.Prefab,
+                    prefab    = entry.prefab,
+                    count     = Random.Range(entry.minCount, entry.maxCount + 1),
+                });
             }
         }
+
+        if (allResults.Count == 0) return;
+
+        // Count total individual drops so we can spread angles evenly.
+        int total = 0;
+        foreach (var r in allResults) total += r.count;
+
+        // Random starting angle so the ring isn't always axis-aligned.
+        float startAngle = Random.Range(0f, 360f);
+        int   dropIndex  = 0;
+
+        foreach (var result in allResults)
+            for (int i = 0; i < result.count; i++)
+                SpawnDrop(result, dropIndex++, total, startAngle);
+    }
+
+    private void SpawnDrop(LootRollResult result, int dropIndex, int totalDrops, float startAngle)
+    {
+        bool networkActive = NetworkManager.Singleton != null && NetworkManager.Singleton.IsListening;
+
+        // ── Angular dispersion ────────────────────────────────────────────────
+        // With 2+ drops, divide the circle into equal sectors and place each
+        // item in its own sector so they never pile on top of each other.
+        // With only 1 drop, use a plain random position (no sector needed).
+        Vector3 targetPos;
+        if (totalDrops <= 1)
+        {
+            Vector3 rand = Random.insideUnitSphere * dropScatterRadius;
+            rand.y    = 0f;
+            targetPos = transform.position + rand;
+        }
+        else
+        {
+            float sectorSize = 360f / totalDrops;
+            float baseAngle  = startAngle + dropIndex * sectorSize;
+            // ±25 % jitter within the sector so the ring looks organic, not mechanical.
+            float angle      = baseAngle + Random.Range(-sectorSize * 0.25f, sectorSize * 0.25f);
+            // Minimum 60 % of radius so items don't clump at the centre.
+            float radius     = Random.Range(dropScatterRadius * 0.6f, dropScatterRadius);
+            float rad        = angle * Mathf.Deg2Rad;
+            targetPos = transform.position + new Vector3(Mathf.Cos(rad) * radius, 0f, Mathf.Sin(rad) * radius);
+        }
+
+        // ── Snap target to ground surface ─────────────────────────────────────
+        // Items have no Rigidbody, so they won't fall on their own.
+        // Sample the terrain height (or raycast for non-terrain scenes) so the
+        // item always lands at ground level regardless of the enemy's centre Y.
+        targetPos.y = SampleGroundHeight(targetPos);
+
+        // Spawn at the enemy's centre — LootDropAnimation flies it to targetPos.
+        GameObject dropped = Instantiate(result.prefab, transform.position, Quaternion.identity);
+
+        LootDropAnimation dropAnim = dropped.GetComponent<LootDropAnimation>();
+        if (dropAnim != null)
+            dropAnim.PreInit(targetPos);
+        else
+            dropped.transform.position = targetPos; // prefab has no animation — place directly
+
+            // Configure ItemPool pickups before NGO spawns them so the server-side
+            // roll and visual are both applied in OnNetworkSpawn / Start.
+            // NOTE: In multiplayer, remote (non-host) clients will not have itemPool
+            // injected — they'll log a warning and miss the visual. Full MP support
+            // requires a global ItemDataCatalog (future work). Host-client always works.
+            if (result.entryType == LootEntryType.ItemPool && result.chosenItem != null)
+            {
+                LootPickup pickup = dropped.GetComponent<LootPickup>();
+                if (pickup != null)
+                {
+                    pickup.lootType = LootType.Items;
+                    pickup.itemPool = new System.Collections.Generic.List<ItemData> { result.chosenItem };
+                }
+                else
+                {
+                    Debug.LogWarning($"[EnemyReward] ItemPool drop prefab '{result.prefab.name}' has no LootPickup component.");
+                }
+
+                if (networkActive)
+                    Debug.LogWarning("[EnemyReward] ItemPool drops in multiplayer only work correctly for the host-client. " +
+                                     "Remote clients require a global ItemDataCatalog (future work).");
+            }
+
+            NetworkObject netObj = dropped.GetComponent<NetworkObject>();
+            if (netObj != null && networkActive)
+                netObj.Spawn();
+    }
+
+    // ─── Ground Height Helper ─────────────────────────────────────────────────
+
+    /// <summary>
+    /// Returns the Y position of the ground at the given XZ location.
+    /// Mirrors PlayerSpawner.GetSpawnPosition: prefers Terrain.SampleHeight,
+    /// falls back to a downward raycast, then uses Y=0 as a last resort.
+    /// </summary>
+    private static float SampleGroundHeight(Vector3 pos)
+    {
+        // Priority 1: Unity Terrain heightmap — fast, no physics required.
+        Terrain terrain = Terrain.activeTerrain;
+        if (terrain != null)
+            return terrain.SampleHeight(pos) + terrain.transform.position.y;
+
+        // Priority 2: Physics raycast for non-Terrain scenes.
+        Vector3 origin = new Vector3(pos.x, pos.y + 500f, pos.z);
+        if (Physics.Raycast(origin, Vector3.down, out RaycastHit hit, 1000f,
+                            Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore))
+            return hit.point.y;
+
+        // Fallback: assume flat ground at Y=0.
+        return 0f;
     }
 }

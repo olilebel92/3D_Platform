@@ -24,6 +24,9 @@ public class LootPickupEditor : Editor
     SerializedProperty _lifetime;
     SerializedProperty _pickupParticles;
     SerializedProperty _pickupSound;
+    SerializedProperty _interactionLabelHeight;
+    SerializedProperty _interactionLabelFontSize;
+    SerializedProperty _interactionLabelColor;
 
     static readonly string[] TypeLabels = { "XP Reward", "HP Potion", "Mana Potion", "Material / Item", "Items (Random from Pool)", "Random Item (Procedural)" };
     static readonly Color[]  TypeColors =
@@ -53,6 +56,9 @@ public class LootPickupEditor : Editor
         _lifetime       = serializedObject.FindProperty("lifetime");
         _pickupParticles = serializedObject.FindProperty("pickupParticles");
         _pickupSound    = serializedObject.FindProperty("pickupSound");
+        _interactionLabelHeight   = serializedObject.FindProperty("interactionLabelHeight");
+        _interactionLabelFontSize = serializedObject.FindProperty("interactionLabelFontSize");
+        _interactionLabelColor    = serializedObject.FindProperty("interactionLabelColor");
     }
 
     public override void OnInspectorGUI()
@@ -110,6 +116,14 @@ public class LootPickupEditor : Editor
                 if (PoolIsEmptyOrAllNull(_itemPool))
                     EditorGUILayout.HelpBox("Add at least one non-null ItemData to the pool. " +
                                             "On spawn, one entry is chosen at random (server-authoritative).", MessageType.Warning);
+
+                EditorGUILayout.Space(6);
+                EditorGUILayout.LabelField("Interaction Prompt", EditorStyles.boldLabel);
+                EditorGUILayout.HelpBox("Items loot is interactable: the player must press F (or gamepad South) " +
+                                        "while in range to pick it up. The label below floats above the item.", MessageType.Info);
+                EditorGUILayout.PropertyField(_interactionLabelHeight,   new GUIContent("Label Height"));
+                EditorGUILayout.PropertyField(_interactionLabelFontSize, new GUIContent("Label Font Size"));
+                EditorGUILayout.PropertyField(_interactionLabelColor,    new GUIContent("Label Color"));
                 break;
 
             case LootType.RandomItem:

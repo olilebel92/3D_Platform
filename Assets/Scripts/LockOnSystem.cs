@@ -58,10 +58,10 @@ public class LockOnSystem : MonoBehaviour
     // ─── Input ────────────────────────────────────────────────────────────────
 
     [Header("Input")]
-    [Tooltip("Button that toggles soft-target. Default: Tab (keyboard) / R3 (gamepad).")]
+    [Tooltip("Button that toggles soft-target. Default: Caps Lock (keyboard) / R3 (gamepad).")]
     [SerializeField] private InputAction lockOnAction = new InputAction(
         type: InputActionType.Button,
-        binding: "<Keyboard>/tab"
+        binding: "<Keyboard>/capsLock"
     );
 
     [Tooltip("Axis used to cycle between targets (isometric: camera stays put). Default: right gamepad stick.")]

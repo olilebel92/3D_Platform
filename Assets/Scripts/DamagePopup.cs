@@ -35,6 +35,35 @@ public class DamagePopup : MonoBehaviour
     // ─── Public Setup ─────────────────────────────────────────────────────────
 
     /// <summary>
+    /// Called by DamagePopupManager for free-text popups (e.g. "LEVEL UP!").
+    /// </summary>
+    public void InitializeText(string text, Color color, float fontSize = 6f,
+        TMP_FontAsset font = null, float moveDelay = 0f, float holdDuration = -1f, float fadeDuration = -1f,
+        Color outlineColor = default, float outlineWidth = 0f)
+    {
+        _label = GetComponent<TextMeshPro>();
+        if (_label == null) { Destroy(gameObject); return; }
+
+        MeshRenderer mr = GetComponent<MeshRenderer>();
+        if (mr != null) mr.sortingOrder = 20000;
+
+        _mainCam       = Camera.main;
+        _label.fontSize = fontSize;
+        _label.text    = text;
+        _color         = color;
+        _label.color   = _color;
+        _moveDelay     = moveDelay;
+        if (holdDuration >= 0f) this.holdDuration = holdDuration;
+        if (fadeDuration >= 0f) this.fadeDuration = fadeDuration;
+        if (font != null) _label.font = font;
+        if (outlineWidth > 0f) { _label.outlineColor = outlineColor; _label.outlineWidth = outlineWidth; }
+
+        float dx = Random.Range(-horizontalDrift, horizontalDrift);
+        _drift = new Vector3(dx, riseSpeed, 0f);
+        _timer = 0f;
+    }
+
+    /// <summary>
     /// Called by DamagePopupManager immediately after instantiation.
     /// </summary>
     /// <param name="amount">Value to display.</param>
@@ -52,6 +81,9 @@ public class DamagePopup : MonoBehaviour
             Destroy(gameObject);
             return;
         }
+
+        MeshRenderer mr = GetComponent<MeshRenderer>();
+        if (mr != null) mr.sortingOrder = 20000;
 
         _mainCam = Camera.main;
 

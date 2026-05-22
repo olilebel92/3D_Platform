@@ -255,6 +255,7 @@ public class InventoryUI : MonoBehaviour
         else
         {
             ItemTooltip.Instance?.Hide();
+            ItemContextMenu.Instance?.Hide();
             if (pauseGameWhileOpen) PauseManager.ReleasePause();
         }
 
@@ -277,6 +278,7 @@ public class InventoryUI : MonoBehaviour
             inventoryPanel.SetActive(false);
 
         ItemTooltip.Instance?.Hide();
+        ItemContextMenu.Instance?.Hide();
         if (pauseGameWhileOpen) PauseManager.ReleasePause();
 
         bool anyPanelOpen = _characterWindow != null && _characterWindow.IsOpen;

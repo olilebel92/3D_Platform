@@ -94,4 +94,8 @@ public class EnemyData : ScriptableObject
 
     [Tooltip("HP restored to the nearest player when giveHPOnDeath is true.")]
     public int hpRewardOnDeath = 1;
+
+    [Header("Loot Table")]
+    [Tooltip("Optional shared loot table. When assigned, overrides the per-enemy inline Drop Table on EnemyReward.")]
+    public LootTableSO lootTable;
 }

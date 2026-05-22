@@ -10,19 +10,18 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 9c5f8a9e4be4b6c42a10ba05afe871e9, type: 3}
-  m_Name: Thor_Chest
+  m_Name: TestItem_Epic
   m_EditorClassIdentifier: Assembly-CSharp::ItemData
-  itemName: Mjolnir's Aegis
-  description: Etched with runes of lightning. No blade has ever pierced it twice.
-  icon: {fileID: 21300000, guid: 9aba920906123b14384e28b51cb3c688, type: 3}
-  slot: 3
-  rarity: 5
+  itemName: Shadowweave Pants
+  description: Woven from shadow essence. Move unseen, strike unseen.
+  icon: {fileID: 0}
+  subType: {fileID: 11400000, guid: 53d51f1d4957df54da93418ce7c64e43, type: 2}
+  rarity: {fileID: 11400000, guid: a1da392f394e41f419329e716e454a71, type: 2}
+  assetGuid:
   statLines:
+  - type: 0
+    value: 22
+  - type: 1
+    value: 18
   - type: 2
-    value: 20
-  - type: 3
-    value: 400
-  - type: 4
-    value: 3
-  - type: 10
-    value: 75
+    value: 12

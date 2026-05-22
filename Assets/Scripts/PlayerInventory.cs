@@ -192,6 +192,10 @@ public class PlayerInventory : MonoBehaviour
         return deleted;
     }
 
+    /// <summary>Returns the item at a specific inventory index, or null if the slot is empty or out of range.</summary>
+    public ItemData GetItemAt(int index)
+        => (index >= 0 && index < _items.Count) ? _items[index] : null;
+
     /// <summary>Returns a copy of all owned items.</summary>
     public List<ItemData> GetAllItems() => new(_items);
 

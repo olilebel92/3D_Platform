@@ -88,16 +88,22 @@ def _render_item_form(prefill: dict, key_prefix: str, lock_asset_name: bool) -> 
                                   placeholder="e.g. Gauntlets of the Void",
                                   key=f"{key_prefix}_name")
     with col2:
-        slot_options   = list(config.EQUIPMENT_SLOT.values())
-        rarity_options = list(config.ITEM_RARITY.values())
-        slot = st.selectbox("Slot", slot_options,
-            index=slot_options.index(prefill.get("slot", slot_options[0]))
-                  if prefill.get("slot") in slot_options else 0,
-            key=f"{key_prefix}_slot")
-        rarity = st.selectbox("Rarity", rarity_options,
-            index=rarity_options.index(prefill.get("rarity", rarity_options[0]))
-                  if prefill.get("rarity") in rarity_options else 0,
-            key=f"{key_prefix}_rarity")
+        sub_types     = _load_sub_types()
+        rarities_list = _load_rarities()
+        subtype_labels = [s["displayName"] for s in sub_types]
+        rarity_labels  = [r["displayName"] for r in rarities_list]
+        prefill_subtype = prefill.get("subType_name", "")
+        prefill_rarity  = prefill.get("rarity", "")
+        subtype_label = st.selectbox(
+            "Sub Type", subtype_labels or ["—"],
+            index=subtype_labels.index(prefill_subtype) if prefill_subtype in subtype_labels else 0,
+            key=f"{key_prefix}_subtype",
+        )
+        rarity_label = st.selectbox(
+            "Rarity", rarity_labels or ["—"],
+            index=rarity_labels.index(prefill_rarity) if prefill_rarity in rarity_labels else 0,
+            key=f"{key_prefix}_rarity",
+        )
 
     description = st.text_area("Description", value=prefill.get("description", ""),
                                placeholder="Flavour text or tooltip…", height=80,
@@ -134,13 +140,20 @@ def _render_item_form(prefill: dict, key_prefix: str, lock_asset_name: bool) -> 
         if row["type"] and row["value"] != 0
     ]
 
+    subtype_by_label = {s["displayName"]: s for s in sub_types}
+    rarity_by_label  = {r["displayName"]: r for r in rarities_list}
+    selected_subtype = subtype_by_label.get(subtype_label, {})
+    selected_rarity  = rarity_by_label.get(rarity_label, {})
+
     return {
-        "asset_name":  asset_name,
-        "item_name":   item_name or asset_name,
-        "description": description,
-        "slot":        slot,
-        "rarity":      rarity,
-        "stat_lines":  stat_lines,
+        "asset_name":   asset_name,
+        "item_name":    item_name or asset_name,
+        "description":  description,
+        "subtype_name": subtype_label,
+        "subtype_guid": selected_subtype.get("guid", ""),
+        "rarity":       rarity_label,
+        "rarity_guid":  selected_rarity.get("guid", ""),
+        "stat_lines":   stat_lines,
     }
 
 

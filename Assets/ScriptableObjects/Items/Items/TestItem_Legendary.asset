@@ -10,17 +10,18 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 9c5f8a9e4be4b6c42a10ba05afe871e9, type: 3}
-  m_Name: FireBoots
+  m_Name: TestItem_Legendary
   m_EditorClassIdentifier: Assembly-CSharp::ItemData
-  itemName: Fire God Boots
-  description: Forged by the gods.
-  icon: {fileID: 21300000, guid: fdaf843922779eb47b6fc2c2f63a0f48, type: 3}
-  slot: 0
-  rarity: 5
+  itemName: Stormlord Boots
+  description: Crackling with divine lightning. Said to belong to a god who walked among men.
+  icon: {fileID: 0}
+  subType: {fileID: 11400000, guid: 866c0cacc589de448aabe08a3414e2af, type: 2}
+  rarity: {fileID: 11400000, guid: 77ba89cf21be97744b992f4895c0672a, type: 2}
+  assetGuid:
   statLines:
-  - type: 8
-    value: 50.0
+  - type: 0
+    value: 35
+  - type: 1
+    value: 28
   - type: 2
-    value: 50.0
-  - type: 9
-    value: 20.0
+    value: 20

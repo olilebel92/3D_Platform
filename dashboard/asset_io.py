@@ -80,6 +80,13 @@ def _read_meta_guid(asset_path: Path) -> str | None:
     return m.group(1) if m else None
 
 
+def _make_so_ref(guid: str) -> str:
+    """Format a Unity SO reference inline value. Empty guid → unassigned `{fileID: 0}`."""
+    if guid:
+        return f"{{fileID: 11400000, guid: {guid}, type: 2}}"
+    return "{fileID: 0}"
+
+
 def _ensure_dir_with_meta(directory: Path) -> None:
     """Create a directory and its Unity .meta if it didn't exist."""
     if not directory.exists():
@@ -262,6 +269,9 @@ def append_enum_value(cs_path: Path, enum_name: str, new_value: str) -> tuple[bo
 
 def scan_items() -> list[dict]:
     """Return list of parsed ItemData dicts from the Items directory."""
+    rarity_by_guid  = {r["guid"]: r["displayName"] for r in scan_rarities() if r.get("guid")}
+    subtype_by_guid = {s["guid"]: s for s in scan_sub_types() if s.get("guid")}
+
     items = []
     for path in sorted(config.ITEMS_DIR.glob("*.asset")):
         mb = _load_unity_yaml(path)
@@ -270,19 +280,30 @@ def scan_items() -> list[dict]:
         script = mb.get("m_Script", {})
         if script.get("guid") != config.ITEM_SCRIPT_GUID:
             continue
+
         stat_lines = []
         for sl in (mb.get("statLines") or []):
             stat_lines.append({
-                "type": config.STAT_TYPE.get(sl.get("type", 0), "STR"),
+                "type":  config.STAT_TYPE.get(sl.get("type", 0), "STR"),
                 "value": float(sl.get("value", 0)),
             })
+
+        rarity_ref  = mb.get("rarity")  or {}
+        subtype_ref = mb.get("subType") or {}
+        rarity_guid  = rarity_ref.get("guid")  if isinstance(rarity_ref,  dict) else None
+        subtype_guid = subtype_ref.get("guid") if isinstance(subtype_ref, dict) else None
+        subtype      = subtype_by_guid.get(subtype_guid) if subtype_guid else None
+
         items.append({
-            "asset_file": path.stem,
-            "itemName":   mb.get("itemName", ""),
-            "description": mb.get("description", ""),
-            "slot":   config.EQUIPMENT_SLOT.get(mb.get("slot", 0), "Boots"),
-            "rarity": config.ITEM_RARITY.get(mb.get("rarity", 0), "Normal"),
-            "statLines": stat_lines,
+            "asset_file":   path.stem,
+            "itemName":     mb.get("itemName", ""),
+            "description":  mb.get("description", ""),
+            "slot":         subtype["equipSlot"]   if subtype else "—",
+            "subType_name": subtype["displayName"] if subtype else "—",
+            "subType_guid": subtype_guid or "",
+            "rarity":       rarity_by_guid.get(rarity_guid, "—") if rarity_guid else "—",
+            "rarity_guid":  rarity_guid or "",
+            "statLines":    stat_lines,
         })
     return items
 
@@ -307,8 +328,9 @@ MonoBehaviour:
   itemName: {item_name}
   description: {description}
   icon: {{fileID: 0}}
-  slot: {slot}
-  rarity: {rarity}
+  subType: {subtype_ref}
+  rarity: {rarity_ref}
+  assetGuid:
   statLines:
 {stat_lines}"""
 
@@ -336,8 +358,8 @@ def write_item_asset(data: dict) -> tuple[bool, str]:
         class_id=config.ITEM_CLASS_ID,
         item_name=_yaml_str(data.get("item_name", asset_name)),
         description=_yaml_str(data.get("description", "")),
-        slot=config.EQUIPMENT_SLOT_INV.get(data.get("slot", "Boots"), 0),
-        rarity=config.ITEM_RARITY_INV.get(data.get("rarity", "Normal"), 0),
+        subtype_ref=_make_so_ref(data.get("subtype_guid", "")),
+        rarity_ref=_make_so_ref(data.get("rarity_guid", "")),
         stat_lines=stat_lines_yaml,
     )
 
@@ -358,8 +380,8 @@ def update_item_asset(asset_file: str, data: dict) -> tuple[bool, str]:
     updates = {
         "itemName":    _yaml_str(data.get("item_name", asset_file)),
         "description": _yaml_str(data.get("description", "")),
-        "slot":        str(config.EQUIPMENT_SLOT_INV.get(data.get("slot", "Boots"), 0)),
-        "rarity":      str(config.ITEM_RARITY_INV.get(data.get("rarity", "Normal"), 0)),
+        "subType":     _make_so_ref(data.get("subtype_guid", "")),
+        "rarity":      _make_so_ref(data.get("rarity_guid", "")),
     }
     text = _update_scalar_fields(text, updates)
 
@@ -411,6 +433,7 @@ def scan_rarities() -> list[dict]:
 
         rarities.append({
             "asset_file":          path.stem,
+            "guid":                _read_meta_guid(path),
             "displayName":         mb.get("displayName", path.stem),
             "sortOrder":           gi("sortOrder", 0),
             "color":               {"r": float(color.get("r", 1.0)), "g": float(color.get("g", 1.0)),
@@ -657,6 +680,7 @@ def scan_sub_types() -> list[dict]:
 
         items.append({
             "asset_file":     path.stem,
+            "guid":           _read_meta_guid(path),
             "displayName":    mb.get("displayName", path.stem),
             "mainTypeName":   mt_name,
             "mainTypeGuid":   mt_guid,
