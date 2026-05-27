@@ -17,6 +17,7 @@ MonoBehaviour:
   damagePerSkillRank: 0
   chainCountPerRank: 1
   cooldown: 1
+  manaCost: 5
   spellName: HealingWave
   description: 'Pulsing healing all allies caught in its wake. Each rank amplifies
     its healing.

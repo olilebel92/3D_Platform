@@ -12,7 +12,6 @@ public class GodMode : MonoBehaviour
 {
     [Header("God Mode Settings")]
     [SerializeField] private float _godHP = 50000f;
-    [SerializeField] private int _godSkillPoints = 999;
 
     [Header("Spells to Equip")]
     [Tooltip("Drag all SpellData assets here (up to 10 slots).")]
@@ -50,7 +49,7 @@ public class GodMode : MonoBehaviour
         ApplySkillPoints();
         ApplySpells();
         _isActive = true;
-        Debug.Log($"[GodMode] ENABLED — HP {_godHP}, {_godSkillPoints} skill points, {_spells?.Length ?? 0} spells equipped.");
+        Debug.Log($"[GodMode] ENABLED — HP {_godHP}, all skills maxed, {_spells?.Length ?? 0} spells equipped.");
     }
 
     [ContextMenu("Disable God Mode")]
@@ -95,12 +94,11 @@ public class GodMode : MonoBehaviour
     {
         if (SkillTreeManager.Instance == null)
         {
-            Debug.LogWarning("[GodMode] SkillTreeManager.Instance is null — skill points not applied.");
+            Debug.LogWarning("[GodMode] SkillTreeManager.Instance is null — skills not maxed.");
             return;
         }
 
-        for (int i = 0; i < _godSkillPoints; i++)
-            SkillTreeManager.Instance.AddSkillPoint();
+        SkillTreeManager.Instance.MaxAllSkills();
     }
 
     private void ApplySpells()

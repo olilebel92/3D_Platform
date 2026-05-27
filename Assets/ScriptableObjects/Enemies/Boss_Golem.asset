@@ -13,26 +13,26 @@ MonoBehaviour:
   m_Name: Boss_Golem
   m_EditorClassIdentifier: Assembly-CSharp::EnemyData
   enemyName: Boss_Golem
-  description: ''
+  description: 
   icon: {fileID: 0}
-  creatureTypes:
-  - 4
+  creatureTypes: 04000000
   category: 2
   level: 5
   prefab: {fileID: 1077356408, guid: 4f8cdd193bc7e2b4693dd14d1164c030, type: 3}
-  maxHealth: 100.0
-  moveSpeed: 4.0
+  maxHealth: 100
+  moveSpeed: 4
   attackDamageMin: 10
   attackDamageMax: 12
-  attackCooldown: 5.0
-  attackRange: 3.0
-  detectionRange: 50.0
+  attackCooldown: 5
+  attackRange: 3
+  detectionRange: 200
   attackStunChance: 0.5
-  attackStunDuration: 3.0
+  attackStunDuration: 3
   attackMoveLockDuration: 0.6
-  retargetInterval: 1.0
-  angularSpeed: 200.0
-  rotationSpeed: 200.0
+  retargetInterval: 1
+  angularSpeed: 200
+  rotationSpeed: 200
   xpReward: 50
   giveHPOnDeath: 0
   hpRewardOnDeath: 0
+  lootTable: {fileID: 11400000, guid: e25127396f07f754c82c85bded395817, type: 2}

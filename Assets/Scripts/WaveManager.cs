@@ -1,4 +1,5 @@
 using System.Collections;
+using System.Collections.Generic;
 using UnityEngine;
 using TMPro;
 using Unity.Netcode;
@@ -68,6 +69,9 @@ public class WaveManager : NetworkBehaviour
     [Tooltip("Seconds of warning before the first enemy spawns each wave.")]
     public float waveAnnounceDuration = 2f;
 
+    [Tooltip("Seconds of warning before a boss wave spawns. Use a longer value to let players prepare.")]
+    public float bossWavePrepareDuration = 10f;
+
     // ─── Difficulty Scaling ───────────────────────────────────────────────────
     [Header("XP Rewards")]
     [Tooltip("Base XP awarded to the player per enemy kill.")]
@@ -126,6 +130,15 @@ public class WaveManager : NetworkBehaviour
     private bool gameOver         = false;
     public Transform playerTransform;
 
+    // ─── Ready-Up State ───────────────────────────────────────────────────────
+    /// <summary>True while the system is waiting for all players to press R.</summary>
+    public bool IsWaitingForReady { get; private set; }
+
+    private bool                _allReady        = false;
+    private readonly HashSet<ulong> _readySet    = new();
+    private int                 _lastReadyCount  = -1;
+    private int                 _totalForReady   = 1;
+
     // ─── Unity Lifecycle ──────────────────────────────────────────────────────
     void Awake()
     {
@@ -167,6 +180,9 @@ public class WaveManager : NetworkBehaviour
     // ─── Wave Loop ────────────────────────────────────────────────────────────
     IEnumerator RunWaves()
     {
+        // Ready check before wave 1
+        yield return WaitForAllReady();
+
         while (!gameOver)
         {
             currentWave++;
@@ -174,10 +190,22 @@ public class WaveManager : NetworkBehaviour
 
             // Announce wave
             UpdateWaveLabel();
-            SetStatus(isBossWave
-                ? "BOSS WAVE " + currentWave + " incoming!"
-                : "Wave " + currentWave + " incoming!");
-            yield return new WaitForSeconds(waveAnnounceDuration);
+            float announceDuration = isBossWave ? bossWavePrepareDuration : waveAnnounceDuration;
+            if (isBossWave)
+            {
+                float bossCountdown = announceDuration;
+                while (bossCountdown > 0f && !gameOver)
+                {
+                    SetStatus("BOSS WAVE " + currentWave + " in " + Mathf.CeilToInt(bossCountdown) + "s — PREPARE!");
+                    bossCountdown -= Time.deltaTime;
+                    yield return null;
+                }
+            }
+            else
+            {
+                SetStatus("Wave " + currentWave + " incoming!");
+                yield return new WaitForSeconds(announceDuration);
+            }
 
             if (gameOver) break;
 
@@ -208,15 +236,79 @@ public class WaveManager : NetworkBehaviour
             // ── Wave item reward ──────────────────────────────────────────────
             GrantWaveReward(currentWave);
 
-            // Countdown to next wave
-            float countdown = timeBetweenWaves;
-            while (countdown > 0f && !gameOver)
-            {
-                SetStatus("Next wave in " + Mathf.CeilToInt(countdown) + "s...");
-                countdown -= Time.deltaTime;
-                yield return null;
-            }
+            if (gameOver) break;
+
+            // ── Ready check before next wave ──────────────────────────────────
+            yield return WaitForAllReady();
         }
+    }
+
+    // ─── Ready-Up Coroutine ───────────────────────────────────────────────────
+
+    /// <summary>
+    /// Pauses the wave loop until every connected player has pressed R.
+    /// In singleplayer, resolves as soon as the local player presses R.
+    /// </summary>
+    IEnumerator WaitForAllReady()
+    {
+        _allReady       = false;
+        _readySet.Clear();
+        _lastReadyCount = -1;
+        _totalForReady  = IsNetworkActive()
+            ? NetworkManager.Singleton.ConnectedClientsIds.Count
+            : 1;
+
+        IsWaitingForReady = true;
+        if (IsNetworkActive() && IsServer) SetWaitingForReadyClientRpc(true);
+
+        while (!_allReady && !gameOver)
+        {
+            int count = IsNetworkActive() ? _readySet.Count : 0;
+            if (count != _lastReadyCount)
+            {
+                _lastReadyCount = count;
+                SetStatus($"Press [R] to ready up!  {count}/{_totalForReady} ready");
+            }
+            yield return null;
+        }
+
+        IsWaitingForReady = false;
+        if (IsNetworkActive() && IsServer) SetWaitingForReadyClientRpc(false);
+    }
+
+    // ─── Ready-Up Public API ──────────────────────────────────────────────────
+
+    /// <summary>
+    /// Called by the local player's controller when R is pressed.
+    /// Routes to a ServerRpc in multiplayer; resolves directly in singleplayer.
+    /// </summary>
+    public void ReadyUp()
+    {
+        if (!IsWaitingForReady) return;
+
+        if (IsNetworkActive())
+            SubmitReadyServerRpc();
+        else
+            _allReady = true;
+    }
+
+    [Rpc(SendTo.Server)]
+    private void SubmitReadyServerRpc(RpcParams rpcParams = default)
+    {
+        if (!IsWaitingForReady) return;
+
+        ulong sender = rpcParams.Receive.SenderClientId;
+        _readySet.Add(sender);
+
+        int total = NetworkManager.Singleton.ConnectedClientsIds.Count;
+        if (_readySet.Count >= total)
+            _allReady = true;
+    }
+
+    [ClientRpc]
+    private void SetWaitingForReadyClientRpc(bool waiting)
+    {
+        IsWaitingForReady = waiting;
     }
 
     // ─── Spawning ─────────────────────────────────────────────────────────────

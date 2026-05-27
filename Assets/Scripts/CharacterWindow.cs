@@ -34,6 +34,9 @@ public class CharacterWindow : MonoBehaviour
     [Tooltip("StaminaSystem on the Player. Leave blank to auto-find by 'Player' tag.")]
     public StaminaSystem playerStaminaSystem;
 
+    [Tooltip("ManaSystem on the Player. Leave blank to auto-find by 'Player' tag.")]
+    public ManaSystem playerManaSystem;
+
     // ─── Inspector — Stat Labels ──────────────────────────────────────────────
 
     [Header("Stat Labels — drag your TMP labels here")]
@@ -51,6 +54,9 @@ public class CharacterWindow : MonoBehaviour
 
     [Tooltip("Shows max stamina pool.")]
     public TextMeshProUGUI staminaLabel;
+
+    [Tooltip("Shows current and max mana.")]
+    public TextMeshProUGUI manaLabel;
 
     [Tooltip("Displays total HP regeneration per second (base + equipment bonus).")]
     public TextMeshProUGUI regenLabel;
@@ -84,6 +90,21 @@ public class CharacterWindow : MonoBehaviour
 
     [Tooltip("Shows crit damage bonus as a percentage.")]
     public TextMeshProUGUI critDamageLabel;
+
+    [Tooltip("Shows dodge chance as a percentage (AGI + skill tree, capped by ExperienceManager.maxDodgeChance).")]
+    public TextMeshProUGUI dodgeLabel;
+
+    [Tooltip("Shows total armor points and the resulting physical damage reduction (capped at 90%).")]
+    public TextMeshProUGUI armorLabel;
+
+    [Tooltip("Shows Fire Affinity total (items + skill tree) and the derived +%dmg / %resist.")]
+    public TextMeshProUGUI fireAffinityLabel;
+
+    [Tooltip("Shows Lightning Affinity total (items + skill tree) and the derived +%dmg / %resist.")]
+    public TextMeshProUGUI lightningAffinityLabel;
+
+    [Tooltip("Shows Frost Affinity total (items + skill tree) and the derived +%dmg / %resist.")]
+    public TextMeshProUGUI frostAffinityLabel;
 
     [Tooltip("Shows move speed (sourced from PlayerController if present).")]
     public TextMeshProUGUI moveSpeedLabel;
@@ -148,7 +169,7 @@ public class CharacterWindow : MonoBehaviour
     void Start()
     {
         // Auto-find player components if not assigned
-        if (playerHealthSystem == null || playerStaminaSystem == null)
+        if (playerHealthSystem == null || playerStaminaSystem == null || playerManaSystem == null)
         {
             GameObject playerObj = GameObject.FindGameObjectWithTag("Player");
             if (playerObj != null)
@@ -158,6 +179,9 @@ public class CharacterWindow : MonoBehaviour
 
                 if (playerStaminaSystem == null)
                     playerStaminaSystem = playerObj.GetComponent<StaminaSystem>();
+
+                if (playerManaSystem == null)
+                    playerManaSystem = playerObj.GetComponent<ManaSystem>();
 
                 _playerAttack = playerObj.GetComponent<PlayerAttack>();
                 _playerController = playerObj.GetComponent<PlayerController>();
@@ -258,6 +282,7 @@ public class CharacterWindow : MonoBehaviour
 
         playerHealthSystem  = playerObj.GetComponent<HealthSystem>();
         playerStaminaSystem = playerObj.GetComponent<StaminaSystem>();
+        playerManaSystem    = playerObj.GetComponent<ManaSystem>();
         _playerAttack       = playerObj.GetComponent<PlayerAttack>();
         _playerController   = playerObj.GetComponent<PlayerController>();
 
@@ -366,6 +391,30 @@ public class CharacterWindow : MonoBehaviour
             int critDamagePct = Mathf.RoundToInt(xp.ComputedCritDamage * 100f);
             SetLabel(critRateLabel,   "Crit Rate",   $"{critRatePct}%");
             SetLabel(critDamageLabel, "Crit Damage", $"{critDamagePct}%");
+
+            // ── Dodge ─────────────────────────────────────────────────────────
+            int dodgePct    = Mathf.RoundToInt(xp.ComputedDodgeChance * 100f);
+            int dodgeCapPct = Mathf.RoundToInt(xp.maxDodgeChance      * 100f);
+            string dodgeStr = dodgePct >= dodgeCapPct
+                ? $"{dodgePct}% <color=#C9A84C>(capped)</color>"
+                : $"{dodgePct}%";
+            SetLabel(dodgeLabel, "Dodge", dodgeStr);
+
+            // ── Armor ─────────────────────────────────────────────────────────
+            int   armorPoints = xp.ComputedArmor;
+            float armorPct    = Mathf.Min(HealthSystem.MaxArmorReduction,
+                                          armorPoints * HealthSystem.PctReductionPerArmor) * 100f;
+            int   armorCapPct = Mathf.RoundToInt(HealthSystem.MaxArmorReduction * 100f);
+            int   armorPctInt = Mathf.RoundToInt(armorPct);
+            string armorStr = armorPctInt >= armorCapPct
+                ? $"{armorPoints} <color=#C9A84C>({armorPctInt}% — capped)</color>"
+                : $"{armorPoints} <color=#C9A84C>({armorPctInt}%)</color>";
+            SetLabel(armorLabel, "Armor", armorStr);
+
+            // ── Affinity (Fire / Lightning / Frost) ───────────────────────────
+            SetAffinityLabel(fireAffinityLabel,      "Fire Affinity",      SpellSchool.Fire);
+            SetAffinityLabel(lightningAffinityLabel, "Lightning Affinity", SpellSchool.Lightning);
+            SetAffinityLabel(frostAffinityLabel,     "Frost Affinity",     SpellSchool.Frost);
         }
         else
         {
@@ -393,6 +442,12 @@ public class CharacterWindow : MonoBehaviour
             SetLabel(staminaLabel, "Max Stamina", playerStaminaSystem.maxStamina.ToString("F0"));
         else
             Debug.LogWarning("[CharacterWindow] StaminaSystem not found on player!");
+
+        // ── Mana ──────────────────────────────────────────────────────────────
+        if (playerManaSystem != null)
+            SetLabel(manaLabel, "Mana", $"{Mathf.RoundToInt(playerManaSystem.CurrentMana)} / {Mathf.RoundToInt(playerManaSystem.maxMana)}");
+        else
+            Debug.LogWarning("[CharacterWindow] ManaSystem not found on player!");
 
         // ── Combat (PlayerAttack) ─────────────────────────────────────────────
         if (_playerAttack != null)
@@ -423,7 +478,7 @@ public class CharacterWindow : MonoBehaviour
             float equipBonus   = PlayerInventory.Instance != null
                 ? PlayerInventory.Instance.TotalBonusMovementSpeed : 0f; // 0-1 fraction
             int agiMovePct    = Mathf.RoundToInt(xp.ComputedMoveSpeed(_baseMoveSpeed)   / _baseMoveSpeed   * 100f);
-            int agiSprintPct  = Mathf.RoundToInt(xp.ComputedSprintSpeed(_baseSprintSpeed) / _baseSprintSpeed * 100f);
+            int agiSprintPct  = Mathf.RoundToInt(xp.ComputedSprintSpeed(_baseSprintSpeed) / _baseMoveSpeed   * 100f);
             int equipBonusPct = Mathf.RoundToInt(equipBonus * 100f);
             string moveStr   = equipBonusPct > 0
                 ? $"{agiMovePct + equipBonusPct}% <color=#C9A84C>(+{equipBonusPct}%)</color>"
@@ -443,6 +498,20 @@ public class CharacterWindow : MonoBehaviour
     {
         if (label == null) return;
         label.text = $"{statName}:  {value}";
+    }
+
+    private void SetAffinityLabel(TextMeshProUGUI label, string statName, SpellSchool school)
+    {
+        if (label == null) return;
+        int affinity = PlayerInventory.Instance != null
+            ? PlayerInventory.Instance.GetAffinity(school) : 0;
+        int dmgPct    = affinity;                                  // offensive is uncapped
+        int resistCap = Mathf.RoundToInt(HealthSystem.MaxAffinityResistance * 100f);
+        int resistPct = Mathf.Min(resistCap, affinity);
+        string resistStr = resistPct >= resistCap
+            ? $"{resistPct}% resist <color=#C9A84C>(capped)</color>"
+            : $"{resistPct}% resist";
+        label.text = $"{statName}:  {affinity} <color=#C9A84C>(+{dmgPct}% dmg / {resistStr})</color>";
     }
 
     /// <summary>

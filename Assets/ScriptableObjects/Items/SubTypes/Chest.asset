@@ -16,7 +16,7 @@ MonoBehaviour:
   mainType: {fileID: 11400000, guid: 07963ee8bcb559f47917745fbb28f1ca, type: 2}
   equipSlot: 3
   attachBone: 
-  worldModelPrefab: {fileID: 183212, guid: 3a36eb5d4db845d4e9351b7bfb31f282, type: 3}
+  worldModelPrefab: {fileID: 7581844431014960132, guid: f874fe88ded947c409f602885f3c605b, type: 3}
   defaultIcon: {fileID: 21300000, guid: adca9178272f2124ca0bd83cd08d5b36, type: 3}
   iconPool: []
   allowedStats: 

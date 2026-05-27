@@ -1,5 +1,7 @@
 using UnityEditor;
+using UnityEditorInternal;
 using UnityEngine;
+using System.Collections.Generic;
 
 /// <summary>
 /// Custom Inspector for LootPickup.
@@ -10,7 +12,9 @@ public class LootPickupEditor : Editor
 {
     // ─── Serialized Properties ────────────────────────────────────────────────
     SerializedProperty _lootType;
+    SerializedProperty _xpRestoreMode;
     SerializedProperty _xpReward;
+    SerializedProperty _xpRestorePercent;
     SerializedProperty _hpRestoreMode;
     SerializedProperty _hpReward;
     SerializedProperty _hpRestorePercent;
@@ -19,7 +23,13 @@ public class LootPickupEditor : Editor
     SerializedProperty _manaRestorePercent;
     SerializedProperty _itemReward;
     SerializedProperty _itemPool;
+    SerializedProperty _rarityWeights;
+    ReorderableList    _rarityWeightsList;
     SerializedProperty _randomItemWaveOverride;
+
+    // Cached for quick-fill buttons — populated once in OnEnable.
+    List<RarityData> _cachedRarities;
+    SerializedProperty _pickupRadius;
     SerializedProperty _playerTag;
     SerializedProperty _lifetime;
     SerializedProperty _pickupParticles;
@@ -27,6 +37,9 @@ public class LootPickupEditor : Editor
     SerializedProperty _interactionLabelHeight;
     SerializedProperty _interactionLabelFontSize;
     SerializedProperty _interactionLabelColor;
+    SerializedProperty _tooltipLabelHeight;
+    SerializedProperty _tooltipLabelFontSize;
+    SerializedProperty _tooltipLabelColor;
 
     static readonly string[] TypeLabels = { "XP Reward", "HP Potion", "Mana Potion", "Material / Item", "Items (Random from Pool)", "Random Item (Procedural)" };
     static readonly Color[]  TypeColors =
@@ -42,7 +55,9 @@ public class LootPickupEditor : Editor
     void OnEnable()
     {
         _lootType           = serializedObject.FindProperty("lootType");
+        _xpRestoreMode      = serializedObject.FindProperty("xpRestoreMode");
         _xpReward           = serializedObject.FindProperty("xpReward");
+        _xpRestorePercent   = serializedObject.FindProperty("xpRestorePercent");
         _hpRestoreMode      = serializedObject.FindProperty("hpRestoreMode");
         _hpReward           = serializedObject.FindProperty("hpReward");
         _hpRestorePercent   = serializedObject.FindProperty("hpRestorePercent");
@@ -50,8 +65,42 @@ public class LootPickupEditor : Editor
         _manaReward         = serializedObject.FindProperty("manaReward");
         _manaRestorePercent = serializedObject.FindProperty("manaRestorePercent");
         _itemReward         = serializedObject.FindProperty("itemReward");
-        _itemPool           = serializedObject.FindProperty("itemPool");
+        _itemPool      = serializedObject.FindProperty("itemPool");
+        _rarityWeights = serializedObject.FindProperty("rarityWeights");
         _randomItemWaveOverride = serializedObject.FindProperty("randomItemWaveOverride");
+
+        // Build ReorderableList for rarity weights — avoids layout-event mismatch on add/remove.
+        _rarityWeightsList = new ReorderableList(serializedObject, _rarityWeights,
+            draggable: true, displayHeader: true, displayAddButton: true, displayRemoveButton: true);
+
+        _rarityWeightsList.drawHeaderCallback = rect =>
+            EditorGUI.LabelField(rect, "Rarity Weights  (empty = equal chance)");
+
+        _rarityWeightsList.drawElementCallback = (rect, index, isActive, isFocused) =>
+        {
+            if (index < 0 || index >= _rarityWeights.arraySize) return;
+            SerializedProperty element  = _rarityWeights.GetArrayElementAtIndex(index);
+            SerializedProperty rarityProp = element.FindPropertyRelative("rarity");
+            SerializedProperty weightProp = element.FindPropertyRelative("weight");
+            if (rarityProp == null || weightProp == null) return;
+            rect.y += 2f;
+            float h     = EditorGUIUtility.singleLineHeight;
+            float split = rect.width * 0.65f;
+            EditorGUI.PropertyField(new Rect(rect.x,         rect.y, split - 4f,          h), rarityProp, GUIContent.none);
+            EditorGUI.PropertyField(new Rect(rect.x + split, rect.y, rect.width - split,  h), weightProp, GUIContent.none);
+        };
+
+        _rarityWeightsList.elementHeight = EditorGUIUtility.singleLineHeight + 4f;
+
+        // Cache rarity assets once instead of searching every repaint.
+        _cachedRarities = new List<RarityData>();
+        foreach (string g in AssetDatabase.FindAssets("t:RarityData"))
+        {
+            RarityData r = AssetDatabase.LoadAssetAtPath<RarityData>(AssetDatabase.GUIDToAssetPath(g));
+            if (r != null) _cachedRarities.Add(r);
+        }
+        _cachedRarities.Sort((a, b) => a.sortOrder.CompareTo(b.sortOrder));
+        _pickupRadius   = serializedObject.FindProperty("pickupRadius");
         _playerTag      = serializedObject.FindProperty("playerTag");
         _lifetime       = serializedObject.FindProperty("lifetime");
         _pickupParticles = serializedObject.FindProperty("pickupParticles");
@@ -59,11 +108,15 @@ public class LootPickupEditor : Editor
         _interactionLabelHeight   = serializedObject.FindProperty("interactionLabelHeight");
         _interactionLabelFontSize = serializedObject.FindProperty("interactionLabelFontSize");
         _interactionLabelColor    = serializedObject.FindProperty("interactionLabelColor");
+        _tooltipLabelHeight   = serializedObject.FindProperty("tooltipLabelHeight");
+        _tooltipLabelFontSize = serializedObject.FindProperty("tooltipLabelFontSize");
+        _tooltipLabelColor    = serializedObject.FindProperty("tooltipLabelColor");
     }
 
     public override void OnInspectorGUI()
     {
         serializedObject.Update();
+        EditorGUI.BeginChangeCheck();
 
         EditorGUILayout.Space(4);
         EditorGUILayout.LabelField("Loot Type", EditorStyles.boldLabel);
@@ -83,7 +136,12 @@ public class LootPickupEditor : Editor
         switch ((LootType)typeIndex)
         {
             case LootType.XPReward:
-                EditorGUILayout.PropertyField(_xpReward, new GUIContent("XP Amount"));
+                EditorGUILayout.PropertyField(_xpRestoreMode, new GUIContent("Restore Mode"));
+                var xpMode = (RestoreMode)_xpRestoreMode.enumValueIndex;
+                if (xpMode == RestoreMode.Flat || xpMode == RestoreMode.Both)
+                    EditorGUILayout.PropertyField(_xpReward, new GUIContent("XP Amount"));
+                if (xpMode == RestoreMode.Percent || xpMode == RestoreMode.Both)
+                    EditorGUILayout.PropertyField(_xpRestorePercent, new GUIContent("Restore %"));
                 break;
 
             case LootType.HPPotion:
@@ -112,10 +170,14 @@ public class LootPickupEditor : Editor
 
             case LootType.Items:
                 EditorGUILayout.PropertyField(_itemPool, new GUIContent("Item Pool"), true);
-                DrawRarityQuickFillButtons(_itemPool);
+                DrawRarityQuickFillButtons(_itemPool, _cachedRarities);
                 if (PoolIsEmptyOrAllNull(_itemPool))
                     EditorGUILayout.HelpBox("Add at least one non-null ItemData to the pool. " +
                                             "On spawn, one entry is chosen at random (server-authoritative).", MessageType.Warning);
+
+                EditorGUILayout.Space(4);
+                try { _rarityWeightsList.DoLayoutList(); }
+                catch { serializedObject.Update(); }
 
                 EditorGUILayout.Space(6);
                 EditorGUILayout.LabelField("Interaction Prompt", EditorStyles.boldLabel);
@@ -124,6 +186,12 @@ public class LootPickupEditor : Editor
                 EditorGUILayout.PropertyField(_interactionLabelHeight,   new GUIContent("Label Height"));
                 EditorGUILayout.PropertyField(_interactionLabelFontSize, new GUIContent("Label Font Size"));
                 EditorGUILayout.PropertyField(_interactionLabelColor,    new GUIContent("Label Color"));
+
+                EditorGUILayout.Space(4);
+                EditorGUILayout.LabelField("Stats Tooltip", EditorStyles.boldLabel);
+                EditorGUILayout.PropertyField(_tooltipLabelHeight,   new GUIContent("Label Height"));
+                EditorGUILayout.PropertyField(_tooltipLabelFontSize, new GUIContent("Label Font Size"));
+                EditorGUILayout.PropertyField(_tooltipLabelColor,    new GUIContent("Label Color"));
                 break;
 
             case LootType.RandomItem:
@@ -133,11 +201,24 @@ public class LootPickupEditor : Editor
                     "(or the override above). All clients see the same SubType model + Rarity glow before pickup. " +
                     "The collecting client generates the final item locally with rolled stat lines.",
                     MessageType.Info);
+
+                EditorGUILayout.Space(6);
+                EditorGUILayout.LabelField("Interaction Prompt", EditorStyles.boldLabel);
+                EditorGUILayout.PropertyField(_interactionLabelHeight,   new GUIContent("Label Height"));
+                EditorGUILayout.PropertyField(_interactionLabelFontSize, new GUIContent("Label Font Size"));
+                EditorGUILayout.PropertyField(_interactionLabelColor,    new GUIContent("Label Color"));
+
+                EditorGUILayout.Space(4);
+                EditorGUILayout.LabelField("Stats Tooltip", EditorStyles.boldLabel);
+                EditorGUILayout.PropertyField(_tooltipLabelHeight,   new GUIContent("Label Height"));
+                EditorGUILayout.PropertyField(_tooltipLabelFontSize, new GUIContent("Label Font Size"));
+                EditorGUILayout.PropertyField(_tooltipLabelColor,    new GUIContent("Label Color"));
                 break;
         }
 
         EditorGUILayout.Space(6);
         EditorGUILayout.LabelField("Settings", EditorStyles.boldLabel);
+        EditorGUILayout.PropertyField(_pickupRadius, new GUIContent("Pickup Radius"));
         EditorGUILayout.PropertyField(_playerTag,  new GUIContent("Player Tag"));
         EditorGUILayout.PropertyField(_lifetime,   new GUIContent("Lifetime (s)"));
 
@@ -146,7 +227,8 @@ public class LootPickupEditor : Editor
         EditorGUILayout.PropertyField(_pickupParticles, new GUIContent("Pickup Particles"));
         EditorGUILayout.PropertyField(_pickupSound,     new GUIContent("Pickup Sound"));
 
-        serializedObject.ApplyModifiedProperties();
+        if (EditorGUI.EndChangeCheck())
+            serializedObject.ApplyModifiedProperties();
     }
 
     private static bool PoolIsEmptyOrAllNull(SerializedProperty list)
@@ -162,7 +244,7 @@ public class LootPickupEditor : Editor
     // ─── Rarity Quick-Fill ────────────────────────────────────────────────────
     // Iterates all RarityData assets in the project. For each rarity asset, adds
     // a button that bulk-appends every ItemData whose rarity matches.
-    private static void DrawRarityQuickFillButtons(SerializedProperty list)
+    private static void DrawRarityQuickFillButtons(SerializedProperty list, List<RarityData> rarities)
     {
         EditorGUILayout.Space(2);
         EditorGUILayout.LabelField("Quick Fill", EditorStyles.miniBoldLabel);
@@ -170,17 +252,6 @@ public class LootPickupEditor : Editor
         Color prevBg = GUI.backgroundColor;
 
         EditorGUILayout.BeginHorizontal();
-
-        // Find all RarityData assets sorted by sortOrder.
-        string[] rarityGuids = AssetDatabase.FindAssets("t:RarityData");
-        var rarities = new System.Collections.Generic.List<RarityData>();
-        foreach (string g in rarityGuids)
-        {
-            string path = AssetDatabase.GUIDToAssetPath(g);
-            RarityData r = AssetDatabase.LoadAssetAtPath<RarityData>(path);
-            if (r != null) rarities.Add(r);
-        }
-        rarities.Sort((a, b) => a.sortOrder.CompareTo(b.sortOrder));
 
         foreach (RarityData rarity in rarities)
         {

@@ -18,9 +18,13 @@ public enum StatType
     AllStats,        // adds to STR, AGI, and INT simultaneously
     CritRate,    // percentage points (5 → +5 % crit rate)
     CritDamage,  // percentage points (25 → +25 % crit dmg)
-    FireDamage,
+    FireAffinity,  // 1 point = +1% fire damage dealt AND +1% fire damage reduction (defensive capped at 80%).
+                   // Inherits the old "FireDamage" slot (enum index 10) so existing .asset stat lines auto-migrate.
     MovementSpeed, // percentage points (20 → +20 % move speed)
     SpellPower,
+    Armor,             // 1 point = 1% physical damage reduction (capped at 90% in HealthSystem)
+    LightningAffinity, // 1 point = +1% lightning damage dealt AND +1% lightning damage reduction (defensive capped at 80%)
+    FrostAffinity,     // 1 point = +1% frost damage dealt AND +1% frost damage reduction (defensive capped at 80%)
 }
 
 // ─── Stat Line ────────────────────────────────────────────────────────────────
@@ -49,6 +53,8 @@ public class ItemData : ScriptableObject
     [Header("Identity")]
     public string itemName = "New Item";
     [TextArea(2, 4)] public string description;
+    [Tooltip("Optional green flavour text shown at the bottom of the tooltip — use for set names, unique bonuses, or lore. Leave empty for standard items.")]
+    [TextArea(1, 3)] public string greenText;
     [Tooltip("Per-item icon override. If null, falls back to SubType.defaultIcon / iconPool.")]
     public Sprite icon;
 
@@ -112,9 +118,12 @@ public class ItemData : ScriptableObject
     public float BonusManaRegenPerSecond => GetFloat(StatType.ManaRegenPerSecond);
     public float BonusCritRate   => GetFloat(StatType.CritRate)   / 100f;
     public float BonusCritDamage   => GetFloat(StatType.CritDamage)   / 100f;
-    public float BonusFireDamage   => GetFloat(StatType.FireDamage);
+    public int   BonusFireAffinity      => GetInt(StatType.FireAffinity);
+    public int   BonusLightningAffinity => GetInt(StatType.LightningAffinity);
+    public int   BonusFrostAffinity     => GetInt(StatType.FrostAffinity);
     public float BonusMovementSpeed => GetFloat(StatType.MovementSpeed) / 100f;
     public float BonusSpellPower   => GetFloat(StatType.SpellPower);
+    public int   BonusArmor        => GetInt(StatType.Armor);
 
     // ─── Rarity Colours ───────────────────────────────────────────────────────
 
@@ -157,9 +166,12 @@ public class ItemData : ScriptableObject
                 StatType.AllStats       => "All Stats",
                 StatType.CritRate     => "Crit Rate",
                 StatType.CritDamage   => "Crit Damage",
-                StatType.FireDamage   => "Fire Damage",
+                StatType.FireAffinity      => "Fire Affinity",
+                StatType.LightningAffinity => "Lightning Affinity",
+                StatType.FrostAffinity     => "Frost Affinity",
                 StatType.MovementSpeed => "Movement Speed",
                 StatType.SpellPower   => "Spell Power",
+                StatType.Armor        => "Armor",
                 _                     => line.type.ToString(),
             };
             string valStr = isPercent ? $"+{line.value:F0}%" : isDecimal ? $"+{line.value:F1}" : $"+{line.value:F0}";

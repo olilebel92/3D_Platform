@@ -788,6 +788,7 @@ Slider { margin: 4px 0; }
     gap: 6px;
     margin-top: 8px;
     align-items: center;
+    flex-shrink: 0;
 }
 
 .chat-field {

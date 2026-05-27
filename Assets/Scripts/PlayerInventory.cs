@@ -282,6 +282,38 @@ public class PlayerInventory : MonoBehaviour
     public float TotalBonusCritRate   => _equipped.Values.Sum(i => i.BonusCritRate);
     public float TotalBonusCritDamage   => _equipped.Values.Sum(i => i.BonusCritDamage);
     public float TotalBonusMovementSpeed => _equipped.Values.Sum(i => i.BonusMovementSpeed);
-    public float TotalBonusFireDamage    => _equipped.Values.Sum(i => i.BonusFireDamage);
+    public int   TotalBonusFireAffinity      => _equipped.Values.Sum(i => i.BonusFireAffinity);
+    public int   TotalBonusLightningAffinity => _equipped.Values.Sum(i => i.BonusLightningAffinity);
+    public int   TotalBonusFrostAffinity     => _equipped.Values.Sum(i => i.BonusFrostAffinity);
     public float TotalBonusSpellPower    => _equipped.Values.Sum(i => i.BonusSpellPower);
+    public int   TotalBonusArmor         => _equipped.Values.Sum(i => i.BonusArmor);
+
+    /// <summary>
+    /// Total Affinity points the player has for the given school (equipment + skill tree).
+    /// Returns 0 for Arcane / Healing — those schools are not affinity-eligible.
+    /// 1 point = +1% damage dealt with that school, AND +1% damage taken reduction from that school
+    /// (defensive cap of 80% is applied at the damage-resolution site, not here).
+    /// </summary>
+    public int GetAffinity(SpellSchool school)
+    {
+        int items = school switch
+        {
+            SpellSchool.Fire      => TotalBonusFireAffinity,
+            SpellSchool.Lightning => TotalBonusLightningAffinity,
+            SpellSchool.Frost     => TotalBonusFrostAffinity,
+            _                     => 0,
+        };
+        int skillTree = 0;
+        if (SkillTreeManager.Instance != null)
+        {
+            skillTree = school switch
+            {
+                SpellSchool.Fire      => SkillTreeManager.Instance.TotalFireAffinity,
+                SpellSchool.Lightning => SkillTreeManager.Instance.TotalLightningAffinity,
+                SpellSchool.Frost     => SkillTreeManager.Instance.TotalFrostAffinity,
+                _                     => 0,
+            };
+        }
+        return items + skillTree;
+    }
 }

@@ -77,6 +77,23 @@ public class HealthSystem : NetworkBehaviour
     private bool _isDead = false;
     private PlayerInventory _inventory;
     private float _skillTreeRegen = 0f;
+    private float _dodgeChance = 0f;
+    private int _armorPoints = 0;
+    private int _fireAffinity = 0;
+    private int _lightningAffinity = 0;
+    private int _frostAffinity = 0;
+
+    /// <summary>Hard cap on % physical damage reduction from armor (0.90 = 90%).</summary>
+    public const float MaxArmorReduction = 0.90f;
+
+    /// <summary>1 armor point = +1% physical damage reduction.</summary>
+    public const float PctReductionPerArmor = 0.01f;
+
+    /// <summary>Hard cap on % elemental damage reduction from affinity (0.80 = 80%).</summary>
+    public const float MaxAffinityResistance = 0.80f;
+
+    /// <summary>1 affinity point = +1% elemental damage reduction (capped by MaxAffinityResistance).</summary>
+    public const float PctReductionPerAffinity = 0.01f;
 
     // ─── Facade ───────────────────────────────────────────────────────────────
     /// <summary>True only after OnNetworkSpawn has run on a live NGO instance.</summary>
@@ -109,6 +126,92 @@ public class HealthSystem : NetworkBehaviour
     {
         _skillTreeRegen = bonus;
     }
+
+    /// <summary>
+    /// Stores the player's current dodge chance on the server so TakeDamage can roll it.
+    /// Called by ExperienceManager whenever AGI changes. Auto-routes to server in MP.
+    /// </summary>
+    public void SetDodgeChance(float chance)
+    {
+        if (IsNetworked && !IsServer)
+        {
+            SetDodgeChanceRpc(chance);
+            return;
+        }
+        _dodgeChance = chance;
+    }
+
+    [Rpc(SendTo.Server)]
+    void SetDodgeChanceRpc(float chance)
+    {
+        _dodgeChance = chance;
+    }
+
+    /// <summary>
+    /// Stores the player's current armor points on the server so TakeDamage can
+    /// reduce incoming physical damage. Called by ExperienceManager whenever
+    /// equipment or skill tree changes. Auto-routes to the server in MP.
+    /// </summary>
+    public void SetArmor(int armor)
+    {
+        if (IsNetworked && !IsServer)
+        {
+            SetArmorRpc(armor);
+            return;
+        }
+        _armorPoints = Mathf.Max(0, armor);
+    }
+
+    [Rpc(SendTo.Server)]
+    void SetArmorRpc(int armor)
+    {
+        _armorPoints = Mathf.Max(0, armor);
+    }
+
+    /// <summary>Server-side current armor points (read-only).</summary>
+    public int ArmorPoints => _armorPoints;
+
+    /// <summary>Current % physical damage reduction from armor (0–MaxArmorReduction).</summary>
+    public float ArmorDamageReduction =>
+        Mathf.Min(MaxArmorReduction, _armorPoints * PctReductionPerArmor);
+
+    /// <summary>
+    /// Stores the player's current per-element Affinity totals on the server so TakeDamage
+    /// can apply elemental resistance. Called by ExperienceManager whenever equipment or
+    /// skill tree changes. Auto-routes to the server in MP.
+    /// </summary>
+    public void SetAffinity(int fire, int lightning, int frost)
+    {
+        if (IsNetworked && !IsServer)
+        {
+            SetAffinityRpc(fire, lightning, frost);
+            return;
+        }
+        _fireAffinity      = Mathf.Max(0, fire);
+        _lightningAffinity = Mathf.Max(0, lightning);
+        _frostAffinity     = Mathf.Max(0, frost);
+    }
+
+    [Rpc(SendTo.Server)]
+    void SetAffinityRpc(int fire, int lightning, int frost)
+    {
+        _fireAffinity      = Mathf.Max(0, fire);
+        _lightningAffinity = Mathf.Max(0, lightning);
+        _frostAffinity     = Mathf.Max(0, frost);
+    }
+
+    /// <summary>Server-side current Affinity for a school (read-only). Returns 0 for non-elemental schools.</summary>
+    public int GetAffinity(SpellSchool school) => school switch
+    {
+        SpellSchool.Fire      => _fireAffinity,
+        SpellSchool.Lightning => _lightningAffinity,
+        SpellSchool.Frost     => _frostAffinity,
+        _                     => 0,
+    };
+
+    /// <summary>Current % elemental damage reduction from affinity for this school (0–MaxAffinityResistance).</summary>
+    public float GetAffinityResistance(SpellSchool school) =>
+        Mathf.Min(MaxAffinityResistance, GetAffinity(school) * PctReductionPerAffinity);
 
     // ─── Unity Lifecycle ──────────────────────────────────────────────────────
 
@@ -208,37 +311,72 @@ public class HealthSystem : NetworkBehaviour
     /// Apply damage. Auto-routes through ServerRpc when called from a client in MP.
     /// In solo or on the server, applies immediately and broadcasts feedback.
     /// </summary>
-    public void TakeDamage(int amount, bool isCrit = false)
+    /// <param name="isPhysical">
+    /// When true (default), armor reduces the incoming amount by 1% per armor point,
+    /// capped at <see cref="MaxArmorReduction"/>. Spell callers should pass false to
+    /// bypass armor — magical damage ignores physical armor.
+    /// </param>
+    /// <param name="school">
+    /// Damage element. Fire / Lightning / Frost are reduced by this target's Affinity
+    /// for that school (1 point = 1%, capped at <see cref="MaxAffinityResistance"/>).
+    /// Arcane / Healing are treated as no element and bypass the affinity layer.
+    /// </param>
+    public void TakeDamage(int amount, bool isCrit = false, bool isPhysical = true,
+                           SpellSchool school = SpellSchool.Arcane)
     {
         // Client in MP: forward to server. The server-side call broadcasts feedback
         // back to every machine, including this one — popup and sound arrive ~1 RTT later.
         if (IsNetworked && !IsServer)
         {
-            TakeDamageServerRpc(amount, isCrit);
+            TakeDamageServerRpc(amount, isCrit, isPhysical, school);
             return;
         }
 
         if (_isDead) return;
 
-        float newHealth = Mathf.Clamp(currentHealth - amount, 0f, maxHealth);
+        if (_dodgeChance > 0f && UnityEngine.Random.value < _dodgeChance)
+        {
+            if (IsNetworked)
+                ShowDodgeFeedbackOwnerRpc();
+            else
+                ShowDodgeFeedbackLocal();
+            return;
+        }
+
+        int finalAmount = amount;
+
+        // Affinity resistance: applied first so armor (if any) acts on the post-resist amount.
+        float affinityResist = GetAffinityResistance(school);
+        if (affinityResist > 0f)
+            finalAmount = Mathf.Max(0, Mathf.RoundToInt(finalAmount * (1f - affinityResist)));
+
+        // Armor: flat % reduction on physical hits only.
+        if (isPhysical && _armorPoints > 0)
+        {
+            float reduction = ArmorDamageReduction;
+            finalAmount = Mathf.Max(0, Mathf.RoundToInt(finalAmount * (1f - reduction)));
+        }
+
+        float newHealth = Mathf.Clamp(currentHealth - finalAmount, 0f, maxHealth);
         WriteCurrentHealth(newHealth);
 
         DebugLogger.Log(DebugLogger.Category.Damage,
-            $"{gameObject.name} took {amount} damage — HP: {currentHealth}/{maxHealth}");
+            $"{gameObject.name} took {finalAmount} damage (raw {amount}, armor {_armorPoints}, " +
+            $"{school} resist {Mathf.RoundToInt(affinityResist * 100f)}%) — HP: {currentHealth}/{maxHealth}");
 
         if (IsNetworked)
-            ShowDamageFeedbackClientRpc(amount, isCrit);
+            ShowDamageFeedbackClientRpc(finalAmount, isCrit);
         else
-            ShowDamageFeedbackLocal(amount, isCrit);
+            ShowDamageFeedbackLocal(finalAmount, isCrit);
 
         if (currentHealth <= 0f)
             Die();
     }
 
     [Rpc(SendTo.Server)]
-    public void TakeDamageServerRpc(int amount, bool isCrit)
+    public void TakeDamageServerRpc(int amount, bool isCrit, bool isPhysical, SpellSchool school)
     {
-        TakeDamage(amount, isCrit);
+        TakeDamage(amount, isCrit, isPhysical, school);
     }
 
     [Rpc(SendTo.ClientsAndHost)]
@@ -260,6 +398,15 @@ public class HealthSystem : NetworkBehaviour
             bool isPlayer = CompareTag("Player");
             DamagePopupManager.Instance.ShowDamage(transform.position, amount, isPlayer, isCrit);
         }
+    }
+
+    [Rpc(SendTo.Owner)]
+    void ShowDodgeFeedbackOwnerRpc() => ShowDodgeFeedbackLocal();
+
+    void ShowDodgeFeedbackLocal()
+    {
+        if (DamagePopupManager.Instance != null)
+            DamagePopupManager.Instance.ShowDodge(transform.position);
     }
 
     // ─── Public API — Heal ────────────────────────────────────────────────────
@@ -445,6 +592,8 @@ public class HealthSystem : NetworkBehaviour
             {
                 foreach (var col in GetComponents<Collider>())
                     col.enabled = false;
+                if (IsNetworked)
+                    DisableCollidersClientRpc();
             }
 
             OnDeath?.Invoke();
@@ -480,6 +629,14 @@ public class HealthSystem : NetworkBehaviour
             DeathScreenManager.Instance.ShowDeathScreen();
         else
             Debug.LogWarning("[HealthSystem] Player died but no DeathScreenManager found in scene.");
+    }
+
+    [ClientRpc]
+    void DisableCollidersClientRpc()
+    {
+        if (keepColliderOnDeath) return;
+        foreach (var col in GetComponents<Collider>())
+            col.enabled = false;
     }
 
     /// <summary>Called by PlayerUILinker after it wires the UI references at runtime.</summary>

@@ -1,0 +1,3 @@
+# TMP SDF font atlases contain embedded 1MB texture blobs — treat as binary
+# to avoid inflating the diff badge with hex pixel data
+Assets/Resources/Fonts/*.asset binary

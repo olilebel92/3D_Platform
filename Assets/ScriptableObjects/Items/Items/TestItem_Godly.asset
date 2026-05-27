@@ -14,10 +14,11 @@ MonoBehaviour:
   m_EditorClassIdentifier: Assembly-CSharp::ItemData
   itemName: Crown of Eternity
   description: Worn only by those who have transcended mortality itself.
+  greenText: 
   icon: {fileID: 0}
-  subType: {fileID: 11400000, guid: a3cc8c0594bac444c8bf28c950ffdbff, type: 2}
+  subType: {fileID: 11400000, guid: 866c0cacc589de448aabe08a3414e2af, type: 2}
   rarity: {fileID: 11400000, guid: 64dcb9b331c632a4abbf9bebcf19c071, type: 2}
-  assetGuid:
+  assetGuid: c4871f8b59fe445f90fb05f159f71ca8
   statLines:
   - type: 0
     value: 60

@@ -10,7 +10,7 @@ using Unity.Netcode;
 /// Character Stats panel (CharacterWindow) — the game never pauses.
 /// Attach this to your Player GameObject.
 /// </summary>
-public class ExperienceManager : MonoBehaviour
+public class ExperienceManager : NetworkBehaviour
 {
     // ─── Singleton ────────────────────────────────────────────────────────────
 
@@ -57,6 +57,9 @@ public class ExperienceManager : MonoBehaviour
     [Tooltip("Max HP gained per STR point spent.")]
     public int hpPerStr = 5;
 
+    [Tooltip("Max HP granted automatically on each level-up (before stat spend).")]
+    public int hpPerLevel = 10;
+
     // ─── AGI Tuning ───────────────────────────────────────────────────────────
 
     // ─── Crit Stats ───────────────────────────────────────────────────────────
@@ -94,6 +97,13 @@ public class ExperienceManager : MonoBehaviour
 
     [Tooltip("Hard floor for attack cooldown regardless of AGI.")]
     public float agiMinAttackCooldown = 0.3f;
+
+    [Tooltip("Flat dodge chance added per AGI point. (0.01 = +1% per point)")]
+    public float dodgeChancePerAgi = 0.01f;
+
+    [Tooltip("Maximum dodge chance regardless of AGI + skill tree bonuses. (0.70 = 70% cap)")]
+    [Range(0f, 1f)]
+    public float maxDodgeChance = 0.70f;
 
     // ─── INT Tuning ───────────────────────────────────────────────────────────
 
@@ -188,6 +198,13 @@ public class ExperienceManager : MonoBehaviour
         if (currentLevel > 1)
             InitializeStartingLevel();
 
+        if (_playerHealth != null)
+        {
+            _playerHealth.SetDodgeChance(ComputedDodgeChance);
+            _playerHealth.SetArmor(ComputedArmor);
+            PushAffinityToHealth();
+        }
+
         UpdateUI();
     }
 
@@ -212,10 +229,13 @@ public class ExperienceManager : MonoBehaviour
         else
             Debug.LogWarning("[ExperienceManager] SkillTreeManager not found — skill points not granted for starting level.");
 
-        Debug.Log($"[ExperienceManager] Initialized to level {currentLevel}: +{levelsGained} stat points, +{levelsGained} skill points, xpToNextLevel={xpToNextLevel}");
+        if (_playerHealth != null && hpPerLevel > 0)
+            _playerHealth.IncreaseMaxHealth(hpPerLevel * levelsGained);
+
+        Debug.Log($"[ExperienceManager] Initialized to level {currentLevel}: +{levelsGained} stat points, +{levelsGained} skill points, +{hpPerLevel * levelsGained} HP, xpToNextLevel={xpToNextLevel}");
     }
 
-    void OnDestroy()
+    public override void OnDestroy()
     {
         if (_inventory != null)
             _inventory.OnInventoryChanged -= OnEquipmentChanged;
@@ -228,6 +248,8 @@ public class ExperienceManager : MonoBehaviour
 
         // Clear singleton if this was the local instance
         if (Instance == this) Instance = null;
+
+        base.OnDestroy();
     }
 
     /// <summary>
@@ -251,6 +273,13 @@ public class ExperienceManager : MonoBehaviour
         int skillTreeHP = SkillTreeManager.Instance != null ? SkillTreeManager.Instance.TotalHpBonus : 0;
         _playerHealth.ApplyEquipmentHP(strHP + flatHP + skillTreeHP);
 
+        // AGI / skill-tree changes can shift dodge; equipment/skill-tree changes can shift armor.
+        // Equipment/skill-tree changes can shift affinity. Push all three unconditionally —
+        // HealthSystem auto-routes each to the server in MP.
+        _playerHealth.SetDodgeChance(ComputedDodgeChance);
+        _playerHealth.SetArmor(ComputedArmor);
+        PushAffinityToHealth();
+
         if (_playerMana != null)
         {
             int   flatMana      = _inventory != null ? _inventory.TotalBonusMana     : 0;
@@ -259,6 +288,19 @@ public class ExperienceManager : MonoBehaviour
             _playerMana.ApplyEquipmentMana(flatMana + skillTreeMana);
             _playerMana.ApplyEquipmentManaRegen(manaRegen);
         }
+    }
+
+    /// <summary>
+    /// Computes the player's per-element Affinity totals (items + skill tree) and pushes
+    /// them to HealthSystem so the server can apply elemental resistance on incoming damage.
+    /// </summary>
+    private void PushAffinityToHealth()
+    {
+        if (_playerHealth == null) return;
+        int fire      = _inventory != null ? _inventory.GetAffinity(SpellSchool.Fire)      : 0;
+        int lightning = _inventory != null ? _inventory.GetAffinity(SpellSchool.Lightning) : 0;
+        int frost     = _inventory != null ? _inventory.GetAffinity(SpellSchool.Frost)     : 0;
+        _playerHealth.SetAffinity(fire, lightning, frost);
     }
 
     /// <summary>Called whenever a skill tree node is learned — re-applies HP and regen bonuses.</summary>
@@ -333,6 +375,29 @@ public class ExperienceManager : MonoBehaviour
     public float ComputedAttackCooldown(float baseAttackCooldown)
         => Mathf.Max(agiMinAttackCooldown, baseAttackCooldown * (1f - EffectiveAGI * agiCooldownReductionPct));
 
+    /// <summary>Flat dodge chance from AGI + skill tree bonuses, capped at maxDodgeChance.</summary>
+    public float ComputedDodgeChance
+    {
+        get
+        {
+            float skillTreeDodge = SkillTreeManager.Instance != null
+                ? SkillTreeManager.Instance.TotalDodgeChanceBonus
+                : 0f;
+            return Mathf.Min(maxDodgeChance, EffectiveAGI * dodgeChancePerAgi + skillTreeDodge);
+        }
+    }
+
+    /// <summary>Total armor points from equipment + skill tree. 1 point = +1% physical damage reduction (capped at 90% in HealthSystem).</summary>
+    public int ComputedArmor
+    {
+        get
+        {
+            int equipArmor    = _inventory != null ? _inventory.TotalBonusArmor : 0;
+            int skillTreeArmor = SkillTreeManager.Instance != null ? SkillTreeManager.Instance.TotalArmorBonus : 0;
+            return equipArmor + skillTreeArmor;
+        }
+    }
+
     /// <summary>Spell damage multiplier from INT + skill tree % bonus (includes equipment). +intSpellDamagePct% per point.</summary>
     public float SpellDamageMultiplier
         => 1f + EffectiveINT * intSpellDamagePct
@@ -373,19 +438,43 @@ public class ExperienceManager : MonoBehaviour
             _audioSource.PlayOneShot(levelUpClip);
         }
 
-        if (levelUpVFX != null)
-            levelUpVFX.Play();
+        PlayLevelUpVfxLocal();
+
+        if (_playerHealth != null && hpPerLevel > 0)
+            _playerHealth.IncreaseMaxHealth(hpPerLevel);
 
         if (DamagePopupManager.Instance != null)
             DamagePopupManager.Instance.ShowLevelUp(transform.position);
 
-        if (levelUpGlowMaterial != null)
-            StartCoroutine(GlowCoroutine());
+        if (IsOwner)
+            BroadcastLevelUpVfxServerRpc();
 
         if (SkillTreeManager.Instance != null)
             SkillTreeManager.Instance.AddSkillPoint();
         else
             Debug.LogWarning("[ExperienceManager] SkillTreeManager not found — skill point not awarded.");
+    }
+
+    private void PlayLevelUpVfxLocal()
+    {
+        if (levelUpVFX != null)
+            levelUpVFX.Play();
+
+        if (levelUpGlowMaterial != null)
+            StartCoroutine(GlowCoroutine());
+    }
+
+    [ServerRpc]
+    private void BroadcastLevelUpVfxServerRpc()
+    {
+        PlayLevelUpVfxClientRpc();
+    }
+
+    [ClientRpc]
+    private void PlayLevelUpVfxClientRpc()
+    {
+        if (IsOwner) return; // already played locally in TriggerLevelUp
+        PlayLevelUpVfxLocal();
     }
 
     private void BuildGlowShell()
@@ -459,7 +548,9 @@ public class ExperienceManager : MonoBehaviour
         if (statPoints <= 0) return false;
         statPoints--;
         agility++;
-        Debug.Log($"[STAT] +1 AGI → {agility}  |  {statPoints} points remaining");
+        if (_playerHealth != null)
+            _playerHealth.SetDodgeChance(ComputedDodgeChance);
+        Debug.Log($"[STAT] +1 AGI → {agility} (dodge {ComputedDodgeChance * 100f:F0}%)  |  {statPoints} points remaining");
         UpdateUI();
         return true;
     }

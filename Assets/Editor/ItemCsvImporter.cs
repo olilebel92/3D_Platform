@@ -51,7 +51,7 @@ public static class ItemCsvImporter
             // 3  slot
             // 4  rarity
             // 5  STR  6 AGI  7 INT  8 FlatHP  9 HPRegenPerSecond  10 AllStats
-            // 11 CritRate  12 CritDamage  13 FireDamage  14 MovementSpeed  15 SpellPower
+            // 11 CritRate  12 CritDamage  13 FireAffinity  14 MovementSpeed  15 SpellPower
 
             string assetFileName = cols[0].Trim();
             string assetPath     = $"{OutputFolder}/{assetFileName}.asset";
@@ -82,7 +82,7 @@ public static class ItemCsvImporter
             TryAddStat(item, StatType.AllStats,       cols, 10);
             TryAddStat(item, StatType.CritRate,       cols, 11);
             TryAddStat(item, StatType.CritDamage,     cols, 12);
-            TryAddStat(item, StatType.FireDamage,     cols, 13);
+            TryAddStat(item, StatType.FireAffinity,   cols, 13);
             TryAddStat(item, StatType.MovementSpeed,  cols, 14);
             TryAddStat(item, StatType.SpellPower,     cols, 15);
 

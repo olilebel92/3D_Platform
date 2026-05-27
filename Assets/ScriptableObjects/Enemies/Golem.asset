@@ -15,25 +15,23 @@ MonoBehaviour:
   enemyName: Golem
   description: null
   icon: {fileID: 0}
-  creatureTypes:
-  - 4
   creatureTypes: 04000000
   category: 0
   level: 1
   prefab: {fileID: 1077356408, guid: 4f8cdd193bc7e2b4693dd14d1164c030, type: 3}
-  maxHealth: 10.0
-  moveSpeed: 3.0
+  maxHealth: 10
+  moveSpeed: 3
   attackDamageMin: 1
   attackDamageMax: 2
   attackCooldown: 1.5
-  attackRange: 2.0
-  detectionRange: 25.0
-  attackStunChance: 0.0
-  attackStunDuration: 1.0
+  attackRange: 2
+  detectionRange: 200
+  attackStunChance: 0
+  attackStunDuration: 1
   attackMoveLockDuration: 0.6
-  retargetInterval: 1.0
-  angularSpeed: 200.0
-  rotationSpeed: 200.0
+  retargetInterval: 1
+  angularSpeed: 200
+  rotationSpeed: 200
   xpReward: 3
   giveHPOnDeath: 0
   hpRewardOnDeath: 0

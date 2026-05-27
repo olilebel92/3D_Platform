@@ -51,7 +51,7 @@ public class ItemDropper : NetworkBehaviour
         if (LocalInstance == this) LocalInstance = null;
     }
 
-    void OnDestroy()
+    public override void OnDestroy()
     {
         if (LocalInstance == this) LocalInstance = null;
     }

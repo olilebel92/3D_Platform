@@ -48,6 +48,10 @@ crashlytics-build.properties
 ehthumbs.db
 Thumbs.db
 
+# Third-party vendor demo folders (Unity touches these on every settings change)
+Assets/Toon Shaders Pro/Demo/
+Assets/Toon Shaders Pro/Demo.meta
+
 # Third-party asset packs — re-import from Asset Store
 Assets/MasterMagicFX/
 Assets/MasterMagicFX.meta

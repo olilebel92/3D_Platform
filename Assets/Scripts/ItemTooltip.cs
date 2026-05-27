@@ -56,10 +56,36 @@ public class ItemTooltip : MonoBehaviour
 
     // ─── Public API ───────────────────────────────────────────────────────────
 
+    /// <summary>Show tooltip anchored to an inventory UI slot.</summary>
     public void Show(ItemData item, RectTransform anchor)
     {
         if (item == null) return;
+        PopulateLabels(item);
+        _canvasGroup.alpha = 0f;
+        StartCoroutine(PositionNextTo(anchor));
+    }
 
+    /// <summary>Show tooltip at an arbitrary screen position (e.g. mouse cursor or world-to-screen).</summary>
+    public void Show(ItemData item, Vector2 screenPosition)
+    {
+        if (item == null) return;
+        PopulateLabels(item);
+        _canvasGroup.alpha = 0f;
+        StartCoroutine(PositionAtScreen(screenPosition));
+    }
+
+    public void Hide()
+    {
+        if (tooltipPanel != null)
+        {
+            StopAllCoroutines();
+            if (_canvasGroup != null) _canvasGroup.alpha = 0f;
+            tooltipPanel.SetActive(false);
+        }
+    }
+
+    private void PopulateLabels(ItemData item)
+    {
         tooltipPanel.SetActive(true);
         tooltipPanel.transform.SetAsLastSibling();
 
@@ -73,24 +99,22 @@ public class ItemTooltip : MonoBehaviour
         }
 
         if (statsLabel != null)
-            statsLabel.text = item.BuildStatSummary();
-
-        // Hide while repositioning to avoid one-frame flicker
-        _canvasGroup.alpha = 0f;
-        StartCoroutine(PositionNextTo(anchor));
-    }
-
-    public void Hide()
-    {
-        if (tooltipPanel != null)
         {
-            StopAllCoroutines();
-            if (_canvasGroup != null) _canvasGroup.alpha = 0f;
-            tooltipPanel.SetActive(false);
+            string subHeader = item.subType != null
+                ? $"<size=90%><color=#CCCCCC>{item.subType.displayName}</color></size>\n"
+                : "";
+            statsLabel.text = subHeader + item.BuildStatSummary();
         }
     }
 
     // ─── Positioning ──────────────────────────────────────────────────────────
+
+    private System.Collections.IEnumerator PositionAtScreen(Vector2 screenPosition)
+    {
+        yield return null;
+        ClampAndPlace(screenPosition);
+        _canvasGroup.alpha = 1f;
+    }
 
     private System.Collections.IEnumerator PositionNextTo(RectTransform anchor)
     {
@@ -100,30 +124,26 @@ public class ItemTooltip : MonoBehaviour
         // Convert slot centre (world space) to canvas local space
         Vector2 screenCenter = RectTransformUtility.WorldToScreenPoint(null, anchor.position);
 
-        RectTransformUtility.ScreenPointToLocalPointInRectangle(
-            _canvasRect,
-            screenCenter,
-            _canvas.renderMode == RenderMode.ScreenSpaceOverlay ? null : _canvas.worldCamera,
-            out Vector2 localPos);
+        ClampAndPlace(screenCenter);
+        _canvasGroup.alpha = 1f;
+    }
 
-        // Offset to the right of the slot so the icon stays visible
+    // Converts a screen-space point to canvas-local, applies slotOffset, clamps, and sets position.
+    private void ClampAndPlace(Vector2 screenPos)
+    {
+        Camera cam = _canvas.renderMode == RenderMode.ScreenSpaceOverlay ? null : _canvas.worldCamera;
+        RectTransformUtility.ScreenPointToLocalPointInRectangle(_canvasRect, screenPos, cam, out Vector2 localPos);
         localPos += slotOffset;
 
-        // Clamp so tooltip doesn't go off screen
         Vector2 panelSize  = _panelRect.sizeDelta;
         Vector2 canvasSize = _canvasRect.sizeDelta;
 
-        // If tooltip goes off right edge, flip it to the left of the slot
         if (localPos.x + panelSize.x * 0.5f > canvasSize.x * 0.5f)
             localPos.x -= panelSize.x + slotOffset.x * 2f;
 
-        // If tooltip goes off bottom edge, push it up
         if (localPos.y - panelSize.y * 0.5f < -canvasSize.y * 0.5f)
             localPos.y += panelSize.y;
 
         _panelRect.localPosition = new Vector3(localPos.x, localPos.y, 0f);
-
-        // Reveal after positioning
-        _canvasGroup.alpha = 1f;
     }
 }

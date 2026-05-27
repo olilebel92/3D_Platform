@@ -72,27 +72,31 @@ public class SkillTreeNode : ScriptableObject
     [Tooltip("Flat bonus per level added to all spell damage.")]
     public float spellDamageBonus = 0f;
 
-    [Tooltip("Flat bonus per level added specifically to fire spell damage.")]
-    public float fireDamageBonus = 0f;
-
     [Tooltip("Flat bonus per level added specifically to healing spells.")]
     public float healBonus = 0f;
+
+    [Tooltip("Flat armor points added per level. 1 armor = +1% physical damage reduction (capped at 90% in HealthSystem).")]
+    public int armorBonus = 0;
+
+    [Tooltip("Flat dodge chance added per level. (0.05 = +5% per level, capped by ExperienceManager.maxDodgeChance)")]
+    public float dodgeChanceBonus = 0f;
 
     [Header("Passive Effects — Percent Bonuses")]
     [Tooltip("Percent bonus per level added to all spell damage. (0.10 = +10%)")]
     public float spellDamagePctBonus = 0f;
 
-    [Tooltip("Percent bonus per level added specifically to fire spell damage. (0.10 = +10%)")]
-    public float fireDamagePctBonus = 0f;
-
     [Tooltip("Percent bonus per level added specifically to healing spells. (0.10 = +10%)")]
     public float healPctBonus = 0f;
 
-    [Tooltip("Flat bonus per level added specifically to lightning spell damage.")]
-    public float lightningDamageBonus = 0f;
+    [Header("Passive Effects — Affinity")]
+    [Tooltip("Flat Fire Affinity points added per level. 1 point = +1% fire damage dealt AND +1% fire damage reduction (defensive capped at 80%).")]
+    public int fireAffinityBonus = 0;
 
-    [Tooltip("Percent bonus per level added specifically to lightning spell damage. (0.10 = +10%)")]
-    public float lightningDamagePctBonus = 0f;
+    [Tooltip("Flat Lightning Affinity points added per level. 1 point = +1% lightning damage dealt AND +1% lightning damage reduction (defensive capped at 80%).")]
+    public int lightningAffinityBonus = 0;
+
+    [Tooltip("Flat Frost Affinity points added per level. 1 point = +1% frost damage dealt AND +1% frost damage reduction (defensive capped at 80%).")]
+    public int frostAffinityBonus = 0;
 
     // ─── Description Resolution ───────────────────────────────────────────────
 
@@ -175,13 +179,14 @@ public class SkillTreeNode : ScriptableObject
         AddFlat(manaBonus,              "Max Mana",         asInt: true);
         AddFlat(manaRegenBonus,         "Mana Regen/s");
         AddFlat(spellDamageBonus,       "Spell Damage");
-        AddFlat(fireDamageBonus,        "Fire Damage");
         AddFlat(healBonus,              "Healing Power");
-        AddFlat(lightningDamageBonus,   "Lightning Damage");
+        AddFlat(armorBonus,             "Armor",            asInt: true);
+        AddFlat(fireAffinityBonus,      "Fire Affinity",      asInt: true);
+        AddFlat(lightningAffinityBonus, "Lightning Affinity", asInt: true);
+        AddFlat(frostAffinityBonus,     "Frost Affinity",     asInt: true);
         AddPct(spellDamagePctBonus,     "Spell Damage");
-        AddPct(fireDamagePctBonus,      "Fire Damage");
         AddPct(healPctBonus,            "Healing Power");
-        AddPct(lightningDamagePctBonus, "Lightning Damage");
+        AddPct(dodgeChanceBonus,        "Dodge Chance");
 
         return sb.Length > 0 ? sb.ToString() : "No effects.";
     }

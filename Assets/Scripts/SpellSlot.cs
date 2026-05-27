@@ -79,7 +79,15 @@ public class SpellSlot : MonoBehaviour,
         // an O(1) list lookup per frame when the cache isn't populated yet.
         if (_spellCaster == null && PlayerController.All.Count > 0)
         {
-            _spellCaster = PlayerController.All[0].GetComponent<SpellCaster>();
+            foreach (var pc in PlayerController.All)
+            {
+                var sc = pc.GetComponent<SpellCaster>();
+                if (sc != null && sc.enabled)
+                {
+                    _spellCaster = sc;
+                    break;
+                }
+            }
         }
 
         if (cooldownOverlay == null || CurrentSpell == null || _spellCaster == null)

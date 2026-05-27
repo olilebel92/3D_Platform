@@ -269,6 +269,19 @@ def _render_create_enum_tab() -> None:
 
 
 def render():
+    st.markdown("""
+<style>
+div[data-testid="stHorizontalBlock"] div[data-testid="column"]:last-child
+    div[data-testid="stButton"] > button {
+    padding: 2px 12px;
+    min-height: 0;
+    height: auto;
+    font-size: 0.80em;
+    line-height: 1.4;
+}
+</style>
+""", unsafe_allow_html=True)
+
     col_left, col_right = st.columns([3, 1])
     with col_right:
         if st.button("Refresh Enemies", key="refresh_enemies"):
@@ -294,11 +307,11 @@ def render():
             cols[0].write(e["enemyName"])
             cols[1].markdown(_category_badge(e["category"]),
                              unsafe_allow_html=True)
-            cols[2].write(e.get("level", 1))
+            cols[2].markdown(str(e.get("level", 1)))
             cols[3].write(", ".join(e["creatureTypes"]))
-            cols[4].write(int(e["maxHealth"]))
+            cols[4].markdown(str(int(e["maxHealth"])))
             cols[5].write(f"{e['attackDamageMin']}–{e['attackDamageMax']}")
-            cols[6].write(e["xpReward"])
+            cols[6].markdown(str(e["xpReward"]))
             if cols[7].button("Edit", key=f"edit_btn_{e['asset_file']}"):
                 _clear_edit_widget_state(e["asset_file"])
                 st.session_state["enemy_editing"] = e["asset_file"]

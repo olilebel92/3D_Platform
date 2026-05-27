@@ -69,6 +69,7 @@ public class PlayerAttack : NetworkBehaviour
     private PlayerInputActions _inputActions;
     private ExperienceManager _xp;
     private SpellCaster _spellCaster;
+    private StatusEffectHandler _statusEffects;
     private float _cooldownTimer = 0f;
     private float _activeWindowTimer = 0f;
     private bool _isAttacking = false;
@@ -92,8 +93,9 @@ public class PlayerAttack : NetworkBehaviour
         }
 
         // Cache own ExperienceManager — each player has their own instance.
-        _xp          = GetComponent<ExperienceManager>();
-        _spellCaster = GetComponent<SpellCaster>();
+        _xp            = GetComponent<ExperienceManager>();
+        _spellCaster   = GetComponent<SpellCaster>();
+        _statusEffects = GetComponent<StatusEffectHandler>();
 
         if (_inputActions == null)
         {
@@ -105,8 +107,7 @@ public class PlayerAttack : NetworkBehaviour
             _inputActions.Player.Enable();
         }
 
-        if (_inputActions != null)
-            _inputActions.Player.Fire.performed += OnFire;
+        // No event subscription needed — fire input is polled each frame in Update.
 
         // ── Animator ──────────────────────────────────────────────────────────
         if (audioSource == null)
@@ -137,9 +138,6 @@ public class PlayerAttack : NetworkBehaviour
     public override void OnDestroy()
     {
         base.OnDestroy();
-        // Always unsubscribe to avoid memory leaks / stale callbacks.
-        if (_inputActions != null)
-            _inputActions.Player.Fire.performed -= OnFire;
     }
 
     // ─── NGO Lifecycle ────────────────────────────────────────────────────────
@@ -177,6 +175,13 @@ public class PlayerAttack : NetworkBehaviour
             }
         }
 
+        // ── Auto-attack while LMB is held ─────────────────────────────────────
+        if (!_isAttacking && _inputActions != null &&
+            _inputActions.Player.Fire.IsPressed())
+        {
+            TryAttack();
+        }
+
         // ── Active Damage Window ──────────────────────────────────────────────
         if (_attackWindowActive)
         {
@@ -193,13 +198,14 @@ public class PlayerAttack : NetworkBehaviour
         }
     }
 
-    // ─── Input Callback ───────────────────────────────────────────────────────
+    // ─── Attack Logic ─────────────────────────────────────────────────────────
 
-    private void OnFire(InputAction.CallbackContext ctx)
+    private void TryAttack()
     {
         if (_isAttacking) return;
         if (animator == null) return;
         if (Time.timeScale == 0f) return; // block attacks while any popup/menu is open
+        if (_statusEffects != null && _statusEffects.IsStunned) return;
         if (_spellCaster != null && _spellCaster.IsActive) return; // block during Target/Cast/Channel
 
         // ── Trigger animation ─────────────────────────────────────────────────

@@ -126,7 +126,6 @@ public class LootTableSO : ScriptableObject
         foreach (LootTableEntry entry in entries)
         {
             if (maxDrops > 0 && totalDrops >= maxDrops) break;
-            if (Random.value > entry.dropChance) continue;
 
             // Validate required references per entry type
             switch (entry.entryType)
@@ -161,7 +160,18 @@ public class LootTableSO : ScriptableObject
                     break;
             }
 
-            int count = Random.Range(entry.minCount, entry.maxCount + 1);
+            // Roll maxCount times independently at dropChance, then clamp to minCount as floor.
+            // Max Count = number of rolls = maximum possible drops.
+            // Min Count = guaranteed minimum (bypasses chance — always drops at least this many).
+            // e.g. min 2 / max 6 / 85%: roll 6 times, but always drop at least 2.
+            int numRolls = entry.maxCount;
+            if (maxDrops > 0) numRolls = Mathf.Min(numRolls, maxDrops - totalDrops);
+
+            int count = 0;
+            for (int i = 0; i < numRolls; i++)
+                if (Random.value <= entry.dropChance) count++;
+
+            count = Mathf.Max(count, entry.minCount);  // guaranteed floor
             if (maxDrops > 0) count = Mathf.Min(count, maxDrops - totalDrops);
 
             // Pick one item from the pool (server-side, before spawning the pickup)

@@ -30,6 +30,9 @@ public class PlayerUILinker : MonoBehaviour
     [Tooltip("The fill Image on the mana bar.")]
     public Image manaBarFill;
 
+    [Tooltip("The lighter-blue reserved-mana overlay Image. Sibling of manaBarFill, rendered behind it. Optional — leave empty to disable the preview chunk.")]
+    public Image manaBarReservedFill;
+
     [Tooltip("The root panel that shows/hides the mana bar.")]
     public GameObject manaBarPanel;
 
@@ -141,8 +144,9 @@ public class PlayerUILinker : MonoBehaviour
         ManaSystem mana = localPlayer.GetComponent<ManaSystem>();
         if (mana != null)
         {
-            mana.manaBarFill  = manaBarFill;
-            mana.manaBarPanel = manaBarPanel;
+            mana.manaBarFill         = manaBarFill;
+            mana.manaBarReservedFill = manaBarReservedFill;
+            mana.manaBarPanel        = manaBarPanel;
             mana.RefreshUI();
         }
 

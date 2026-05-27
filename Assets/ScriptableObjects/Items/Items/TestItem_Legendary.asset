@@ -13,11 +13,13 @@ MonoBehaviour:
   m_Name: TestItem_Legendary
   m_EditorClassIdentifier: Assembly-CSharp::ItemData
   itemName: Stormlord Boots
-  description: Crackling with divine lightning. Said to belong to a god who walked among men.
+  description: Crackling with divine lightning. Said to belong to a god who walked
+    among men.
+  greenText: 
   icon: {fileID: 0}
-  subType: {fileID: 11400000, guid: 866c0cacc589de448aabe08a3414e2af, type: 2}
+  subType: {fileID: 11400000, guid: 6aa5e9f065ec1654985661c045d767dc, type: 2}
   rarity: {fileID: 11400000, guid: 77ba89cf21be97744b992f4895c0672a, type: 2}
-  assetGuid:
+  assetGuid: 567a51b409b45f840905a2dc8add2a28
   statLines:
   - type: 0
     value: 35

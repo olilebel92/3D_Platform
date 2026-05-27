@@ -170,7 +170,7 @@ public class ChainLightning : NetworkBehaviour
     {
         HealthSystem health = target.GetComponent<HealthSystem>()
                            ?? target.GetComponentInChildren<HealthSystem>();
-        health?.TakeDamage(Mathf.RoundToInt(damage), false);
+        health?.TakeDamage(Mathf.RoundToInt(damage), isCrit: false, isPhysical: false, school: SpellSchool.Lightning);
 
         SpawnHitEffect(target.position + Vector3.up * 0.5f);
     }

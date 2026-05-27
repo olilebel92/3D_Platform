@@ -5,8 +5,9 @@ using Unity.Netcode;
 /// Attach this to your Fireball prefab.
 /// Moves forward, explodes on impact with AOE falloff damage.
 ///
-/// Damage formula:
-///   raw = (baseDamage + TotalSpellDamageBonus + TotalFireDamageBonus) * SpellDamageMultiplier (INT)
+/// Damage formula (see SpellCaster.ComputeRawDamage):
+///   raw = (baseDamage + TotalSpellDamageBonus + equipSpellPower) * SpellDamageMultiplier (INT)
+///         × (1 + FireAffinity / 100)         // uncapped offensive bonus
 ///   targets inside blastRadius   → raw
 ///   targets inside falloffRadius → lerp raw → raw * minDamageFraction
 ///
@@ -161,7 +162,7 @@ public class Fireball : NetworkBehaviour
             int   damage = Mathf.RoundToInt(ComputeFalloffDamage(raw, dist));
 
             // HealthSystem auto-routes to the server in MP and applies directly in solo.
-            health.TakeDamage(damage);
+            health.TakeDamage(damage, isCrit: false, isPhysical: false, school: SpellSchool.Fire);
 
             Debug.Log($"[Fireball] Hit '{hit.name}' for {damage} damage.");
         }

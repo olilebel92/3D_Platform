@@ -43,6 +43,9 @@ public class EnemyAI : NetworkBehaviour
     public float attackStunDuration = 1f;
     [Tooltip("Seconds the enemy stops moving after triggering an attack (match to attack animation length).")]
     public float attackMoveLockDuration = 0.6f;
+    [Tooltip("Element tag for this enemy's attacks. Arcane = physical/typeless (default). " +
+             "Set Fire/Lightning/Frost on elemental enemies — the player's matching Affinity will reduce incoming damage.")]
+    [SerializeField] private SpellSchool attackElement = SpellSchool.Arcane;
     private float attackTimer = 0f;
     private float attackMoveLockTimer = 0f;
 
@@ -304,7 +307,10 @@ public class EnemyAI : NetworkBehaviour
             float stunDuration = (Random.value < attackStunChance) ? attackStunDuration : 0f;
 
             if (_playerHealth != null)
-                _playerHealth.TakeDamage(rolledDamage);
+            {
+                bool isPhysical = attackElement == SpellSchool.Arcane;
+                _playerHealth.TakeDamage(rolledDamage, isCrit: false, isPhysical: isPhysical, school: attackElement);
+            }
 
             // Stun is a client-side effect — apply locally in solo, target owner in MP.
             if (stunDuration > 0f)

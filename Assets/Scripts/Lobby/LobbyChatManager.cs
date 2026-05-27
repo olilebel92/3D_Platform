@@ -1,5 +1,6 @@
 using UnityEngine;
 using UnityEngine.UIElements;
+using UnityEngine.InputSystem;
 using Unity.Netcode;
 using Unity.Collections;
 
@@ -29,6 +30,7 @@ public class LobbyChatManager : NetworkBehaviour
 
     private ScrollView _chatScroll;
     private TextField  _chatField;
+    private bool       _chatFieldFocused;
 
     // ─── Unity Lifecycle ──────────────────────────────────────────────────────
 
@@ -49,12 +51,19 @@ public class LobbyChatManager : NetworkBehaviour
 
         if (_chatField != null)
         {
-            _chatField.RegisterCallback<KeyDownEvent>(evt =>
-            {
-                if (evt.keyCode == KeyCode.Return || evt.keyCode == KeyCode.KeypadEnter)
-                    OnSendClicked();
-            });
+            _chatField.RegisterCallback<FocusInEvent>(_ => _chatFieldFocused = true);
+            _chatField.RegisterCallback<FocusOutEvent>(_ => _chatFieldFocused = false);
+            _chatField.schedule.Execute(() => _chatField.Focus()).StartingIn(100);
         }
+    }
+
+    void Update()
+    {
+        if (!_chatFieldFocused || _chatField == null) return;
+        var kb = Keyboard.current;
+        if (kb == null) return;
+        if (kb.enterKey.wasPressedThisFrame || kb.numpadEnterKey.wasPressedThisFrame)
+            OnSendClicked();
     }
 
     public override void OnDestroy()

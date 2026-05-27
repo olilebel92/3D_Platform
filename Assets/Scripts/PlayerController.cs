@@ -451,6 +451,13 @@ public class PlayerController : NetworkBehaviour
         // the server), so we must explicitly block input while any panel is open.
         if (PauseManager.IsPaused) return;
 
+        // ── Ready-Up ──────────────────────────────────────────────────────────
+        if (Keyboard.current != null && Keyboard.current.rKey.wasPressedThisFrame
+            && WaveManager.Instance != null && WaveManager.Instance.IsWaitingForReady)
+        {
+            WaveManager.Instance.ReadyUp();
+        }
+
         // ── Stun ──────────────────────────────────────────────────────────────
         // While stunned, freeze all input and movement (cast is cancelled by StatusEffectHandler).
         if (_statusEffects != null && _statusEffects.IsStunned) return;

@@ -25,14 +25,16 @@ public enum TelegraphShape
 /// <summary>Determines which damage school bonuses apply to this spell.</summary>
 public enum SpellSchool
 {
-    /// <summary>Generic magic — benefits from spell damage bonuses only.</summary>
+    /// <summary>Generic magic — benefits from spell damage bonuses only. Treated as "no element" for affinity.</summary>
     Arcane,
-    /// <summary>Fire magic — benefits from spell damage AND fire damage bonuses.</summary>
+    /// <summary>Fire magic — benefits from spell damage AND Fire Affinity (offensive %).</summary>
     Fire,
-    /// <summary>Healing — benefits from spell damage bonuses as heal power; fire bonuses are ignored.</summary>
+    /// <summary>Healing — benefits from heal power bonuses; affinity is ignored.</summary>
     Healing,
-    /// <summary>Lightning magic — benefits from spell damage AND lightning damage bonuses.</summary>
+    /// <summary>Lightning magic — benefits from spell damage AND Lightning Affinity (offensive %).</summary>
     Lightning,
+    /// <summary>Frost magic — benefits from spell damage AND Frost Affinity (offensive %).</summary>
+    Frost,
 }
 
 /// <summary>Where the spell prefab is spawned.</summary>
@@ -94,6 +96,11 @@ public class SpellData : ScriptableObject
 
     [Tooltip("Mana deducted from the player's pool when this spell is cast. 0 = free.")]
     public float manaCost = 0f;
+
+    [Tooltip("Mana cost multiplier applied per skill rank above 1. Rank 1 uses manaCost as-is. " +
+             "Example: 1.2 → rank 2 costs 20% more, rank 3 costs 44% more. Set to 1 for no scaling.")]
+    [Range(1f, 3f)]
+    public float manaCostMultiplierPerRank = 1.2f;
 
     [Header("Basic Info")]
     public string spellName = "Unnamed Spell";
@@ -220,6 +227,17 @@ public class SpellData : ScriptableObject
     public float chainJumpDelay = 0.3f;
 
     /// <summary>
+    /// Returns the effective mana cost for the given skill rank.
+    /// Rank 0 or 1 returns <see cref="manaCost"/>; each rank above 1 multiplies by <see cref="manaCostMultiplierPerRank"/>.
+    /// </summary>
+    public float GetManaCost(int skillRank)
+    {
+        if (manaCost <= 0f) return 0f;
+        int extraRanks = Mathf.Max(0, skillRank - 1);
+        return manaCost * Mathf.Pow(manaCostMultiplierPerRank, extraRanks);
+    }
+
+    /// <summary>
     /// Returns the base damage for this spell.
     /// Prefers the SpellData baseDamage field if set (> 0).
     /// Falls back to reading the prefab component for legacy Fireball / HealingWave assets
@@ -273,6 +291,7 @@ public class SpellData : ScriptableObject
             {
                 SpellSchool.Healing   => new Color(0.2f, 0.9f, 0.2f, 0.45f),  // green
                 SpellSchool.Lightning => new Color(0.9f, 0.9f, 0.1f, 0.45f),  // yellow
+                SpellSchool.Frost     => new Color(0.3f, 0.7f, 1f,  0.45f),   // cyan
                 _                     => new Color(0.9f, 0.1f, 0.1f, 0.45f),  // red
             };
         }

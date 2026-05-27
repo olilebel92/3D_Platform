@@ -74,14 +74,8 @@ public class SkillTreeManager : MonoBehaviour
     /// <summary>Sum of all spellDamageBonus values from learned nodes.</summary>
     public float TotalSpellDamageBonus { get; private set; } = 0f;
 
-    /// <summary>Sum of all fireDamageBonus values from learned nodes.</summary>
-    public float TotalFireDamageBonus { get; private set; } = 0f;
-
     /// <summary>Sum of all percent spell damage bonuses from learned nodes (0.10 = +10%).</summary>
     public float TotalSpellDamagePctBonus { get; private set; } = 0f;
-
-    /// <summary>Sum of all percent fire damage bonuses from learned nodes (0.10 = +10%).</summary>
-    public float TotalFireDamagePctBonus { get; private set; } = 0f;
 
     /// <summary>Sum of all flat heal bonuses from learned nodes.</summary>
     public float TotalHealBonus { get; private set; } = 0f;
@@ -89,11 +83,14 @@ public class SkillTreeManager : MonoBehaviour
     /// <summary>Sum of all percent heal bonuses from learned nodes (0.10 = +10%).</summary>
     public float TotalHealPctBonus { get; private set; } = 0f;
 
-    /// <summary>Sum of all flat lightning damage bonuses from learned nodes.</summary>
-    public float TotalLightningDamageBonus { get; private set; } = 0f;
+    /// <summary>Sum of all Fire Affinity points from learned nodes. 1 = +1% fire dmg dealt, +1% fire dmg taken reduced (defensive cap 80%).</summary>
+    public int TotalFireAffinity { get; private set; } = 0;
 
-    /// <summary>Sum of all percent lightning damage bonuses from learned nodes (0.10 = +10%).</summary>
-    public float TotalLightningDamagePctBonus { get; private set; } = 0f;
+    /// <summary>Sum of all Lightning Affinity points from learned nodes. 1 = +1% lightning dmg dealt, +1% lightning dmg taken reduced (defensive cap 80%).</summary>
+    public int TotalLightningAffinity { get; private set; } = 0;
+
+    /// <summary>Sum of all Frost Affinity points from learned nodes. 1 = +1% frost dmg dealt, +1% frost dmg taken reduced (defensive cap 80%).</summary>
+    public int TotalFrostAffinity { get; private set; } = 0;
 
     /// <summary>Sum of all flat max HP bonuses from learned nodes.</summary>
     public int TotalHpBonus { get; private set; } = 0;
@@ -106,6 +103,12 @@ public class SkillTreeManager : MonoBehaviour
 
     /// <summary>Sum of all flat mana regen bonuses from learned nodes (mana per second).</summary>
     public float TotalManaRegenBonus { get; private set; } = 0f;
+
+    /// <summary>Sum of all flat armor points from learned nodes. 1 point = +1% physical damage reduction.</summary>
+    public int TotalArmorBonus { get; private set; } = 0;
+
+    /// <summary>Sum of all flat dodge chance bonuses from learned nodes (0.05 = +5%).</summary>
+    public float TotalDodgeChanceBonus { get; private set; } = 0f;
 
     // ─── Events ───────────────────────────────────────────────────────────────
 
@@ -162,6 +165,53 @@ public class SkillTreeManager : MonoBehaviour
     }
 
     // ─── Public API ───────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Godmode helper: instantly levels every skill tree node to its maximum,
+    /// bypassing skill point costs and prerequisites.
+    /// </summary>
+    public void MaxAllSkills()
+    {
+        var nodeUIs = FindObjectsByType<SkillNodeUI>(FindObjectsInactive.Include, FindObjectsSortMode.None);
+        foreach (var ui in nodeUIs)
+            ForceLearnNodeToMax(ui.node);
+
+        Debug.Log($"[SkillTree] MaxAllSkills: all {nodeUIs.Length} node(s) maxed.");
+        RefreshUI();
+        OnTreeChanged?.Invoke();
+    }
+
+    private void ForceLearnNodeToMax(SkillTreeNode node)
+    {
+        if (node == null) return;
+        _nodeLevels.TryGetValue(node, out int current);
+        if (current >= node.maxLevel) return;
+
+        for (int i = current; i < node.maxLevel; i++)
+        {
+            TotalStrBonus             += Mathf.RoundToInt(node.strBonus           * node.scalingFactor);
+            TotalAgiBonus             += Mathf.RoundToInt(node.agiBonus           * node.scalingFactor);
+            TotalIntBonus             += Mathf.RoundToInt(node.intBonus           * node.scalingFactor);
+            TotalSpellDamageBonus     += node.spellDamageBonus    * node.scalingFactor;
+            TotalSpellDamagePctBonus  += node.spellDamagePctBonus * node.scalingFactor;
+            TotalHealBonus            += node.healBonus           * node.scalingFactor;
+            TotalHealPctBonus         += node.healPctBonus        * node.scalingFactor;
+            TotalFireAffinity         += Mathf.RoundToInt(node.fireAffinityBonus      * node.scalingFactor);
+            TotalLightningAffinity    += Mathf.RoundToInt(node.lightningAffinityBonus * node.scalingFactor);
+            TotalFrostAffinity        += Mathf.RoundToInt(node.frostAffinityBonus     * node.scalingFactor);
+            TotalHpBonus              += Mathf.RoundToInt(node.hpBonus      * node.scalingFactor);
+            TotalHpRegenBonus         += node.hpRegenBonus   * node.scalingFactor;
+            TotalManaBonus            += Mathf.RoundToInt(node.manaBonus    * node.scalingFactor);
+            TotalManaRegenBonus       += node.manaRegenBonus * node.scalingFactor;
+            TotalArmorBonus           += Mathf.RoundToInt(node.armorBonus   * node.scalingFactor);
+            TotalDodgeChanceBonus     += node.dodgeChanceBonus * node.scalingFactor;
+
+            if (i == 0 && node.unlocksSpell != null)
+                AddSpellToBar(node.unlocksSpell);
+        }
+
+        _nodeLevels[node] = node.maxLevel;
+    }
 
     /// <summary>Grant one skill point (call this from ExperienceManager on level-up).</summary>
     public void AddSkillPoint()
@@ -232,17 +282,18 @@ public class SkillTreeManager : MonoBehaviour
         TotalAgiBonus             += Mathf.RoundToInt(node.agiBonus           * node.scalingFactor);
         TotalIntBonus             += Mathf.RoundToInt(node.intBonus           * node.scalingFactor);
         TotalSpellDamageBonus     += node.spellDamageBonus    * node.scalingFactor;
-        TotalFireDamageBonus      += node.fireDamageBonus     * node.scalingFactor;
         TotalSpellDamagePctBonus  += node.spellDamagePctBonus * node.scalingFactor;
-        TotalFireDamagePctBonus   += node.fireDamagePctBonus  * node.scalingFactor;
         TotalHealBonus               += node.healBonus              * node.scalingFactor;
         TotalHealPctBonus            += node.healPctBonus           * node.scalingFactor;
-        TotalLightningDamageBonus    += node.lightningDamageBonus    * node.scalingFactor;
-        TotalLightningDamagePctBonus += node.lightningDamagePctBonus * node.scalingFactor;
+        TotalFireAffinity            += Mathf.RoundToInt(node.fireAffinityBonus      * node.scalingFactor);
+        TotalLightningAffinity       += Mathf.RoundToInt(node.lightningAffinityBonus * node.scalingFactor);
+        TotalFrostAffinity           += Mathf.RoundToInt(node.frostAffinityBonus     * node.scalingFactor);
         TotalHpBonus                 += Mathf.RoundToInt(node.hpBonus      * node.scalingFactor);
         TotalHpRegenBonus            += node.hpRegenBonus   * node.scalingFactor;
         TotalManaBonus               += Mathf.RoundToInt(node.manaBonus    * node.scalingFactor);
         TotalManaRegenBonus          += node.manaRegenBonus * node.scalingFactor;
+        TotalArmorBonus              += Mathf.RoundToInt(node.armorBonus   * node.scalingFactor);
+        TotalDodgeChanceBonus        += node.dodgeChanceBonus * node.scalingFactor;
 
         Debug.Log($"[SkillTree] '{node.nodeName}' leveled to {newLevel}/{node.maxLevel}. " +
                   $"Points left: {SkillPoints}. Spell bonus total: +{TotalSpellDamageBonus}");
@@ -281,17 +332,18 @@ public class SkillTreeManager : MonoBehaviour
         TotalAgiBonus             = 0;
         TotalIntBonus             = 0;
         TotalSpellDamageBonus     = 0f;
-        TotalFireDamageBonus      = 0f;
         TotalSpellDamagePctBonus  = 0f;
-        TotalFireDamagePctBonus   = 0f;
         TotalHealBonus            = 0f;
         TotalHealPctBonus         = 0f;
-        TotalLightningDamageBonus    = 0f;
-        TotalLightningDamagePctBonus = 0f;
+        TotalFireAffinity         = 0;
+        TotalLightningAffinity    = 0;
+        TotalFrostAffinity        = 0;
         TotalHpBonus              = 0;
         TotalHpRegenBonus         = 0f;
         TotalManaBonus            = 0;
         TotalManaRegenBonus       = 0f;
+        TotalArmorBonus           = 0;
+        TotalDodgeChanceBonus     = 0f;
 
         Debug.Log($"[SkillTree] All nodes refunded. Points restored: {pointsRefunded}. Total: {SkillPoints}");
 

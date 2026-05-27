@@ -103,9 +103,11 @@ public class LootDropAnimation : NetworkBehaviour
     {
         _animating = true;
 
-        // Disable collider and bob/spin so they don't fight the animation.
+        // Disable collider so the pickup can't be collected mid-flight, and suppress
+        // bob/spin so it doesn't fight the parabolic arc. PickupVisual stays enabled so
+        // its Update() can keep the unparented rarity VFX tracking the pickup's X/Z.
         if (_col    != null) _col.enabled    = false;
-        if (_visual != null) _visual.enabled = false;
+        if (_visual != null) _visual.SetBobSpinSuppressed(true);
 
         float elapsed = 0f;
         while (elapsed < duration)
@@ -126,7 +128,14 @@ public class LootDropAnimation : NetworkBehaviour
         transform.position = to;
 
         if (_col    != null) _col.enabled    = true;
-        if (_visual != null) _visual.enabled = true;
+        if (_visual != null)
+        {
+            // Re-raycast ground at the landed position so the VFX snaps to local terrain
+            // height, not whatever ground the enemy died on. Then release bob/spin — the
+            // bob origin is re-captured from the landed transform on the next Update().
+            _visual.RefreshVfxGroundSnap();
+            _visual.SetBobSpinSuppressed(false);
+        }
 
         _animating = false;
     }

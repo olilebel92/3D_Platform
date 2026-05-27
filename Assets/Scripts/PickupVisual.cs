@@ -19,6 +19,9 @@ public class PickupVisual : MonoBehaviour
     [Tooltip("Speed of the bob cycle.")]
     public float bobSpeed = 2f;
 
+    [Tooltip("How far above the spawn point the item floats (added to the bob origin).")]
+    public float spawnHeightOffset = 0.5f;
+
     [Header("Model")]
     [Tooltip("Empty child transform under which the SubType.worldModelPrefab is instanced. " +
              "If null, the model is parented directly to this transform.")]
@@ -39,11 +42,27 @@ public class PickupVisual : MonoBehaviour
     [Tooltip("Optional Light whose colour is tinted by rarity. Leave null to skip.")]
     public Light glowLight;
 
+    [Header("VFX Ground Snap")]
+    [Tooltip("Layers considered 'ground' when snapping the rarity VFX. The VFX is placed at " +
+             "hit.y + rarity.particleYOffset so designers can author it relative to ground.")]
+    public LayerMask vfxGroundMask = ~0;
+
+    [Tooltip("How far down to raycast from above the pickup when looking for the ground surface.")]
+    public float vfxGroundRayLength = 10f;
+
+    [Tooltip("Extra multiplier applied on top of rarity.particleScale when spawning the rarity VFX. " +
+             "1.0 = use the rarity's scale as-is. Bump this to make all rarity VFX bigger without " +
+             "editing every RarityData asset.")]
+    public float vfxScaleMultiplier = 1.4f;
+
     // ─── Internal ─────────────────────────────────────────────────────────────
     private Vector3 _startPosition;
     private bool _bobOriginCaptured;
     private GameObject _spawnedModel;
     private GameObject _spawnedRarityParticles;
+    private float _spawnedRarityParticlesGroundY;
+    private float _spawnedRarityParticlesYOffset;
+    private bool _bobSpinSuppressed;
     private MaterialPropertyBlock _mpb;
     private static readonly int EmissionColorId = Shader.PropertyToID("_EmissionColor");
 
@@ -58,15 +77,69 @@ public class PickupVisual : MonoBehaviour
 
     void Update()
     {
-        if (!_bobOriginCaptured)
+        // Bob/spin is suppressed by LootDropAnimation during the drop arc so it doesn't
+        // fight the parabolic motion. The VFX-follow block below still runs every frame
+        // so the rarity particles track the pickup's X/Z through the entire animation.
+        if (!_bobSpinSuppressed)
         {
-            _startPosition = transform.position;
-            _bobOriginCaptured = true;
+            if (!_bobOriginCaptured)
+            {
+                _startPosition = transform.position + new Vector3(0f, spawnHeightOffset, 0f);
+                _bobOriginCaptured = true;
+            }
+
+            transform.Rotate(0f, rotateSpeed * Time.deltaTime, 0f);
+            float newY = _startPosition.y + Mathf.Sin(Time.time * bobSpeed) * bobHeight;
+            transform.position = new Vector3(transform.position.x, newY, transform.position.z);
         }
 
-        transform.Rotate(0f, rotateSpeed * Time.deltaTime, 0f);
-        float newY = _startPosition.y + Mathf.Sin(Time.time * bobSpeed) * bobHeight;
-        transform.position = new Vector3(transform.position.x, newY, transform.position.z);
+        // VFX is unparented (so it doesn't inherit the bob), but it should still follow
+        // the pickup's X/Z — even during the drop animation. Y stays pinned to the snapped
+        // ground level (refreshed by RefreshVfxGroundSnap when the pickup lands).
+        if (_spawnedRarityParticles != null)
+        {
+            _spawnedRarityParticles.transform.position = new Vector3(
+                transform.position.x,
+                _spawnedRarityParticlesGroundY,
+                transform.position.z);
+        }
+    }
+
+    // ─── Drop-Animation Coordination ──────────────────────────────────────────
+
+    /// <summary>
+    /// Called by LootDropAnimation to suppress the bob/spin transform writes during the
+    /// parabolic arc without disabling the whole component (so VFX-follow keeps running).
+    /// On release (true → false) the bob origin is re-captured from the landed position.
+    /// </summary>
+    public void SetBobSpinSuppressed(bool suppressed)
+    {
+        if (_bobSpinSuppressed && !suppressed)
+            _bobOriginCaptured = false;
+        _bobSpinSuppressed = suppressed;
+    }
+
+    /// <summary>
+    /// Re-runs the downward ground raycast from the current transform position and updates
+    /// the VFX's pinned Y. Called by LootDropAnimation right after the pickup lands, so the
+    /// VFX snaps to the actual terrain elevation at the scatter target instead of the
+    /// terrain elevation at the enemy's death position.
+    /// </summary>
+    public void RefreshVfxGroundSnap()
+    {
+        if (_spawnedRarityParticles == null) return;
+        _spawnedRarityParticlesGroundY = RaycastGroundY() + _spawnedRarityParticlesYOffset;
+    }
+
+    private float RaycastGroundY()
+    {
+        Vector3 rayOrigin = transform.position + Vector3.up * 0.5f;
+        if (Physics.Raycast(rayOrigin, Vector3.down, out RaycastHit hit,
+                            vfxGroundRayLength + 0.5f, vfxGroundMask, QueryTriggerInteraction.Ignore))
+        {
+            return hit.point.y;
+        }
+        return transform.position.y;
     }
 
     // ─── Apply Item-Specific Visuals ──────────────────────────────────────────
@@ -128,12 +201,26 @@ public class PickupVisual : MonoBehaviour
 
         if (rarity.particlePrefab != null)
         {
-            Transform parent = modelAnchor != null ? modelAnchor : transform;
-            _spawnedRarityParticles = Instantiate(rarity.particlePrefab, parent);
-            _spawnedRarityParticles.transform.localPosition = new Vector3(0f, rarity.particleYOffset, 0f);
-            _spawnedRarityParticles.transform.localRotation = Quaternion.identity;
-            _spawnedRarityParticles.transform.localScale = Vector3.one * Mathf.Max(0.01f, rarity.particleScale);
+            // VFX is intentionally NOT parented to the pickup: the pickup transform bobs and
+            // sits spawnHeightOffset above the ground, but the VFX should stay pinned to
+            // the ground (raycast down, then add rarity.particleYOffset) so designers can
+            // author it at e.g. Y=0.05 relative to whatever terrain it lands on.
+            _spawnedRarityParticles = Instantiate(rarity.particlePrefab);
+            _spawnedRarityParticlesYOffset = rarity.particleYOffset;
+            _spawnedRarityParticlesGroundY = RaycastGroundY() + _spawnedRarityParticlesYOffset;
+            _spawnedRarityParticles.transform.position = new Vector3(
+                transform.position.x,
+                _spawnedRarityParticlesGroundY,
+                transform.position.z);
+            _spawnedRarityParticles.transform.rotation = Quaternion.identity;
+            _spawnedRarityParticles.transform.localScale = Vector3.one * Mathf.Max(0.01f, rarity.particleScale) * Mathf.Max(0.01f, vfxScaleMultiplier);
         }
+    }
+
+    void OnDestroy()
+    {
+        // VFX is unparented, so it won't be destroyed with the pickup automatically.
+        if (_spawnedRarityParticles != null) Destroy(_spawnedRarityParticles);
     }
 
     private void ClearSpawnedVisuals()

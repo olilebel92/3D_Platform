@@ -65,6 +65,15 @@ public struct RolledLoot : INetworkSerializable, System.IEquatable<RolledLoot>
     public override int GetHashCode() => System.HashCode.Combine(itemGuid, subTypeGuid, rarityGuid, statsSerialized);
 }
 
+/// <summary>Maps one RarityData to a relative drop weight for the Items pool picker.</summary>
+[System.Serializable]
+public class RarityWeight
+{
+    public RarityData rarity;
+    [Min(0f), Tooltip("Relative drop weight — higher = more likely. Does not need to sum to 100.")]
+    public float weight = 1f;
+}
+
 /// <summary>
 /// General-purpose ground pickup. Select a LootType in the Inspector
 /// to configure only the fields that apply to that reward.
@@ -88,8 +97,15 @@ public class LootPickup : NetworkBehaviour
     public LootType lootType = LootType.XPReward;
 
     // ─── XP ───────────────────────────────────────────────────────────────────
-    [Tooltip("Amount of XP granted to the collecting player on pickup.")]
+    [Tooltip("Flat: grants a fixed XP amount. Percent: grants a % of XP required for the next level. Both: applies flat then percent on top.")]
+    public RestoreMode xpRestoreMode = RestoreMode.Flat;
+
+    [Tooltip("Flat amount of XP granted on pickup.")]
     public int xpReward = 25;
+
+    [Tooltip("Percentage of XP-to-next-level granted on pickup (0–100).")]
+    [Range(0, 100)]
+    public float xpRestorePercent = 10f;
 
     [Tooltip("Scales xpReward with wave number: final XP = xpReward × (1 + xpWaveScale × currentWave). " +
              "Set 0 to keep flat XP. e.g. 0.5 = +50% XP per wave.")]
@@ -125,6 +141,10 @@ public class LootPickup : NetworkBehaviour
     [Tooltip("Pool of ItemData. One entry is chosen at random on spawn and added to the player's inventory. " +
              "The random pick is rolled on the server in multiplayer so every client agrees on the outcome.")]
     public List<ItemData> itemPool = new();
+
+    [Tooltip("Per-rarity weights for the Items pool. Leave empty for equal chance. " +
+             "Weights are relative — e.g. 70 / 25 / 5 gives 70 % Epic, 25 % Legendary, 5 % Godly.")]
+    public List<RarityWeight> rarityWeights = new();
 
     // ─── Random Item ──────────────────────────────────────────────────────────
     [Tooltip("RandomItem only: overrides the wave used for rarity scaling. Set < 1 to use WaveManager.CurrentWave.")]
@@ -167,16 +187,11 @@ public class LootPickup : NetworkBehaviour
     [Tooltip("Tint of the interaction label text.")]
     public Color interactionLabelColor = Color.white;
 
-    // ─── Tooltip (LootType.Items only) ────────────────────────────────────────
-    [Header("Stats Tooltip (Items only)")]
-    [Tooltip("World-vertical offset for the stats tooltip label below the interaction prompt.")]
-    public float tooltipLabelHeight = 0.6f;
+    [Tooltip("Extra world units above the interaction label where the stats label floats.")]
+    public float statsLabelOffset = 0.55f;
 
-    [Tooltip("World-space font size of the stats tooltip.")]
-    public float tooltipLabelFontSize = 0.9f;
-
-    [Tooltip("Tint of the stats tooltip text.")]
-    public Color tooltipLabelColor = new Color(0.85f, 0.85f, 0.85f, 1f);
+    [Tooltip("World-space font size of the stats label (smaller than the interaction label).")]
+    public float statsLabelFontSize = 0.85f;
 
     // ─── Pre-Init (inventory drop support) ───────────────────────────────────
     // Set via PreInitDroppedItem before Spawn so dropped items work in both SP and MP.
@@ -184,7 +199,8 @@ public class LootPickup : NetworkBehaviour
     private ItemData   _soloPreInitItem; // SP fallback: direct reference, no ItemGenerator needed
 
     // ─── Internal ─────────────────────────────────────────────────────────────
-    private bool _collected = false;
+    private bool _collected    = false;
+    private bool _isMouseHovered = false;
 
     // RandomItem: fully generated at spawn so the tooltip shows real stats.
     // Set on server in RollLootLocally(); reconstructed on clients from synced RolledLoot data.
@@ -201,7 +217,7 @@ public class LootPickup : NetworkBehaviour
     private bool RequiresInteraction => lootType == LootType.Items || lootType == LootType.RandomItem;
 
     private TextMeshPro _interactionLabel;
-    private TextMeshPro _tooltipLabel;
+    private TextMeshPro _statsLabel;
     private GameObject  _localOwnerInRange;
     private InputAction _interactAction;
 
@@ -239,7 +255,7 @@ public class LootPickup : NetworkBehaviour
         if (RequiresInteraction)
         {
             CreateInteractionLabel();
-            CreateTooltipLabel();
+            CreateStatsLabel();
         }
     }
 
@@ -281,11 +297,11 @@ public class LootPickup : NetworkBehaviour
             // pickups (player drops, enemy ItemPool drops) behave correctly on clients.
             lootType = _netLootType.Value;
 
-            // Awake ran with the prefab-default lootType — create interaction labels now if needed.
-            if (RequiresInteraction)
+            // Awake ran with the prefab-default lootType — create interaction label now if needed.
+            if (RequiresInteraction && _interactionLabel == null)
             {
-                if (_interactionLabel == null) CreateInteractionLabel();
-                if (_tooltipLabel == null)     CreateTooltipLabel();
+                CreateInteractionLabel();
+                CreateStatsLabel();
             }
 
             // Initial NetworkVariable state is already populated on the client by the time
@@ -392,7 +408,7 @@ public class LootPickup : NetworkBehaviour
         if (RequiresInteraction && _localOwnerInRange != null)
         {
             if (_interactionLabel != null) _interactionLabel.text = BuildInteractionText();
-            if (_tooltipLabel != null)     _tooltipLabel.text     = BuildTooltipText();
+            RefreshStatsLabel();
         }
     }
 
@@ -420,20 +436,38 @@ public class LootPickup : NetworkBehaviour
         obj.SetActive(false);
     }
 
-    private void CreateTooltipLabel()
+    private void ShowInteractionPrompt()
     {
-        GameObject obj = new GameObject("StatsTooltip");
+        if (_interactionLabel != null)
+        {
+            _interactionLabel.text = BuildInteractionText();
+            _interactionLabel.gameObject.SetActive(true);
+        }
+        RefreshStatsLabel();
+    }
+
+    private void HideInteractionPrompt()
+    {
+        if (_interactionLabel != null) _interactionLabel.gameObject.SetActive(false);
+        if (_statsLabel       != null) _statsLabel.gameObject.SetActive(false);
+        ItemTooltip.Instance?.Hide();
+    }
+
+    private void CreateStatsLabel()
+    {
+        GameObject obj = new GameObject("StatsLabel");
         obj.transform.SetParent(transform, worldPositionStays: false);
-        obj.transform.localPosition = new Vector3(0f, tooltipLabelHeight, 0f);
+        obj.transform.localPosition = new Vector3(0f, interactionLabelHeight + statsLabelOffset, 0f);
         obj.transform.localRotation = Quaternion.identity;
 
-        _tooltipLabel = obj.AddComponent<TextMeshPro>();
-        _tooltipLabel.fontSize  = tooltipLabelFontSize;
-        _tooltipLabel.color     = tooltipLabelColor;
-        _tooltipLabel.alignment = TextAlignmentOptions.Center;
-        _tooltipLabel.text      = "";
+        _statsLabel = obj.AddComponent<TextMeshPro>();
+        _statsLabel.fontSize  = statsLabelFontSize;
+        _statsLabel.color     = Color.white;
+        _statsLabel.alignment = TextAlignmentOptions.Center;
+        _statsLabel.fontStyle = FontStyles.Normal;
+        _statsLabel.text      = "";
 
-        MeshRenderer mr = _tooltipLabel.GetComponent<MeshRenderer>();
+        MeshRenderer mr = _statsLabel.GetComponent<MeshRenderer>();
         if (mr != null) mr.sortingOrder = 20000;
 
         int hudLayer = LayerMask.NameToLayer("HudOverlay");
@@ -442,25 +476,53 @@ public class LootPickup : NetworkBehaviour
         obj.SetActive(false);
     }
 
-    private void ShowInteractionPrompt()
+    // Populates and shows the world-space stats label from the currently rolled item.
+    // Hides the label (keeps it dormant) when there's no resolvable item yet.
+    private void RefreshStatsLabel()
     {
-        if (_interactionLabel != null)
+        if (_statsLabel == null) return;
+        ItemData item = ResolveCurrentItem();
+        if (item == null)
         {
-            _interactionLabel.text = BuildInteractionText();
-            _interactionLabel.gameObject.SetActive(true);
+            _statsLabel.gameObject.SetActive(false);
+            return;
         }
-        if (_tooltipLabel != null)
-        {
-            _tooltipLabel.text = BuildTooltipText();
-            _tooltipLabel.gameObject.SetActive(true);
-        }
+        _statsLabel.text = BuildStatsText(item);
+        _statsLabel.gameObject.SetActive(true);
     }
 
-    private void HideInteractionPrompt()
+    private string BuildStatsText(ItemData item)
     {
-        if (_interactionLabel != null) _interactionLabel.gameObject.SetActive(false);
-        if (_tooltipLabel != null)     _tooltipLabel.gameObject.SetActive(false);
+        string subHeader = item.subType != null
+            ? $"<size=90%><color=#CCCCCC>{item.subType.displayName}</color></size>\n"
+            : "";
+        return subHeader + item.BuildStatSummary();
     }
+
+    // Mouse hover only — proximity uses the world-space _statsLabel instead.
+    private void ShowHoverTooltip()
+    {
+        ItemData item = ResolveCurrentItem();
+        if (item == null || ItemTooltip.Instance == null) return;
+
+        Vector2 screenPos = Mouse.current != null
+            ? Mouse.current.position.ReadValue()
+            : new Vector2(Screen.width * 0.5f, Screen.height * 0.5f);
+
+        ItemTooltip.Instance.Show(item, screenPos);
+    }
+
+    private ItemData ResolveCurrentItem()
+    {
+        return lootType switch
+        {
+            LootType.RandomItem => _generatedItem,
+            LootType.Material   => itemReward,
+            LootType.Items      => FindItemInPoolByGuid(CurrentRoll.itemGuid),
+            _                   => null
+        };
+    }
+
 
     private string BuildInteractionText()
     {
@@ -489,26 +551,17 @@ public class LootPickup : NetworkBehaviour
         return "[F] Pick up\nItem";
     }
 
-    private string BuildTooltipText()
-    {
-        if (lootType == LootType.RandomItem)
-            return _generatedItem != null ? _generatedItem.BuildStatSummary() : "";
-
-        ItemData pooled = FindItemInPoolByGuid(CurrentRoll.itemGuid);
-        return pooled != null ? pooled.BuildStatSummary() : "";
-    }
 
     void LateUpdate()
     {
-        // Billboard both labels toward the local camera.
+        // Billboard the interaction + stats labels toward the local camera.
         Camera cam = Camera.main;
         if (cam == null) return;
-        Quaternion rot = Quaternion.LookRotation(cam.transform.forward);
-
+        Quaternion lookRot = Quaternion.LookRotation(cam.transform.forward);
         if (_interactionLabel != null && _interactionLabel.gameObject.activeSelf)
-            _interactionLabel.transform.rotation = rot;
-        if (_tooltipLabel != null && _tooltipLabel.gameObject.activeSelf)
-            _tooltipLabel.transform.rotation = rot;
+            _interactionLabel.transform.rotation = lookRot;
+        if (_statsLabel != null && _statsLabel.gameObject.activeSelf)
+            _statsLabel.transform.rotation = lookRot;
     }
 
     // ─── Trigger ──────────────────────────────────────────────────────────────
@@ -573,12 +626,47 @@ public class LootPickup : NetworkBehaviour
 
         // Refocus on the next closest pickup still in range (if any).
         RefreshLocalFocus(other.gameObject);
+
+        // If mouse is still over the item, restore hover tooltip.
+        if (_isMouseHovered) ShowHoverTooltip();
+    }
+
+    private bool CheckMouseHover()
+    {
+        if (Camera.main == null || Mouse.current == null) return false;
+        Ray ray = Camera.main.ScreenPointToRay(Mouse.current.position.ReadValue());
+
+        // Test against the spawned model's renderers so hover matches the visual footprint,
+        // not the larger proximity trigger sphere (pickupRadius = 0.8f).
+        if (_visual != null)
+        {
+            foreach (Renderer r in _visual.GetComponentsInChildren<Renderer>())
+            {
+                if (r is ParticleSystemRenderer) continue;
+                if (r.bounds.IntersectRay(ray)) return true;
+            }
+        }
+        return false;
     }
 
     void Update()
     {
-        // Only the focused pickup listens for the Interact input.
         if (!RequiresInteraction || _collected) return;
+
+        // Mouse hover: show screen-space tooltip when player is NOT in proximity.
+        if (_localOwnerInRange == null)
+        {
+            bool nowHovered = CheckMouseHover();
+            if (nowHovered && !_isMouseHovered)  ShowHoverTooltip();
+            if (!nowHovered && _isMouseHovered)  ItemTooltip.Instance?.Hide();
+            _isMouseHovered = nowHovered;
+        }
+        else
+        {
+            _isMouseHovered = false;
+        }
+
+        // Only the focused pickup listens for the Interact input.
         if (_localFocused != this) return;
 
         // Tab cycles to the next nearby pickup when multiple items overlap.
@@ -661,7 +749,47 @@ public class LootPickup : NetworkBehaviour
     {
         if (lootType != LootType.Items) return -1;
         if (itemPool == null || itemPool.Count == 0) return -1;
-        return Random.Range(0, itemPool.Count);
+
+        // Flat roll when no weights are configured.
+        if (rarityWeights == null || rarityWeights.Count == 0)
+            return Random.Range(0, itemPool.Count);
+
+        // Build total weight — only count rarities that actually appear in the pool.
+        float total = 0f;
+        foreach (var rw in rarityWeights)
+        {
+            if (rw == null || rw.rarity == null || rw.weight <= 0f) continue;
+            foreach (var item in itemPool)
+                if (item != null && item.rarity == rw.rarity) { total += rw.weight; break; }
+        }
+
+        if (total <= 0f) return Random.Range(0, itemPool.Count);
+
+        // Pick a rarity.
+        float roll = Random.Range(0f, total);
+        float acc  = 0f;
+        RarityData chosen = null;
+        foreach (var rw in rarityWeights)
+        {
+            if (rw == null || rw.rarity == null || rw.weight <= 0f) continue;
+            bool hasItem = false;
+            foreach (var item in itemPool)
+                if (item != null && item.rarity == rw.rarity) { hasItem = true; break; }
+            if (!hasItem) continue;
+            acc += rw.weight;
+            if (roll <= acc) { chosen = rw.rarity; break; }
+        }
+
+        if (chosen == null) return Random.Range(0, itemPool.Count);
+
+        // Pick uniformly from pool items of the chosen rarity.
+        var candidates = new List<int>();
+        for (int i = 0; i < itemPool.Count; i++)
+            if (itemPool[i] != null && itemPool[i].rarity == chosen) candidates.Add(i);
+
+        return candidates.Count > 0
+            ? candidates[Random.Range(0, candidates.Count)]
+            : Random.Range(0, itemPool.Count);
     }
 
     private ItemData FindItemInPoolByGuid(FixedString64Bytes guid)
@@ -682,10 +810,17 @@ public class LootPickup : NetworkBehaviour
                 ExperienceManager xp = playerObj.GetComponent<ExperienceManager>();
                 if (xp != null)
                 {
-                    int finalXP = xpReward;
-                    if (xpWaveScale > 0f && WaveManager.Instance != null)
-                        finalXP = Mathf.Max(1, Mathf.RoundToInt(xpReward * (1f + xpWaveScale * WaveManager.Instance.CurrentWave)));
-                    xp.GainXP(finalXP);
+                    int totalXP = 0;
+                    if (xpRestoreMode == RestoreMode.Flat || xpRestoreMode == RestoreMode.Both)
+                    {
+                        int flatXP = xpReward;
+                        if (xpWaveScale > 0f && WaveManager.Instance != null)
+                            flatXP = Mathf.Max(1, Mathf.RoundToInt(xpReward * (1f + xpWaveScale * WaveManager.Instance.CurrentWave)));
+                        totalXP += flatXP;
+                    }
+                    if (xpRestoreMode == RestoreMode.Percent || xpRestoreMode == RestoreMode.Both)
+                        totalXP += Mathf.Max(1, Mathf.RoundToInt(xp.xpToNextLevel * (xpRestorePercent / 100f)));
+                    if (totalXP > 0) xp.GainXP(totalXP);
                 }
                 else Debug.LogWarning("[LootPickup] No ExperienceManager on collecting player.");
                 break;
@@ -862,7 +997,7 @@ public class LootPickup : NetworkBehaviour
 
         // Awake() ran before lootType was set, so labels weren't created — create them now.
         if (_interactionLabel == null) CreateInteractionLabel();
-        if (_tooltipLabel     == null) CreateTooltipLabel();
+        if (_statsLabel       == null) CreateStatsLabel();
     }
 
     /// <summary>

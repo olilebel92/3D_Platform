@@ -18,7 +18,7 @@ MonoBehaviour:
     Cooldown: {cooldown}s.
 
     Rank
-    Up: +{rankBonus} damage and +5% Fire Damage.'
+    Up: +{rankBonus} damage and +1 Fire affinity.'
   icon: {fileID: 21300000, guid: 4b1d2e25305a2a546962a888fede5982, type: 3}
   cost: 2
   prerequisites:
@@ -34,12 +34,13 @@ MonoBehaviour:
   manaBonus: 0
   manaRegenBonus: 0
   spellDamageBonus: 0
-  fireDamageBonus: 0
   healBonus: 0
+  armorBonus: 0
+  dodgeChanceBonus: 0
   spellDamagePctBonus: 0
-  fireDamagePctBonus: 0.05
   healPctBonus: 0
-  lightningDamageBonus: 0
-  lightningDamagePctBonus: 0
+  fireAffinityBonus: 1
+  lightningAffinityBonus: 0
+  frostAffinityBonus: 0
   requiresAnySpell: 0
   unlocksSpell: {fileID: 11400000, guid: 4b1f89da9991a3f47853bd5be20165ff, type: 2}

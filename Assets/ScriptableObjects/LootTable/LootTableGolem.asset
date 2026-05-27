@@ -15,9 +15,16 @@ MonoBehaviour:
   entries:
   - entryType: 2
     dropChance: 0.1
-    minCount: 1
+    minCount: 0
     maxCount: 2
     prefab: {fileID: 0}
     lootPickupPrefab: {fileID: 7768051679512440843, guid: cea42df6b532a144d8c8db76be24f0c3, type: 3}
+    itemPool: []
+  - entryType: 0
+    dropChance: 0.2
+    minCount: 0
+    maxCount: 2
+    prefab: {fileID: 7768051679512440843, guid: b42ce63631fde79419782a6b54050914, type: 3}
+    lootPickupPrefab: {fileID: 0}
     itemPool: []
   maxDrops: 0

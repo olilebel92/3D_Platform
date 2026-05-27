@@ -36,6 +36,9 @@ public class DamagePopupManager : MonoBehaviour
     [Tooltip("Color for the Level Up popup.")]
     public Color levelUpColor = new Color(1f, 0.85f, 0f);  // gold
 
+    [Tooltip("Color for the Dodge popup.")]
+    public Color dodgeColor = new Color(0.4f, 0.8f, 1f);   // light blue
+
     [Header("Text Size")]
     [Tooltip("Font size for damage dealt by the player.")]
     public float dealFontSize = 6f;
@@ -54,6 +57,9 @@ public class DamagePopupManager : MonoBehaviour
 
     [Tooltip("Font size for the Level Up popup.")]
     public float levelUpFontSize = 10f;
+
+    [Tooltip("Font size for the Dodge popup.")]
+    public float dodgeFontSize = 7f;
 
     [Header("Spawn Offset")]
     [Tooltip("Height above the damaged object's origin where the popup appears.")]
@@ -174,6 +180,24 @@ public class DamagePopupManager : MonoBehaviour
         DamagePopup popup = obj.GetComponent<DamagePopup>();
         if (popup != null)
             popup.Initialize(amount, xpColor, xpFontSize, suffix: " EXP",
+                font: popupFont, moveDelay: moveDelay, holdDuration: holdDuration, fadeDuration: fadeDuration,
+                outlineColor: outlineColor, outlineWidth: outlineWidth);
+    }
+
+    /// <summary>
+    /// Spawns a floating "DODGE" label above the target position.
+    /// </summary>
+    public void ShowDodge(Vector3 worldPosition)
+    {
+        if (popupPrefab == null) return;
+
+        Vector3 spawnPos = worldPosition + Vector3.up * heightOffset;
+        GameObject obj = Instantiate(popupPrefab, spawnPos, Quaternion.identity);
+        if (_hudOverlayLayer >= 0) obj.layer = _hudOverlayLayer;
+
+        DamagePopup popup = obj.GetComponent<DamagePopup>();
+        if (popup != null)
+            popup.InitializeText("DODGE", dodgeColor, dodgeFontSize,
                 font: popupFont, moveDelay: moveDelay, holdDuration: holdDuration, fadeDuration: fadeDuration,
                 outlineColor: outlineColor, outlineWidth: outlineWidth);
     }

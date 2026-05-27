@@ -71,6 +71,7 @@ public class SpellCaster : NetworkBehaviour
     private SpellData _active            = null;
     private float     _castStartTime     = 0f;
     private bool      _throwEventFired   = false;
+    private bool      _manaSpentThisCast = false;
     private Transform _walkTarget        = null; // enemy being approached in WalkingToTarget
     private float     _lastNoManaFeedbackTime = -10f;
 
@@ -217,6 +218,10 @@ public class SpellCaster : NetworkBehaviour
 
         // Cancelled cast — remove the cooldown so the player isn't penalised.
         if (_active != null) _cooldownEndTimes.Remove(_active);
+
+        // Release any reservation made by BeginCast so no mana is consumed on cancel.
+        if (_mana != null) _mana.ClearReservedMana();
+        _manaSpentThisCast = false;
 
         _state  = CastState.Idle;
         _timer  = 0f;
@@ -417,7 +422,8 @@ public class SpellCaster : NetworkBehaviour
 
                     // Channel spells only fire immediately on cast complete if fireOnChannelStart
                     // is explicitly enabled. Otherwise the first effect fires on the first tick.
-                    if (!isChannel || _active.fireOnChannelStart)
+                    bool firedOnStart = !isChannel || _active.fireOnChannelStart;
+                    if (firedOnStart)
                         FireSpell();
 
                     if (isChannel)
@@ -425,6 +431,10 @@ public class SpellCaster : NetworkBehaviour
                         _state = CastState.Channeling;
                         _timer = _active.channelTickRate;
                         OnChannelBegin?.Invoke(_active);
+                        // If we fired the first tick already, reserve for the next one so
+                        // the lighter chunk stays visible during the inter-tick wait.
+                        // Otherwise the initial BeginCast reservation covers the first tick.
+                        if (firedOnStart) TryReserveNextChannelTick();
                     }
                     else
                     {
@@ -441,6 +451,8 @@ public class SpellCaster : NetworkBehaviour
                 {
                     StopChannel();
                     _telegraphProjector?.Hide();
+                    if (_mana != null) _mana.ClearReservedMana();
+                    _manaSpentThisCast = false;
                     _state  = CastState.Idle;
                     _active = null;
                     OnChannelEnd?.Invoke();
@@ -450,9 +462,14 @@ public class SpellCaster : NetworkBehaviour
                 _timer -= Time.deltaTime;
                 if (_timer <= 0f)
                 {
+                    // Fire the tick — FireSpell() spends whatever's currently reserved.
                     FireSpell();
                     OnChannelTick?.Invoke();
                     _timer = _active?.channelTickRate ?? 0.5f;
+
+                    // Reserve the NEXT tick's cost so the lighter-blue chunk reappears
+                    // during the inter-tick wait. Ends the channel if the player can't afford it.
+                    if (!TryReserveNextChannelTick()) break;
                 }
                 break;
         }
@@ -484,13 +501,15 @@ public class SpellCaster : NetworkBehaviour
         {
             // castStartDelay only — instant-fire after windup
             bool isChannel = _active != null && _active.spellType == SpellType.Channel;
-            if (!isChannel || _active.fireOnChannelStart)
+            bool firedOnStart = !isChannel || _active.fireOnChannelStart;
+            if (firedOnStart)
                 FireSpell();
             if (isChannel)
             {
                 _state = CastState.Channeling;
                 _timer = _active.channelTickRate;
                 OnChannelBegin?.Invoke(_active);
+                if (firedOnStart) TryReserveNextChannelTick();
             }
             else
             {
@@ -523,9 +542,10 @@ public class SpellCaster : NetworkBehaviour
             return;
         }
 
-        if (_mana != null && spell.manaCost > 0f && !_mana.SpendMana(spell.manaCost))
+        float effectiveManaCost = GetEffectiveManaCost(spell);
+        if (_mana != null && effectiveManaCost > 0f && !_mana.HasMana(effectiveManaCost))
         {
-            Debug.Log($"[SpellCaster] Not enough mana for {spell.spellName} (cost {spell.manaCost}, have {_mana.CurrentMana:0.#}).");
+            Debug.Log($"[SpellCaster] Not enough mana for {spell.spellName} (cost {effectiveManaCost:0.#}, have {_mana.CurrentMana:0.#}).");
             if (Time.time - _lastNoManaFeedbackTime >= 0.6f)
             {
                 _lastNoManaFeedbackTime = Time.time;
@@ -538,6 +558,13 @@ public class SpellCaster : NetworkBehaviour
         // Any active state is cancelled before starting a new spell.
         if (_state != CastState.Idle)
             CancelCast();
+
+        // Reserve the mana cost — shown as a lighter-blue chunk on the bar until FireSpell()
+        // actually spends it (or CancelCast() releases it). Reservation only kicks in for
+        // costed spells, so free spells don't allocate or flicker the bar.
+        if (_mana != null && effectiveManaCost > 0f)
+            _mana.ReserveMana(effectiveManaCost);
+        _manaSpentThisCast = false;
 
         // Target-locked spells enter targeting mode — cooldown starts only after target is confirmed.
         if (spell.spellType == SpellType.TargetLocked)
@@ -602,13 +629,15 @@ public class SpellCaster : NetworkBehaviour
 
         // Instant cast (no delay, no cast time)
         bool instantIsChannel = spell.spellType == SpellType.Channel;
-        if (!instantIsChannel || spell.fireOnChannelStart)
+        bool instantFiredOnStart = !instantIsChannel || spell.fireOnChannelStart;
+        if (instantFiredOnStart)
             FireSpell();
         if (instantIsChannel)
         {
             _state = CastState.Channeling;
             _timer = spell.channelTickRate;
             OnChannelBegin?.Invoke(spell);
+            if (instantFiredOnStart) TryReserveNextChannelTick();
         }
         else
         {
@@ -619,9 +648,50 @@ public class SpellCaster : NetworkBehaviour
         }
     }
 
+    /// <summary>
+    /// Reserves the next channel tick's mana cost so the lighter-blue chunk reappears
+    /// during the inter-tick wait. Resets _manaSpentThisCast so the next FireSpell()
+    /// call consumes the new reservation. Returns false (and ends the channel cleanly)
+    /// if the player can no longer afford another tick.
+    /// </summary>
+    bool TryReserveNextChannelTick()
+    {
+        if (_active == null) return false;
+        float tickCost = GetEffectiveManaCost(_active);
+        if (tickCost <= 0f) return true;          // free channel — nothing to reserve
+        if (_mana == null) return true;
+
+        if (!_mana.HasMana(tickCost))
+        {
+            // Out of mana — end the channel cleanly (same teardown as a normal release).
+            StopChannel();
+            _telegraphProjector?.Hide();
+            _mana.ClearReservedMana();
+            _state  = CastState.Idle;
+            _active = null;
+            _manaSpentThisCast = false;
+            OnChannelEnd?.Invoke();
+            DebugLogger.Log(DebugLogger.Category.SpellCast, "Channel ended — out of mana.");
+            return false;
+        }
+
+        _mana.ReserveMana(tickCost);
+        _manaSpentThisCast = false;
+        return true;
+    }
+
     void FireSpell()
     {
         if (_active == null || _active.prefab == null) return;
+
+        // Spend the reserved mana the moment the spell actually fires.
+        // _manaSpentThisCast is reset by TryReserveNextChannelTick() for channel spells,
+        // so each tick spends its own reservation. Non-channel spells fire once.
+        if (!_manaSpentThisCast && _mana != null && GetEffectiveManaCost(_active) > 0f)
+        {
+            _mana.SpendReservedMana();
+            _manaSpentThisCast = true;
+        }
 
         Transform origin = firePoint != null ? firePoint : transform;
         int       count  = Mathf.Max(1, _active.projectileCount);
@@ -991,30 +1061,36 @@ public class SpellCaster : NetworkBehaviour
         return rots;
     }
 
+    float GetEffectiveManaCost(SpellData spell)
+    {
+        int rank = SkillTreeManager.Instance?.GetSpellRank(spell) ?? 0;
+        return spell.GetManaCost(rank);
+    }
+
     float ComputeRawDamage(SpellData spell, int spellRank = 0)
     {
         float baseDmg = spell.BaseDamage + Mathf.Max(0, spellRank - 1) * spell.damagePerSkillRank;
 
-        bool isFire      = spell.school == SpellSchool.Fire;
-        bool isHeal      = spell.school == SpellSchool.Healing;
-        bool isLightning = spell.school == SpellSchool.Lightning;
+        bool isHeal = spell.school == SpellSchool.Healing;
 
-        float spellBonus       = SkillTreeManager.Instance?.TotalSpellDamageBonus      ?? 0f;
-        float fireBonus        = isFire      ? (SkillTreeManager.Instance?.TotalFireDamageBonus         ?? 0f) : 0f;
-        float firePctBonus     = isFire      ? (SkillTreeManager.Instance?.TotalFireDamagePctBonus      ?? 0f) : 0f;
-        float healBonus        = isHeal      ? (SkillTreeManager.Instance?.TotalHealBonus               ?? 0f) : 0f;
-        float healPctBonus     = isHeal      ? (SkillTreeManager.Instance?.TotalHealPctBonus            ?? 0f) : 0f;
-        float lightningBonus   = isLightning ? (SkillTreeManager.Instance?.TotalLightningDamageBonus    ?? 0f) : 0f;
-        float lightningPct     = isLightning ? (SkillTreeManager.Instance?.TotalLightningDamagePctBonus ?? 0f) : 0f;
-        float intMult          = ExperienceManager.Instance?.SpellDamageMultiplier ?? 1f;
+        float spellBonus   = SkillTreeManager.Instance?.TotalSpellDamageBonus    ?? 0f;
+        float healBonus    = isHeal ? (SkillTreeManager.Instance?.TotalHealBonus    ?? 0f) : 0f;
+        float healPctBonus = isHeal ? (SkillTreeManager.Instance?.TotalHealPctBonus ?? 0f) : 0f;
+        float intMult      = ExperienceManager.Instance?.SpellDamageMultiplier   ?? 1f;
 
         // Equipment bonuses — only valid on the owner's client (singleplayer or pre-server-RPC path)
-        float equipSpell = PlayerInventory.Instance?.TotalBonusSpellPower  ?? 0f;
-        float equipFire  = isFire ? (PlayerInventory.Instance?.TotalBonusFireDamage ?? 0f) : 0f;
+        float equipSpell = PlayerInventory.Instance?.TotalBonusSpellPower ?? 0f;
 
-        // Formula: (Base + flat bonuses) × INT multiplier × (1 + school%)
-        return (baseDmg + spellBonus + equipSpell + fireBonus + equipFire + healBonus + lightningBonus)
-               * intMult * (1f + firePctBonus + healPctBonus + lightningPct);
+        // Affinity: per-element % damage bonus (uncapped). Equipment + skill tree are summed
+        // by PlayerInventory.GetAffinity. Heal/Arcane return 0 and contribute nothing.
+        int   affinity     = PlayerInventory.Instance?.GetAffinity(spell.school) ?? 0;
+        float affinityMult = 1f + affinity / 100f;
+
+        // Formula: (Base + flat bonuses) × INT × (1 + heal%) × (1 + affinity/100)
+        return (baseDmg + spellBonus + equipSpell + healBonus)
+               * intMult
+               * (1f + healPctBonus)
+               * affinityMult;
     }
 
     bool IsCastHeld()

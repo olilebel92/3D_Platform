@@ -164,13 +164,12 @@ public class EnemyReward : NetworkBehaviour
         // ── Gather all results first so we know the total drop count ──────────
         var allResults = new System.Collections.Generic.List<LootRollResult>();
 
+        // SO loot table (EnemyData) and inline dropTable are both processed.
         if (_data != null && _data.lootTable != null)
-        {
             allResults.AddRange(_data.lootTable.Roll());
-        }
-        else
+
+        if (dropTable != null)
         {
-            if (dropTable == null || dropTable.Count == 0) return;
             foreach (DropEntry entry in dropTable)
             {
                 if (entry.prefab == null) continue;
@@ -235,11 +234,15 @@ public class EnemyReward : NetworkBehaviour
         // Spawn at the enemy's centre — LootDropAnimation flies it to targetPos.
         GameObject dropped = Instantiate(result.prefab, transform.position, Quaternion.identity);
 
-        LootDropAnimation dropAnim = dropped.GetComponent<LootDropAnimation>();
+        LootDropAnimation       dropAnim   = dropped.GetComponent<LootDropAnimation>();
+        SimpleLootDropAnimation simpleAnim = dropped.GetComponent<SimpleLootDropAnimation>();
+
         if (dropAnim != null)
             dropAnim.PreInit(targetPos);
+        else if (simpleAnim != null)
+            simpleAnim.PreInit(targetPos);
         else
-            dropped.transform.position = targetPos; // prefab has no animation — place directly
+            dropped.transform.position = targetPos;
 
             // Configure ItemPool pickups before NGO spawns them so the server-side
             // roll and visual are both applied in OnNetworkSpawn / Start.
