@@ -1,0 +1,30 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 2f686254ca02d284399db430c32a375e, type: 3}
+  m_Name: LootTableBossGolem
+  m_EditorClassIdentifier: Assembly-CSharp::LootTableSO
+  entries:
+  - entryType: 0
+    dropChance: 0.8
+    minCount: 3
+    maxCount: 6
+    prefab: {fileID: 7768051679512440843, guid: f93569ab0d4a19644ba08b6abda11cf2, type: 3}
+    lootPickupPrefab: {fileID: 0}
+    itemPool: []
+  - entryType: 0
+    dropChance: 0.75
+    minCount: 5
+    maxCount: 15
+    prefab: {fileID: 7768051679512440843, guid: 33f126135c798064fb3c88319e610cbe, type: 3}
+    lootPickupPrefab: {fileID: 0}
+    itemPool: []
+  maxDrops: 0
