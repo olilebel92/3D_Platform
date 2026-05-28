@@ -1,6 +1,6 @@
 using System.Collections.Generic;
 using UnityEngine;
-using UnityEngine.InputSystem;
+using UnityEngine.InputSystem;          // InputAction.WasPressedThisFrame() extension
 using TMPro;
 
 /// <summary>
@@ -27,8 +27,9 @@ public class SkillTreeManager : MonoBehaviour
     [Tooltip("Root panel of the entire skill tree UI.")]
     public GameObject skillTreeWindow;
 
-    [Tooltip("Key that toggles the skill tree window open / closed.")]
-    public Key toggleKey = Key.K;
+    // The toggle key (default: K) is now bound in PlayerInputActions.inputactions
+    // under the UI map's OpenSkillTree action. Edit the asset or rebind at runtime
+    // through InputManager.UI.OpenSkillTree.
 
     [Tooltip("Pause the game (Time.timeScale = 0) while the skill tree is open.")]
     public bool pauseGameWhileOpen = true;
@@ -160,7 +161,7 @@ public class SkillTreeManager : MonoBehaviour
 
     void Update()
     {
-        if (Keyboard.current != null && Keyboard.current[toggleKey].wasPressedThisFrame)
+        if (InputManager.UI.OpenSkillTree.WasPressedThisFrame())
             SetWindowOpen(!_windowOpen);
     }
 

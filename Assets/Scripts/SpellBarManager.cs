@@ -1,6 +1,6 @@
 ﻿using System.Collections.Generic;
 using UnityEngine;
-using UnityEngine.InputSystem;
+using UnityEngine.InputSystem;          // InputAction.WasPressedThisFrame() extension
 
 public class SpellBarManager : MonoBehaviour
 {
@@ -27,12 +27,8 @@ public class SpellBarManager : MonoBehaviour
     // ─── Private State ────────────────────────────────────────────────────────
     private int _selectedIndex = -1;
 
-    // ─── New Input System key mapping ─────────────────────────────────────────
-    private static readonly Key[] s_hotkeys =
-    {
-        Key.Digit1, Key.Digit2, Key.Digit3, Key.Digit4, Key.Digit5,
-        Key.Digit6, Key.Digit7, Key.Digit8, Key.Digit9, Key.Digit0
-    };
+    // Hotkey bindings (keyboard 1..9, 0 for slot 10) live in
+    // PlayerInputActions.inputactions under UI.Spell1..Spell10.
 
     // ─── Unity Lifecycle ──────────────────────────────────────────────────────
     private void Awake()
@@ -171,11 +167,13 @@ public class SpellBarManager : MonoBehaviour
     // ─── Hotkey Input ─────────────────────────────────────────────────────────
     private void HandleHotkeyInput()
     {
-        if (Keyboard.current == null) return;
+        var spells = InputManager.UI.Spell;
+        if (spells == null) return;
 
-        for (int i = 0; i < s_hotkeys.Length && i < slots.Count; i++)
+        int count = Mathf.Min(spells.Length, slots.Count);
+        for (int i = 0; i < count; i++)
         {
-            if (Keyboard.current[s_hotkeys[i]].wasPressedThisFrame)
+            if (spells[i].WasPressedThisFrame())
             {
                 SelectSlot(i);
                 break;

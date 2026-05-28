@@ -1,11 +1,13 @@
 using System.Reflection;
 using Unity.Netcode;
 using UnityEngine;
-using UnityEngine.InputSystem;
+using UnityEngine.InputSystem;          // InputAction.WasPressedThisFrame() extension
 
 /// <summary>
 /// Debug-only cheat tool. Attach to the Player GameObject.
-/// Press 0 in Play Mode to toggle, or right-click → "Enable God Mode".
+/// Press F4 in Play Mode to toggle, or right-click →
+/// "Enable God Mode". The hotkey is bound under UI.ToggleGodMode in
+/// PlayerInputActions.inputactions — rebind there if needed.
 /// Assign all SpellData assets to the Spells list in the Inspector.
 /// </summary>
 public class GodMode : MonoBehaviour
@@ -35,7 +37,7 @@ public class GodMode : MonoBehaviour
         // In solo (no NetworkObject or unspawned), no gate.
         if (_netObj != null && _netObj.IsSpawned && !_netObj.IsOwner) return;
 
-        if (Keyboard.current[Key.Digit0].wasPressedThisFrame)
+        if (InputManager.UI.ToggleGodMode.WasPressedThisFrame())
             Toggle();
     }
 

@@ -1,7 +1,7 @@
 using System.Collections.Generic;
 using TMPro;
 using UnityEngine;
-using UnityEngine.InputSystem;
+using UnityEngine.InputSystem;          // InputAction.WasPressedThisFrame() extension
 using UnityEngine.UI;
 
 /// <summary>
@@ -113,10 +113,7 @@ public class InventoryUI : MonoBehaviour
 
     void Update()
     {
-        if (Keyboard.current != null && Keyboard.current.iKey.wasPressedThisFrame)
-            ToggleInventory();
-
-        if (Gamepad.current != null && Gamepad.current.buttonNorth.wasPressedThisFrame)
+        if (InputManager.UI.OpenInventory.WasPressedThisFrame())
             ToggleInventory();
 
         // Deferred refresh — runs after a drag completes

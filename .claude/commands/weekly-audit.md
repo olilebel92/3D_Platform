@@ -62,6 +62,8 @@ Scan the diff for any of the following. Flag each with file + line reference. Th
 - `NetworkVariable<T>` writes from a client that doesn't own authority
 - Input-reading methods in a `NetworkBehaviour` missing `if (!IsOwner) return;`
 - `HealthSystem.TakeDamage()` / `Heal()` called without a server-side guard at the call site
+- Spell / damage scripts calling `HealthSystem.TakeDamage(...)` **without an explicit `school:` argument** when the spell has an elemental school (Fire / Frost / Lightning). Defaulting to `SpellSchool.Arcane` silently bypasses elemental resist + affinity. Grep for `TakeDamage(` in `Assets/Scripts/Spells/` and the diff; flag any call where the spell's school is non-Arcane but `school:` is missing.
+- Server-spawned spell projectiles / AOE scripts (`Fireball`, `ChainLightning`, `DamageZone`, etc.) reading per-player singletons (`ExperienceManager.Instance`, `SkillTreeManager.Instance`) inside `OnNetworkSpawn` / `Explode` / `OnTriggerEnter` / any authoritative path. Required pattern: `SpellCaster` pre-computes damage owner-side and assigns it to a `[HideInInspector]` runtime field on the prefab **before** `NetworkObject.Spawn()` (see `Fireball.precomputedDamage`). Host-local singletons would otherwise leak host stats into every caster's damage in MP.
 - `ExperienceManager.Instance` accessed before `OnNetworkSpawn()` / `SetAsLocalInstance()`
 - `Die()` modifications that remove or bypass the `IsServer` guard for `destroyOnDeath`
 - Movement/teleport calls against `OwnerNetworkTransform` from the server (must go through an owner-targeted `ClientRpc`)
@@ -90,7 +92,8 @@ Flag any of the following **found in the diff** (not in unchanged code):
 - `Start()` / `Awake()` logic assuming execution order without enforcement
 - Allocations in hot paths (`Update`, `FixedUpdate`, per-frame loops): `new List<>()`, `string` concat, LINQ, `GetComponent` without caching
 - Animator string lookups not cached via `Animator.StringToHash`
-- Legacy Input API usage (`Input.GetKey`, `Input.GetAxis`) — hard rule violation
+- Legacy Input API usage (`Input.GetKey`, `Input.GetAxis`, Input Manager) — hard rule violation
+- **New** direct-device polling introduced in the diff (`Keyboard.current.*`, `Mouse.current.*`, `Gamepad.current.*`). The existing ~15 UI scripts using these are tracked legacy debt pending a `UI` action map migration — adding new ones is banned per CLAUDE.md. Flag any net-new occurrence in changed files; do NOT flag pre-existing usage in unchanged files.
 - Legacy `UnityEngine.UI.Text` usage — must be `TMP_Text` / `TextMeshProUGUI`
 
 ---

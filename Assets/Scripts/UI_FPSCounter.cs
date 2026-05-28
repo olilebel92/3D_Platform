@@ -1,7 +1,7 @@
 ﻿using UnityEngine;
 using TMPro;
+using UnityEngine.InputSystem;          // InputAction.WasPressedThisFrame() extension
 using UnityEngine.Profiling;
-using UnityEngine.InputSystem;
 
 public class UI_FPSCounter : MonoBehaviour
 {
@@ -29,8 +29,8 @@ public class UI_FPSCounter : MonoBehaviour
 
     void Update()
     {
-        // Toggle panel with F3 (New Input System)
-        if (panel != null && Keyboard.current != null && Keyboard.current.f3Key.wasPressedThisFrame)
+        // Toggle panel with F3 (UI.ToggleFPS action — bound in PlayerInputActions.inputactions)
+        if (panel != null && InputManager.UI.ToggleFPS.WasPressedThisFrame())
             panel.SetActive(!panel.activeSelf);
 
         // Stop if hidden or missing refs

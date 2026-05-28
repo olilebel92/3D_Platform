@@ -1,8 +1,8 @@
 using System.Collections.Generic;
 using System.Linq;
 using UnityEngine;
+using UnityEngine.InputSystem;          // InputAction.WasPressedThisFrame() extension
 using UnityEngine.UI;
-using UnityEngine.InputSystem;
 using TMPro;
 
 /// <summary>
@@ -220,11 +220,7 @@ public class CharacterWindow : MonoBehaviour
 
     void Update()
     {
-        bool togglePressed =
-            (Keyboard.current != null && Keyboard.current.cKey.wasPressedThisFrame) ||
-            (Gamepad.current  != null && Gamepad.current.selectButton.wasPressedThisFrame);
-
-        if (togglePressed)
+        if (InputManager.UI.OpenCharacter.WasPressedThisFrame())
         {
             Debug.Log("[CharacterWindow] togglePressed, _isOpen=" + _isOpen);
             ToggleWindow();

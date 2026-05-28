@@ -1,5 +1,5 @@
 using UnityEngine;
-using UnityEngine.InputSystem;
+using UnityEngine.InputSystem;          // InputAction.WasPressedThisFrame() extension
 using UnityEngine.SceneManagement;
 using Unity.Netcode;
 
@@ -40,16 +40,14 @@ public class PauseMenuController : MonoBehaviour
 
     private void Update()
     {
-        // Circle / B or Start closes panels; ESC or Start also toggles pause
-        bool closePressed =
-            (Keyboard.current != null && Keyboard.current.escapeKey.wasPressedThisFrame) ||
-            (Gamepad.current  != null && Gamepad.current.buttonEast.wasPressedThisFrame)  ||
-            (Gamepad.current  != null && Gamepad.current.startButton.wasPressedThisFrame);
-
-        // ESC / Start can also open the pause menu when no panels are open
-        bool pausePressed =
-            (Keyboard.current != null && Keyboard.current.escapeKey.wasPressedThisFrame) ||
-            (Gamepad.current  != null && Gamepad.current.startButton.wasPressedThisFrame);
+        // UI.Cancel = Esc / B-East          → closes the topmost open panel.
+        // UI.Pause  = Esc / Start           → also closes panels AND toggles the
+        //                                     pause menu when nothing else is open.
+        // closePressed = either action fires (any input that should close a panel).
+        // pausePressed = Pause only (B-East alone must not open the pause menu).
+        bool closePressed = InputManager.UI.Cancel.WasPressedThisFrame() ||
+                            InputManager.UI.Pause.WasPressedThisFrame();
+        bool pausePressed = InputManager.UI.Pause.WasPressedThisFrame();
 
         if (!closePressed && !pausePressed) return;
 

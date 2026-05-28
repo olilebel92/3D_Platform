@@ -2,8 +2,8 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.InputSystem;          // InputAction.WasPressedThisFrame() extension
 using UnityEngine.UI;
-using UnityEngine.InputSystem;
 using TMPro;
 
 /// <summary>
@@ -260,18 +260,9 @@ public class PopupManager : MonoBehaviour
     {
         if (_skipRequested) { _skipRequested = false; return true; }
 
-        if (Keyboard.current != null)
-        {
-            if (Keyboard.current.enterKey.wasPressedThisFrame ||
-                Keyboard.current.spaceKey.wasPressedThisFrame ||
-                Keyboard.current.eKey.wasPressedThisFrame)
-                return true;
-        }
-
-        if (Gamepad.current != null && Gamepad.current.buttonSouth.wasPressedThisFrame)
-            return true;
-
-        return false;
+        // UI.Confirm is bound to Enter / Space / E / Gamepad-South in the
+        // PlayerInputActions asset — covers both keyboard and controller skips.
+        return InputManager.UI.Confirm.WasPressedThisFrame();
     }
 
     // ─── Panel Visibility & Fading ────────────────────────────────────────────

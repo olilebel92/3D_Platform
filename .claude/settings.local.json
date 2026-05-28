@@ -12,7 +12,8 @@
       "Bash(grep \"\\\\.asset$\")",
       "Bash(sed 's/?? //')",
       "Bash(gh auth *)",
-      "Bash(grep \"\\\\.cs$\")"
+      "Bash(grep \"\\\\.cs$\")",
+      "Bash(cat /tmp/depmap.md)"
     ]
   }
 }
