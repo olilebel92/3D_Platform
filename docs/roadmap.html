@@ -160,7 +160,7 @@
 <header>
   <div class="header-inner">
     <h1>HackNSlash</h1>
-    <p>Development Roadmap &nbsp;·&nbsp; Updated April 2026 &nbsp;·&nbsp; Timeline refreshes every 3 months</p>
+    <p>Development Roadmap &nbsp;·&nbsp; Updated May 2026 &nbsp;·&nbsp; Timeline refreshes every 3 months</p>
     <div class="header-badges">
       <div class="hbadge">V1.0 Target — Q2 2027</div>
       <div class="hbadge green">Co-op First — 2 to 4 Players</div>
@@ -201,6 +201,46 @@
 <!-- CHANGELOG TAB -->
 <div id="view-changelog" style="display:none">
   <div class="changelog-wrapper">
+
+    <div class="cl-entry">
+      <div class="cl-header">
+        <div class="cl-version">V0.3</div>
+        <div><div class="cl-title">Online Multiplayer (Unity Relay)</div><span class="status-badge badge-active">In Progress</span></div>
+        <div class="cl-date">In Progress — Q3 2026</div>
+      </div>
+      <div class="cl-note"><strong>WIP:</strong> Integration not yet started. Planned: replace the current LAN/direct-IP connection with Unity Gaming Services Relay — host allocates a relay slot and shares a short join code; clients connect without port forwarding or router configuration.</div>
+    </div>
+
+    <div class="cl-entry">
+      <div class="cl-header">
+        <div class="cl-version">V0.25</div>
+        <div><div class="cl-title">Combat Sync &amp; Co-op Polish</div><span class="status-badge badge-completed">Completed</span></div>
+        <div class="cl-date">May 29, 2026</div>
+      </div>
+      <div class="cl-section-title">Networking</div>
+      <ul class="cl-list">
+        <li>HealthSystem promoted to NetworkBehaviour — HP synced via NetworkVariable&lt;float&gt; to all clients in real time</li>
+        <li>TakeDamage(), Heal(), IncreaseMaxHealth() auto-route to server via ServerRpc when called from a client — call sites need no IsServer guard</li>
+      </ul>
+      <div class="cl-section-title">Co-op Spectator Mode</div>
+      <ul class="cl-list">
+        <li>SpectatorController — dead players in MP co-op spectate living teammates; cycle targets with Prev/Next buttons or left-stick axis</li>
+        <li>WaveManager tracks dead players server-side; auto-respawns them at their death position when a survivor clears the wave</li>
+        <li>HealthSystem.IsDead property; PlayerController regen guard skips dead players to prevent premature self-revival mid-wave</li>
+      </ul>
+      <div class="cl-section-title">Input System</div>
+      <ul class="cl-list">
+        <li>InputManager expanded to own the ONE shared PlayerInputActions instance (Player + UI + Spell maps) — single runtime source of truth for all bindings</li>
+        <li>PlayerController and SpellCaster migrated off direct device polling; SpellCaster cancel-cast uses InputManager.Player.CancelCast</li>
+        <li>InputSchemeTracker centralises keyboard↔gamepad detection; CursorManager and iso-aim device claims drive from here</li>
+      </ul>
+      <div class="cl-section-title">Items &amp; Loot</div>
+      <ul class="cl-list">
+        <li>Item SO catalog — 36 ScriptableObjects, Warrior / Mage / Rogue × 4 slots × 3 rarities (Epic, Legendary, Godly)</li>
+        <li>LootTableSO ItemPool entry type — rolls a specific item from a weighted pool on enemy death; LootTableBossGolem added</li>
+        <li>SimpleLootDropAnimation; PickupVisual placeholder model fallback; StatBaseRangeDrawer editor helper</li>
+      </ul>
+    </div>
 
     <div class="cl-entry">
       <div class="cl-header">
@@ -351,12 +391,11 @@
       <div class="reco-card-title">Suggested Timeline</div>
       <table class="phase-table">
         <tr><th>Version</th><th>When</th><th>Focus</th><th>Serves the loop</th></tr>
-        <tr><td class="v">V0.1–V0.2</td><td class="w">Done</td><td class="focus">Foundation + spells, skill tree, settings, FPS overlay</td><td class="why">Foundation</td></tr>
-        <tr><td class="v">V0.3</td><td class="w">Q2 2026</td><td class="focus">Combat sync</td><td class="why">Fair co-op hits</td></tr>
-        <tr><td class="v">V0.25</td><td class="w">Q3 2026 — Summer</td><td class="focus">Online multiplayer (Unity Relay)</td><td class="why">Play anywhere, no port forwarding</td></tr>
-        <tr><td class="v">V0.3</td><td class="w">Q3 2026</td><td class="focus">First dungeon run prototype</td><td class="why loop-marker">Loop proof-of-concept</td></tr>
-        <tr><td class="v">V0.4</td><td class="w">Q4 2026</td><td class="focus">Per-player XP + hub placeholder</td><td class="why loop-marker">Return to hub works</td></tr>
-        <tr><td class="v">V0.5</td><td class="w">Q4 2026</td><td class="focus">Class stats + open skill tree</td><td class="why loop-marker">Upgrade phase works</td></tr>
+        <tr><td class="v">V0.1–V0.25</td><td class="w">Done</td><td class="focus">Foundation, spells, skill tree, combat sync, co-op spectator</td><td class="why">Foundation</td></tr>
+        <tr><td class="v">V0.3</td><td class="w">Q3 2026</td><td class="focus">Online multiplayer (Unity Relay)</td><td class="why">Play anywhere, no port forwarding</td></tr>
+        <tr><td class="v">V0.4</td><td class="w">Q3 2026</td><td class="focus">First dungeon run prototype</td><td class="why loop-marker">Loop proof-of-concept</td></tr>
+        <tr><td class="v">V0.5</td><td class="w">Q4 2026</td><td class="focus">Per-player XP + hub placeholder</td><td class="why loop-marker">Return to hub works</td></tr>
+        <tr><td class="v">V0.55</td><td class="w">Q4 2026</td><td class="focus">Class stats + open skill tree</td><td class="why loop-marker">Upgrade phase works</td></tr>
         <tr><td class="v">V0.6</td><td class="w">Q1 2027</td><td class="focus">Room system + boss + dungeon tiers</td><td class="why loop-marker">Full loop, all phases</td></tr>
         <tr><td class="v">V0.65</td><td class="w">Q1 2027</td><td class="focus">World dressing pass</td><td class="why">Looks like a real game</td></tr>
         <tr><td class="v">V0.75</td><td class="w">Q2 2027</td><td class="focus">Audio pass — SFX, ambient, music</td><td class="why">Feels like a real game</td></tr>
@@ -418,12 +457,12 @@ const VERSIONS = [
    details:["HealingWave — AoE heal spell, server-authoritative, SpellData asset + runtime","StatusEffectHandler — stun system; stun blocks casts and movement; highest-value-wins","Chain lightning walk-to-cast: WalkingToTarget state auto-walks player to out-of-range targets","Chain count scales per skill rank (chainCountPerRank) — upgrading node gives more bounces","Enemy stun on attack — configurable chance + duration; stun VFX spawn/clear on apply and expire","SkillTreeNode: multi-level support (maxLevel, scalingFactor); STR/AGI/INT flat bonuses; spell/fire/heal % bonuses; HP and HP regen bonuses","SkillTreeConnectorUI — connector line renderer for skill tree UI; passive HP and Stats nodes added","PlayerNameTag — world-space TMP billboard, NGO-synced to LobbyPlayer.PlayerName","WaveManager WaveRewardEntry — per-wave custom item drops; RegisterPlayer() fixes MP spawn-order race","PlayerController.All — static registry, GC-free alternative to FindGameObjectsWithTag; cast momentum carry-through","SettingsManager + SettingsUI — master & music volume sliders, persisted via PlayerPrefs","UI_FPSCounter — F3 toggle overlay showing smoothed FPS, ms, and memory usage","Thor armor set — Chest, Helm, Pants, Boots ScriptableObjects + leather icons","GC pass — NonAlloc raycasts, static ChainLightning buffer, ~120 allocs/sec saved in IsoCursorAim","Shader preload via ShaderVariantCollection — eliminates first-cast hitch"],
    note:null},
 
-  {version:"V0.25",title:"Combat Sync",status:"planned",quarter:"Q2 2026",date:"Est. May – Jun 2026",phase:"p2",loop:null,
-   bullets:["HP synced across all clients","Server-authoritative damage","Networked projectiles"],
-   details:["HealthSystem HP becomes NetworkVariable — synced to all clients","TakeDamage() routed through ServerRpc — server validates all hits","PlayerAttack ServerRpc — client requests, server applies damage","FireballShooter spawns projectiles as NetworkObjects","Critical foundation for fair co-op dungeon combat"],
+  {version:"V0.25",title:"Combat Sync & Co-op Polish",status:"completed",quarter:"Q2 2026",date:"May 29, 2026",phase:"p2",loop:null,
+   bullets:["HealthSystem → NetworkBehaviour; HP synced via NetworkVariable to all clients","Server-authoritative TakeDamage — auto-routes to ServerRpc from any context","MP co-op spectator mode — dead players spectate teammates, auto-respawn on wave clear","InputManager: single shared PlayerInputActions instance (Player + UI + Spell maps)","Item SO catalog — 36 items, Warrior / Mage / Rogue, Epic through Godly"],
+   details:["HealthSystem promoted to NetworkBehaviour with NetworkVariable<float> currentHealth/maxHealth — HP synced to all clients","TakeDamage(), Heal(), IncreaseMaxHealth() auto-route to server via ServerRpc when called from a client — call sites need no IsServer guard","SpectatorController — dead players spectate living teammates in MP co-op; cycle with Prev/Next buttons or left-stick axis","WaveManager tracks dead players server-side; auto-respawns them at death position when a survivor clears the wave","HealthSystem.IsDead property; PlayerController regen guard skips dead players to prevent premature self-revival mid-wave","InputManager upgraded to own the ONE shared PlayerInputActions instance (Player + UI + Spell maps) — single runtime source of truth","PlayerController and SpellCaster migrated off direct device polling; InputSchemeTracker centralises keyboard↔gamepad detection","Item SO catalog: 36 ScriptableObjects — Warrior / Mage / Rogue × 4 slots × 3 rarities (Epic, Legendary, Godly)","LootTableSO ItemPool entry type — rolls a specific item from a weighted pool on enemy death; LootTableBossGolem added","SimpleLootDropAnimation; PickupVisual placeholder model fallback; StatBaseRangeDrawer editor helper"],
    note:null},
 
-  {version:"V0.3",title:"Online Multiplayer (Unity Relay)",status:"planned",quarter:"Q3 2026",date:"Est. July 2026",phase:"p2",loop:"Play with anyone, anywhere",
+  {version:"V0.3",title:"Online Multiplayer (Unity Relay)",status:"active",quarter:"Q3 2026",date:"In Progress — Q3 2026",phase:"p2",loop:"Play with anyone, anywhere",
    bullets:["Play over the internet without port forwarding","Join via a short code instead of an IP address","Powered by Unity Gaming Services Relay"],
    details:["Replace raw IP connection with Unity Relay — host allocates a relay slot and shares a join code (e.g. 'ABC-123')","Client joins by entering the join code instead of an IP address","No port forwarding required on the host's router","Free tier covers up to 50 concurrent users — sufficient for early co-op","Requires: Unity Gaming Services project link, Relay + Lobby packages, and changes to OnHost() / OnConnect() in MainMenuManager"],
    note:"LAN co-op already works. Moving this up to summer 2026 — before the dungeon is built — means every subsequent milestone can be tested by anyone, anywhere, without router configuration."},

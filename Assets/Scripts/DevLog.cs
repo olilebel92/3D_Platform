@@ -10,6 +10,20 @@ public class DevLog : MonoBehaviour
     private const string LOG_TEXT =
 @"DoldiGAME
 
+<b><color=#e8920a>v0.3 - Online Multiplayer (Unity Relay)</color></b>  <color=#7a7a9a>2026-05-29 — In Progress</color>
+• Unity Relay integration — play over the internet without port forwarding
+• Join via a short code instead of an IP address
+• Unity Gaming Services: Relay + Lobby packages
+• Changes to OnHost() / OnConnect() in MainMenuManager
+
+<b><color=#3dba6e>v0.25 - Combat Sync & Co-op Polish</color></b>  <color=#7a7a9a>2026-05-29</color>
+• HealthSystem NetworkBehaviour — HP synced via NetworkVariable to all clients
+• TakeDamage() auto-routes to server — no IsServer guard needed at call sites
+• MP co-op spectator mode — dead players spectate teammates, auto-respawn on wave clear
+• InputManager single shared PlayerInputActions instance (Player + UI + Spell maps)
+• Item SO catalog — 36 items, Warrior / Mage / Rogue, Epic through Godly
+• LootTableSO ItemPool drops + loot drop animation polish
+
 <b><color=#3dba6e>v0.2 - Spells, Skill Tree & Polish</color></b>  <color=#7a7a9a>2026-05-08</color>
 • HealingWave spell - AoE heal, server-authoritative
 • Stun system (StatusEffectHandler) - blocks casts & movement
