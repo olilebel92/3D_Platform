@@ -69,20 +69,14 @@ public class CameraControllerThirdPerson : MonoBehaviour
     private float _yaw;
     private float _pitch = 15f;
     private Vector3 _currentPivot;
-    private PlayerInputActions _input;
     private InputAction _lookAction;
 
     // ─── Unity Lifecycle ──────────────────────────────────────────────────────
 
-    void Awake()
-    {
-        _input = new PlayerInputActions();
-    }
-
     void OnEnable()
     {
-        _input.Enable();
-        _lookAction = _input.Player.Look;
+        // Read from the shared instance; PlayerController owns enabling the Player map.
+        _lookAction = InputManager.Player.Look;
 
         if (target != null)
         {
@@ -96,8 +90,7 @@ public class CameraControllerThirdPerson : MonoBehaviour
 
     void OnDisable()
     {
-        _input.Disable();
-
+        _lookAction = null;
     }
 
     void LateUpdate()

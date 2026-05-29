@@ -1,5 +1,4 @@
 using UnityEngine;
-using UnityEngine.InputSystem;
 
 public class CursorManager : MonoBehaviour
 {
@@ -50,49 +49,26 @@ public class CursorManager : MonoBehaviour
         ApplyDefault();
     }
 
-    void OnEnable()  => InputSystem.onDeviceChange += OnDeviceChange;
-    void OnDisable() => InputSystem.onDeviceChange -= OnDeviceChange;
-
-    void Start() { }
-
-    void Update()
+    void OnEnable()
     {
-        // wasUpdatedThisFrame fires on the plug-in frame even without real input;
-        // require non-default state so that mere device connection never triggers a switch.
-        bool gamepadActive = Gamepad.current != null &&
-                             Gamepad.current.wasUpdatedThisFrame &&
-                             !Gamepad.current.CheckStateIsAtDefault();
-
-        bool mouseActive   = Mouse.current   != null &&
-                             (Mouse.current.delta.ReadValue().sqrMagnitude > 0.01f ||
-                              Mouse.current.leftButton.wasPressedThisFrame          ||
-                              Mouse.current.rightButton.wasPressedThisFrame);
-
-        if (!_usingGamepad && gamepadActive)
-        {
-            _usingGamepad = true;
-            RefreshVisibility();
-        }
-        else if (_usingGamepad && mouseActive)
-        {
-            _usingGamepad = false;
-            RefreshVisibility();
-            ApplyDefault();
-        }
+        // Active-device detection is centralized in InputManager — react to scheme
+        // changes instead of polling devices here.
+        InputManager.OnSchemeChanged += OnSchemeChanged;
+        ApplyScheme(InputManager.ActiveScheme, initial: true);
     }
 
-    private void OnDeviceChange(InputDevice device, InputDeviceChange change)
+    void OnDisable() => InputManager.OnSchemeChanged -= OnSchemeChanged;
+
+    private void OnSchemeChanged(InputManager.InputScheme scheme) => ApplyScheme(scheme, initial: false);
+
+    private void ApplyScheme(InputManager.InputScheme scheme, bool initial)
     {
-        // When the active gamepad is unplugged, immediately revert to mouse mode.
-        if (device is Gamepad && change == InputDeviceChange.Removed && _usingGamepad)
-        {
-            if (Gamepad.current == null)
-            {
-                _usingGamepad = false;
-                RefreshVisibility();
-                ApplyDefault();
-            }
-        }
+        bool gamepad = scheme == InputManager.InputScheme.Gamepad;
+        if (!initial && gamepad == _usingGamepad) return;
+
+        _usingGamepad = gamepad;
+        RefreshVisibility();
+        if (!gamepad) ApplyDefault(); // switching back to mouse restores the cursor texture
     }
 
     // ─── Menu Tracking ────────────────────────────────────────────────────────

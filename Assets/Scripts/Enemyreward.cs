@@ -269,7 +269,7 @@ public class EnemyReward : NetworkBehaviour
 
             NetworkObject netObj = dropped.GetComponent<NetworkObject>();
             if (netObj != null && networkActive)
-                netObj.Spawn();
+                netObj.Spawn(destroyWithScene: true); // scene-bound so it's cleared on scene reload/restart
     }
 
     // ─── Ground Height Helper ─────────────────────────────────────────────────

@@ -84,6 +84,36 @@ public class PlayerController : NetworkBehaviour
     public bool IsSprinting { get; private set; }
 
     /// <summary>
+    /// True while this (dead) player is spectating teammates in multiplayer co-op.
+    /// Movement/input is frozen so the body stays where it died until the wave clears.
+    /// Set by DeathScreenManager.EnterSpectatorMode(); cleared by RespawnAtPositionClientRpc().
+    /// </summary>
+    public bool IsSpectating { get; private set; }
+
+    /// <summary>
+    /// Toggles spectating for this (dead) player. Freezes movement (via the Update guard)
+    /// and disables combat components so a dead body can't cast or attack; re-enables them
+    /// on respawn.
+    /// </summary>
+    public void SetSpectating(bool value)
+    {
+        IsSpectating = value;
+        SetCombatEnabled(!value);
+    }
+
+    void SetCombatEnabled(bool on)
+    {
+        if (_spellCaster != null)
+        {
+            if (!on && _spellCaster.IsActive) _spellCaster.CancelCast();
+            _spellCaster.enabled = on;
+        }
+        PlayerAttack attack = GetComponent<PlayerAttack>();
+        if (attack != null) attack.enabled = on;
+        if (lockOn != null) lockOn.enabled = on;
+    }
+
+    /// <summary>
     /// When set by SpellCaster, drives the player toward this world position automatically.
     /// Overrides movement only when there is no manual input. Cleared when the cast fires or cancels.
     /// </summary>
@@ -133,7 +163,9 @@ public class PlayerController : NetworkBehaviour
 
     void Awake()
     {
-        inputActions = new PlayerInputActions();
+        // Single shared instance (owned by InputManager). The owner enables the
+        // Player map below; sibling components borrow this via InputActions.
+        inputActions = InputManager.Actions;
     }
 
     // ─── NGO Lifecycle ────────────────────────────────────────────────────────
@@ -145,10 +177,11 @@ public class PlayerController : NetworkBehaviour
         if (!IsOwner)
         {
             // ── Non-owner: disable all input-driven components ────────────────
-            // SpellCaster and LockOnSystem use raw device APIs (Keyboard.current,
-            // Gamepad.current) that are global — they would respond to input on every
-            // player instance on this machine, not just the locally owned one.
-            // Disabling them here ensures only the owner's instance processes input.
+            // SpellCaster and LockOnSystem react to global, non-owner-aware input
+            // (the shared InputManager.UI / Player maps and device state) — they
+            // would respond on every player instance on this machine,
+            // not just the locally owned one. Disabling them here ensures only the
+            // owner's instance processes input.
             var spellCaster = GetComponent<SpellCaster>();
             if (spellCaster != null) spellCaster.enabled = false;
 
@@ -290,6 +323,9 @@ public class PlayerController : NetworkBehaviour
             yield return wait;
 
             if (_health == null) continue;
+            // Never regen a dead player — Heal() would clear _isDead and auto-revive a
+            // spectating player mid-wave. Respawn is handled explicitly at wave clear.
+            if (_health.IsDead) continue;
             if (_health.currentHealth >= _health.maxHealth) continue;
 
             float regen = _health.TotalRegenPerSecond;
@@ -336,70 +372,43 @@ public class PlayerController : NetworkBehaviour
     // ─── Respawn (Multiplayer) ────────────────────────────────────────────────
 
     /// <summary>
-    /// Called on the owning client when the player clicks "Respawn" on the death screen.
-    /// Forwards the request to the server which heals the player and teleports them
-    /// back to a spawn point, then notifies this client to fade back in.
+    /// Server → owning client: auto-respawn at the position where this player died.
+    /// Called by WaveManager.RespawnDeadPlayers() when a survivor clears the wave.
+    /// Teleports the owner (OwnerNetworkTransform is client-authoritative, so only the
+    /// owner can move itself), clears the spectator state, and restores camera + cursor.
+    /// The server has already healed via HealthSystem.Heal(), so HP arrives via the NV.
     /// </summary>
-    [ServerRpc]
-    public void RespawnServerRpc()
-    {
-        // Heal server-side copy of HealthSystem
-        HealthSystem health = GetComponent<HealthSystem>();
-        if (health != null)
-            health.Heal(health.maxHealth);
-
-        // Find a valid respawn position
-        Vector3 spawnPos = GetRespawnPosition();
-
-        // Send to owning client only
-        ClientRpcParams ownerOnly = new ClientRpcParams
-        {
-            Send = new ClientRpcSendParams { TargetClientIds = new ulong[] { OwnerClientId } }
-        };
-        RespawnClientRpc(spawnPos, ownerOnly);
-
-        Debug.Log($"[PlayerController] Server respawned client {OwnerClientId} at {spawnPos}");
-    }
-
     [ClientRpc]
-    void RespawnClientRpc(Vector3 spawnPos, ClientRpcParams rpcParams = default)
+    public void RespawnAtPositionClientRpc(Vector3 pos, ClientRpcParams rpcParams = default)
     {
         if (!IsOwner) return;
 
-        // HealthSystem replicates HP via NetworkVariable now — the server already healed
-        // in RespawnServerRpc, so the owner sees full HP via NV broadcast.
-
-        // Teleport: disable CharacterController first so we can move the transform
+        // Teleport: disable CharacterController first so we can move the transform.
         if (controller != null) controller.enabled = false;
-        transform.position = spawnPos;
+        transform.position = pos;
         if (controller != null) controller.enabled = true;
 
-        // Reset vertical velocity so the player doesn't fall through if spawned mid-air
+        // Reset vertical velocity so the player doesn't fall through if mid-air.
         verticalVelocity = 0f;
 
-        // Fade back in from the black death screen
-        if (SceneTransitionManager.Instance != null)
-            SceneTransitionManager.Instance.FadeIn();
-
+        // Leave spectator mode (re-enables combat) and hand the camera back to ourselves.
+        SetSpectating(false);
+        DeathScreenManager.Instance?.ExitSpectatorMode();
         CursorManager.Instance?.ApplyDefault();
 
-        Debug.Log($"[PlayerController] Respawned at {spawnPos}");
-    }
-
-    Vector3 GetRespawnPosition()
-    {
-        PlayerSpawner spawner = FindFirstObjectByType<PlayerSpawner>();
-        if (spawner != null)
-            return spawner.GetRespawnPosition();
-
-        // Absolute fallback — should never happen if PlayerSpawner is in the scene
-        return Vector3.up * 5f;
+        Debug.Log($"[PlayerController] Auto-respawned at death position {pos}");
     }
 
     // ─── Input Helpers ────────────────────────────────────────────────────────
 
+    // Guards the shared Player map: only the instance that enabled it disables it.
+    // Non-owner players (and solo OnDestroy) must not toggle the local owner's map.
+    private bool _inputEnabled;
+
     void EnableInput()
     {
+        if (_inputEnabled) return;
+        _inputEnabled = true;
         inputActions.Player.Enable();
         inputActions.Player.Jump.performed        += OnJump;
         inputActions.Player.SprintToggle.performed += OnSprintToggle;
@@ -407,6 +416,8 @@ public class PlayerController : NetworkBehaviour
 
     void DisableInput()
     {
+        if (!_inputEnabled) return;
+        _inputEnabled = false;
         inputActions.Player.Jump.performed        -= OnJump;
         inputActions.Player.SprintToggle.performed -= OnSprintToggle;
         inputActions.Player.Disable();
@@ -451,8 +462,13 @@ public class PlayerController : NetworkBehaviour
         // the server), so we must explicitly block input while any panel is open.
         if (PauseManager.IsPaused) return;
 
+        // ── Spectating (dead in co-op) ────────────────────────────────────────
+        // Freeze the dead body in place (also freezes gravity) while the camera
+        // follows a living teammate. SpectatorController handles camera/cycling.
+        if (IsSpectating) return;
+
         // ── Ready-Up ──────────────────────────────────────────────────────────
-        if (Keyboard.current != null && Keyboard.current.rKey.wasPressedThisFrame
+        if (InputManager.Player.ReadyUp.WasPressedThisFrame()
             && WaveManager.Instance != null && WaveManager.Instance.IsWaitingForReady)
         {
             WaveManager.Instance.ReadyUp();

@@ -256,8 +256,6 @@ public class SpellCaster : NetworkBehaviour
 
     // ─── Input ────────────────────────────────────────────────────────────────
 
-    private PlayerInputActions _inputActions;
-    private bool _ownsInputActions = false;
 
     // ─── Aim ──────────────────────────────────────────────────────────────────
 
@@ -285,25 +283,12 @@ public class SpellCaster : NetworkBehaviour
         }
 
         PlayerController pc = GetComponent<PlayerController>();
-        if (pc != null)
-        {
-            _playerController = pc;
-            _inputActions = pc.InputActions;
-        }
-        else
-        {
-            Debug.LogWarning("[SpellCaster] PlayerController not found — creating standalone input.");
-            _inputActions = new PlayerInputActions();
-            _inputActions.Player.Enable();
-            _ownsInputActions = true;
-        }
+        if (pc != null) _playerController = pc;
     }
 
     public override void OnDestroy()
     {
         base.OnDestroy();
-        if (_ownsInputActions && _inputActions != null)
-            _inputActions.Player.Disable();
         if (_targetSelector != null)
         {
             _targetSelector.OnTargetSelected     -= OnTargetConfirmed;
@@ -327,19 +312,19 @@ public class SpellCaster : NetworkBehaviour
     void Update()
     {
         // Right-click cancels any active cast, channel, or target selection.
-        if (Mouse.current != null && Mouse.current.rightButton.wasPressedThisFrame && IsActive)
+        if (InputManager.Player.CancelCast.WasPressedThisFrame() && IsActive)
         {
             CancelCast();
             return;
         }
 
         // Hotkeys 1–0: select slot and begin cast
-        if (Keyboard.current != null)
+        var spells = InputManager.Spell;
+        if (spells != null)
         {
-            for (int i = 0; i < 10; i++)
+            for (int i = 0; i < spells.Length; i++)
             {
-                Key key = i == 9 ? Key.Digit0 : (Key)((int)Key.Digit1 + i);
-                if (Keyboard.current[key].wasPressedThisFrame)
+                if (spells[i].WasPressedThisFrame())
                 {
                     SpellBarManager.Instance?.SelectSlot(i);
                     BeginCast(SpellBarManager.Instance?.GetSpellAt(i));
@@ -349,11 +334,11 @@ public class SpellCaster : NetworkBehaviour
         }
 
         // Gamepad R1: cast slot 1
-        if (Gamepad.current != null && Gamepad.current.rightShoulder.wasPressedThisFrame)
+        if (InputManager.Player.CastSlot1.WasPressedThisFrame())
             BeginCast(SpellBarManager.Instance?.GetSpellAt(0));
 
         // Gamepad L1: cast slot 2
-        if (Gamepad.current != null && Gamepad.current.leftShoulder.wasPressedThisFrame)
+        if (InputManager.Player.CastSlot2.WasPressedThisFrame())
             BeginCast(SpellBarManager.Instance?.GetSpellAt(1));
 
         TickCastState();
@@ -373,7 +358,7 @@ public class SpellCaster : NetworkBehaviour
                 if (_walkTarget == null) { CancelCast(); break; }
 
                 // Allow Escape to cancel while walking.
-                if (Keyboard.current != null && Keyboard.current.escapeKey.wasPressedThisFrame)
+                if (InputManager.UI.Cancel.WasPressedThisFrame())
                 {
                     CancelCast();
                     break;
@@ -1095,15 +1080,13 @@ public class SpellCaster : NetworkBehaviour
 
     bool IsCastHeld()
     {
-        if (Keyboard.current != null)
-            for (int i = 0; i < 10; i++)
-            {
-                Key key = i == 9 ? Key.Digit0 : (Key)((int)Key.Digit1 + i);
-                if (Keyboard.current[key].isPressed) return true;
-            }
+        var spells = InputManager.Spell;
+        if (spells != null)
+            for (int i = 0; i < spells.Length; i++)
+                if (spells[i].IsPressed()) return true;
 
-        if (Gamepad.current != null && Gamepad.current.rightShoulder.isPressed) return true;
-        if (Gamepad.current != null && Gamepad.current.leftShoulder.isPressed)  return true;
+        if (InputManager.Player.CastSlot1.IsPressed()) return true;
+        if (InputManager.Player.CastSlot2.IsPressed()) return true;
         return false;
     }
 }

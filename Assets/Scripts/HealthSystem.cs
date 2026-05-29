@@ -104,6 +104,10 @@ public class HealthSystem : NetworkBehaviour
     public float currentHealth => IsNetworked ? _netCurrent.Value : _soloCurrent;
     public float maxHealth     => IsNetworked ? _netMax.Value     : _soloMax;
 
+    /// <summary>True once HP has hit 0 and Die() ran, until a Heal() revives this entity.
+    /// Used to gate regen (so dead players don't self-revive) and spectator target checks.</summary>
+    public bool IsDead => _isDead;
+
     public float TotalRegenPerSecond =>
         regenPerSecond + (_inventory != null ? _inventory.TotalBonusHPRegen : 0f) + _skillTreeRegen;
 
@@ -602,22 +606,26 @@ public class HealthSystem : NetworkBehaviour
         }
         else if (CompareTag("Player"))
         {
-            if (WaveManager.Instance != null)
-                WaveManager.Instance.OnPlayerDeath();
-
-            // Death screen must appear on the dying player's machine — not the host.
-            // In MP, target the owner; in solo, show locally.
             if (IsNetworked)
             {
-                ShowDeathScreenOwnerRpc();
-            }
-            else if (DeathScreenManager.Instance != null)
-            {
-                DeathScreenManager.Instance.ShowDeathScreen();
+                // MP: Die() runs server-side. WaveManager decides spectate vs game-over
+                // and drives the owner-targeted death/spectator UI. Fall back to a direct
+                // owner RPC only if no WaveManager exists in the scene.
+                if (WaveManager.Instance != null)
+                    WaveManager.Instance.OnPlayerDeath(this);
+                else
+                    ShowDeathScreenOwnerRpc();
             }
             else
             {
-                Debug.LogWarning("[HealthSystem] Player died but no DeathScreenManager found in scene.");
+                // Solo: stop the wave loop and show the local death screen (unchanged).
+                if (WaveManager.Instance != null)
+                    WaveManager.Instance.OnPlayerDeath(this);
+
+                if (DeathScreenManager.Instance != null)
+                    DeathScreenManager.Instance.ShowDeathScreen();
+                else
+                    Debug.LogWarning("[HealthSystem] Player died but no DeathScreenManager found in scene.");
             }
         }
     }

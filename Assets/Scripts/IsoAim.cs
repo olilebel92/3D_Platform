@@ -41,9 +41,17 @@ public static class IsoAim
 
     /// <summary>
     /// Switches the active aim device. Call this when meaningful input is detected
-    /// on a device — last caller in the frame wins.
+    /// on a device — last caller in the frame wins. Also reports to
+    /// <see cref="InputManager"/> so the global active scheme stays in sync (aiming
+    /// with the stick means you're on gamepad).
     /// </summary>
-    public static void ClaimDevice(Device device) => ActiveDevice = device;
+    public static void ClaimDevice(Device device)
+    {
+        ActiveDevice = device;
+        InputManager.SetScheme(device == Device.Gamepad
+            ? InputManager.InputScheme.Gamepad
+            : InputManager.InputScheme.KeyboardMouse);
+    }
 
     /// <summary>
     /// Writes the aim world point. Ignored if <paramref name="device"/> is not

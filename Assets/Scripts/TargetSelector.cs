@@ -117,7 +117,7 @@ public class TargetSelector : NetworkBehaviour
     {
         if (!IsTargeting) return;
 
-        if (Keyboard.current != null && Keyboard.current.escapeKey.wasPressedThisFrame)
+        if (InputManager.UI.Cancel.WasPressedThisFrame())
         {
             CancelTargeting();
             return;
@@ -125,7 +125,7 @@ public class TargetSelector : NetworkBehaviour
 
         UpdateHover();
 
-        if (Mouse.current != null && Mouse.current.leftButton.wasPressedThisFrame)
+        if (InputManager.Player.Fire.WasPressedThisFrame())
             TrySelectTarget();
     }
 
@@ -201,6 +201,9 @@ public class TargetSelector : NetworkBehaviour
 
     Transform GetEnemyUnderCursor()
     {
+        // Pointer position for a screen-to-world raycast is a device read by design
+        // (allowed exception, like CursorManager) — the Input System has no cleaner
+        // equivalent for projecting the cursor into the world.
         if (Camera.main == null || Mouse.current == null) return null;
 
         Ray ray = Camera.main.ScreenPointToRay(Mouse.current.position.ReadValue());

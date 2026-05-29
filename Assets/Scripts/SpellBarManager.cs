@@ -167,7 +167,7 @@ public class SpellBarManager : MonoBehaviour
     // ─── Hotkey Input ─────────────────────────────────────────────────────────
     private void HandleHotkeyInput()
     {
-        var spells = InputManager.UI.Spell;
+        var spells = InputManager.Spell;
         if (spells == null) return;
 
         int count = Mathf.Min(spells.Length, slots.Count);

@@ -99,12 +99,9 @@ public class PlayerAttack : NetworkBehaviour
 
         if (_inputActions == null)
         {
-            // Fallback: create our own instance only if PlayerController is absent.
-            Debug.LogWarning("[PlayerAttack] PlayerController not found on this GameObject. " +
-                             "Creating a standalone PlayerInputActions instance as fallback. " +
-                             "Ensure Fire action map is enabled.");
-            _inputActions = new PlayerInputActions();
-            _inputActions.Player.Enable();
+            // Fallback: PlayerController absent — use the shared instance directly.
+            // PlayerController owns enable/disable of the Player map.
+            _inputActions = InputManager.Actions;
         }
 
         // No event subscription needed — fire input is polled each frame in Update.

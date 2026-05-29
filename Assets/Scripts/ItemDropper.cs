@@ -120,7 +120,7 @@ public class ItemDropper : NetworkBehaviour
             Debug.LogError("[ItemDropper] DropItemServerRpc: prefab has no NetworkObject — pickup will not network-spawn.");
             return;
         }
-        net.Spawn();
+        net.Spawn(destroyWithScene: true); // scene-bound so it's cleared on scene reload/restart
     }
 
     // ─── Helpers ──────────────────────────────────────────────────────────────
@@ -148,7 +148,7 @@ public class ItemDropper : NetworkBehaviour
             Debug.LogError("[ItemDropper] SpawnDropNetworked: prefab has no NetworkObject — pickup will not network-spawn.");
             return;
         }
-        net.Spawn();
+        net.Spawn(destroyWithScene: true); // scene-bound so it's cleared on scene reload/restart
     }
 
     private void SpawnPickupLocal(ItemData item, Vector3 pos)

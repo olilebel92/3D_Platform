@@ -192,21 +192,8 @@ public class MovementTutorialTrigger : MonoBehaviour
 
     private bool PlayerIsMoving()
     {
-        if (Keyboard.current != null)
-        {
-            if (Keyboard.current.wKey.isPressed ||
-                Keyboard.current.aKey.isPressed ||
-                Keyboard.current.sKey.isPressed ||
-                Keyboard.current.dKey.isPressed)
-                return true;
-        }
-
-        if (Gamepad.current != null)
-        {
-            if (Gamepad.current.leftStick.ReadValue().magnitude > 0.2f)
-                return true;
-        }
-
-        return false;
+        // 0.2 magnitude ≈ the old left-stick deadzone; WASD reports a full-length vector.
+        // Reads the shared Move action (enabled by PlayerController during gameplay).
+        return InputManager.Player.Move.ReadValue<Vector2>().sqrMagnitude > 0.04f;
     }
 }

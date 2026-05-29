@@ -161,7 +161,7 @@ public class ItemData : ScriptableObject
                 StatType.INT        => "Intelligence",
                 StatType.FlatHP     => "HP",
                 StatType.FlatMana   => "Mana",
-                StatType.HPRegenPerSecond   => "HP Regen/s",
+                StatType.HPRegenPerSecond   => "HP Regen",
                 StatType.ManaRegenPerSecond => "Mana Regen/s",
                 StatType.AllStats       => "All Stats",
                 StatType.CritRate     => "Crit Rate",

@@ -1,158 +1,153 @@
+using System;
 using UnityEngine;
 using UnityEngine.InputSystem;
 
 /// <summary>
-/// Process-wide owner of the UI action map. Lets managers that don't have a
-/// Player reference (UI panels, CursorManager, MusicManager, debug tools) read
-/// input via Actions instead of polling <c>Keyboard.current</c> /
-/// <c>Mouse.current</c> / <c>Gamepad.current</c> directly.
+/// Process-wide input hub. Owns the ONE shared <see cref="PlayerInputActions"/>
+/// instance (generated from <c>PlayerInputActions.inputactions</c>) that every
+/// system reads from — the single runtime source of truth for bindings.
 ///
-/// ─── Why this exists separately from <c>PlayerInputActions</c> ────────────
-/// <see cref="PlayerInputActions"/> is auto-generated from the .inputactions
-/// asset and is owned per-player by <c>PlayerController</c>. UI managers run
-/// in scenes without a player (Main Menu, Lobby) and must work before any
-/// player spawns. InputManager constructs its UI map programmatically so it
-/// is independent of player lifecycle, scene loads, and the regeneration
-/// timing of <c>PlayerInputActions.cs</c>.
+/// ─── Why a single shared instance ─────────────────────────────────────────
+/// Previously the UI/Gameplay maps were hand-built in C# here (to compile
+/// without waiting for wrapper regen) AND duplicated in the asset. That split
+/// meant a runtime rebind on one wouldn't affect the other. Now there is one
+/// definition (the asset) and one runtime instance (this), so rebinding and
+/// control-scheme switching are future-proof. <c>PlayerController</c> exposes
+/// the same instance via <c>InputActions</c> for sibling components to borrow.
 ///
-/// ─── Keeping bindings in sync ─────────────────────────────────────────────
-/// The same bindings are defined in BOTH places:
-///   • <c>Assets/Scripts/PlayerInputActions.inputactions</c> — canonical
-///     source for the Unity input editor and future runtime rebinding UI.
-///   • This file — runtime fallback that builds the same map in code.
-/// When you change a UI binding, update both. The asset is what shows up in
-/// the Unity Input Action editor; this code is what executes at runtime.
+/// ─── Maps and enabling ────────────────────────────────────────────────────
+///   • <see cref="UI"/>  — enabled from frame 0 (menus exist before any player).
+///     Gate it inside focused text fields with <c>InputManager.UI.Disable()</c> /
+///     <c>Enable()</c> (the generated struct exposes those).
+///   • <see cref="Player"/> — enabled per-owner by <c>PlayerController</c> on
+///     spawn; carries gameplay + the extras (CancelCast, CastSlot1/2, CycleTarget,
+///     ReadyUp). Owner-gating is the caller's responsibility.
 ///
-/// ─── Lifecycle ────────────────────────────────────────────────────────────
-/// Initialised on <see cref="RuntimeInitializeLoadType.SubsystemRegistration"/>
-/// so the UI map is live from frame 0. The map persists across scene loads
-/// because it's owned by a static field, not a GameObject.
+/// ─── Active scheme ────────────────────────────────────────────────────────
+/// <see cref="ActiveScheme"/> + <see cref="OnSchemeChanged"/> are the single
+/// authority for "is the player on Keyboard&amp;Mouse or Gamepad right now"
+/// (driven by <see cref="InputSchemeTracker"/>). CursorManager and the iso-aim
+/// device claim source from here instead of polling devices themselves.
 /// </summary>
 public static class InputManager
 {
+    public enum InputScheme { KeyboardMouse, Gamepad }
+
     // ─── Public API ──────────────────────────────────────────────────────────
 
-    /// <summary>UI hotkey actions (Pause, OpenInventory, Spell1..10, etc.).</summary>
-    public static UIActions UI => _ui;
+    /// <summary>The single shared generated actions instance.</summary>
+    public static PlayerInputActions Actions { get { EnsureInit(); return _actions; } }
 
-    /// <summary>The raw <see cref="InputActionMap"/> backing <see cref="UI"/>.
-    /// Use for advanced scenarios (rebinding UI, action callbacks).</summary>
-    public static InputActionMap UIMap => _ui.Map;
+    /// <summary>UI hotkey actions (Pause, OpenInventory, Navigate, Point, Click, Spell1..10, …).</summary>
+    public static PlayerInputActions.UIActions UI { get { EnsureInit(); return _actions.UI; } }
+
+    /// <summary>Gameplay actions (Move, Look, Fire, CancelCast, CastSlot1/2, CycleTarget, ReadyUp, …).</summary>
+    public static PlayerInputActions.PlayerActions Player { get { EnsureInit(); return _actions.Player; } }
+
+    /// <summary>Spell hotkeys 1..10 as an array. Index 0-8 → keyboard 1..9, index 9 → keyboard 0.</summary>
+    public static InputAction[] Spell { get { EnsureInit(); return _spell; } }
+
+    /// <summary>Which control scheme produced input most recently.</summary>
+    public static InputScheme ActiveScheme => _activeScheme;
+
+    /// <summary>Fires when <see cref="ActiveScheme"/> changes (e.g. mouse→gamepad).</summary>
+    public static event Action<InputScheme> OnSchemeChanged;
 
     // ─── Internal State ──────────────────────────────────────────────────────
 
-    private static UIActions _ui;
+    private static PlayerInputActions _actions;
+    private static InputAction[] _spell;
+    private static InputScheme _activeScheme = InputScheme.KeyboardMouse;
 
-    // SubsystemRegistration runs once per play session, BEFORE any scene scripts.
-    // This guarantees the UI map exists before the first Update() of any UI
-    // manager. Tearing down any prior map handles the Editor case where domain
-    // reload is disabled and static state leaks across play sessions.
-    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.SubsystemRegistration)]
+    // BeforeSceneLoad runs before any scene MonoBehaviour but late enough that
+    // creating the ScriptableObject-backed asset is allowed (unlike a ctor).
+    [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
     private static void Bootstrap()
     {
-        // Direct field access (not a method call) — UIActions is a struct, so
-        // calling Dispose() on it would mutate a copy and leave the static
-        // field's Map reference alive.
-        if (_ui.Map != null)
+        // Domain-reload-disabled editor sessions leak static state across plays.
+        if (_actions != null)
         {
-            _ui.Map.Disable();
-            _ui.Map.Dispose();
+            _actions.Dispose();
+            _actions = null;
         }
+        _activeScheme = InputScheme.KeyboardMouse;
+        OnSchemeChanged = null;
 
-        _ui = UIActions.Build();
-        _ui.Map.Enable();
+        EnsureInit();
+        InputSchemeTracker.Ensure();
     }
 
-    // ─── UI Action Map ───────────────────────────────────────────────────────
-
-    /// <summary>
-    /// Strongly-typed handle to the UI input action map. Constructed once at
-    /// startup; bindings mirror those in <c>PlayerInputActions.inputactions</c>.
-    /// </summary>
-    public struct UIActions
+    private static void EnsureInit()
     {
-        public InputActionMap Map;
-        public InputAction Pause;
-        public InputAction Cancel;
-        public InputAction OpenInventory;
-        public InputAction OpenSkillTree;
-        public InputAction OpenCharacter;
-        public InputAction ToggleFPS;
-        public InputAction ToggleGodMode;
-        public InputAction Confirm;
-        public InputAction Navigate;
+        if (_actions != null) return;
 
-        /// <summary>Spell hotkeys 1..10. Indices 0-8 map to keyboard 1..9, index 9 maps to keyboard 0.</summary>
-        public InputAction[] Spell;
-
-        /// <summary>Disables the entire UI map. Use when entering a context that
-        /// should consume input directly (e.g. an editable text field).</summary>
-        public void Disable()
+        _actions = new PlayerInputActions();
+        var ui = _actions.UI;
+        _spell = new[]
         {
-            if (Map != null && Map.enabled) Map.Disable();
-        }
+            ui.Spell1, ui.Spell2, ui.Spell3, ui.Spell4, ui.Spell5,
+            ui.Spell6, ui.Spell7, ui.Spell8, ui.Spell9, ui.Spell10
+        };
+        _actions.UI.Enable();
+    }
 
-        /// <summary>Re-enables the UI map after a previous <see cref="Disable"/>.</summary>
-        public void Enable()
-        {
-            if (Map != null && !Map.enabled) Map.Enable();
-        }
+    // Called by InputSchemeTracker (and iso-aim device claims) — fires the event
+    // only on an actual change so redundant per-frame sets are free.
+    internal static void SetScheme(InputScheme scheme)
+    {
+        if (_activeScheme == scheme) return;
+        _activeScheme = scheme;
+        OnSchemeChanged?.Invoke(scheme);
+    }
+}
 
-        internal static UIActions Build()
-        {
-            var map = new InputActionMap("UI");
-            var r = new UIActions { Map = map, Spell = new InputAction[10] };
+/// <summary>
+/// Drives <see cref="InputManager.ActiveScheme"/> by watching which device class
+/// last produced meaningful input. Auto-created at startup; persists across
+/// scenes. This is the ONE place allowed to poll device APIs for scheme
+/// detection (the documented device-detection exception) — consolidated here so
+/// CursorManager and the iso-aim scripts don't each re-implement it.
+/// </summary>
+internal sealed class InputSchemeTracker : MonoBehaviour
+{
+    private static InputSchemeTracker _instance;
 
-            r.Pause          = map.AddAction("Pause",         InputActionType.Button);
-            r.Cancel         = map.AddAction("Cancel",        InputActionType.Button);
-            r.OpenInventory  = map.AddAction("OpenInventory", InputActionType.Button);
-            r.OpenSkillTree  = map.AddAction("OpenSkillTree", InputActionType.Button);
-            r.OpenCharacter  = map.AddAction("OpenCharacter", InputActionType.Button);
-            r.ToggleFPS      = map.AddAction("ToggleFPS",     InputActionType.Button);
-            r.ToggleGodMode  = map.AddAction("ToggleGodMode", InputActionType.Button);
-            r.Confirm        = map.AddAction("Confirm",       InputActionType.Button);
-            r.Navigate       = map.AddAction("Navigate",      InputActionType.Value, expectedControlLayout: "Vector2");
+    public static void Ensure()
+    {
+        if (_instance != null) return;
+        var go = new GameObject("InputSchemeTracker");
+        UnityEngine.Object.DontDestroyOnLoad(go);
+        go.hideFlags = HideFlags.HideInHierarchy;
+        _instance = go.AddComponent<InputSchemeTracker>();
+    }
 
-            r.Pause.AddBinding("<Keyboard>/escape");
-            r.Pause.AddBinding("<Gamepad>/start");
+    void OnEnable()  => InputSystem.onDeviceChange += OnDeviceChange;
+    void OnDisable() => InputSystem.onDeviceChange -= OnDeviceChange;
 
-            r.Cancel.AddBinding("<Keyboard>/escape");
-            r.Cancel.AddBinding("<Gamepad>/buttonEast");
+    void Update()
+    {
+        // wasUpdatedThisFrame fires on the plug-in frame even without real input;
+        // require non-default state so mere connection never triggers a switch.
+        bool gamepadActive = Gamepad.current != null &&
+                             Gamepad.current.wasUpdatedThisFrame &&
+                             !Gamepad.current.CheckStateIsAtDefault();
 
-            r.OpenInventory.AddBinding("<Keyboard>/i");
-            r.OpenInventory.AddBinding("<Gamepad>/buttonNorth");
+        bool kbmActive = (Mouse.current != null &&
+                          (Mouse.current.delta.ReadValue().sqrMagnitude > 0.01f ||
+                           Mouse.current.leftButton.wasPressedThisFrame ||
+                           Mouse.current.rightButton.wasPressedThisFrame)) ||
+                         (Keyboard.current != null && Keyboard.current.anyKey.wasPressedThisFrame);
 
-            r.OpenSkillTree.AddBinding("<Keyboard>/k");
-            r.OpenSkillTree.AddBinding("<Gamepad>/dpad/up");
+        if (gamepadActive)
+            InputManager.SetScheme(InputManager.InputScheme.Gamepad);
+        else if (kbmActive)
+            InputManager.SetScheme(InputManager.InputScheme.KeyboardMouse);
+    }
 
-            r.OpenCharacter.AddBinding("<Keyboard>/c");
-            r.OpenCharacter.AddBinding("<Gamepad>/select");
-
-            r.ToggleFPS.AddBinding("<Keyboard>/f3");
-            r.ToggleGodMode.AddBinding("<Keyboard>/f4");
-
-            r.Confirm.AddBinding("<Keyboard>/enter");
-            r.Confirm.AddBinding("<Keyboard>/space");
-            r.Confirm.AddBinding("<Keyboard>/e");
-            r.Confirm.AddBinding("<Gamepad>/buttonSouth");
-
-            r.Navigate.AddCompositeBinding("2DVector")
-                .With("Up",    "<Keyboard>/upArrow")
-                .With("Down",  "<Keyboard>/downArrow")
-                .With("Left",  "<Keyboard>/leftArrow")
-                .With("Right", "<Keyboard>/rightArrow");
-            r.Navigate.AddBinding("<Gamepad>/leftStick");
-            r.Navigate.AddBinding("<Gamepad>/dpad");
-
-            // Spell1..Spell9 → Keyboard 1..9. Spell10 → Keyboard 0.
-            string[] digits = { "1", "2", "3", "4", "5", "6", "7", "8", "9", "0" };
-            for (int i = 0; i < 10; i++)
-            {
-                r.Spell[i] = map.AddAction("Spell" + (i + 1), InputActionType.Button);
-                r.Spell[i].AddBinding("<Keyboard>/" + digits[i]);
-            }
-
-            return r;
-        }
+    private void OnDeviceChange(InputDevice device, InputDeviceChange change)
+    {
+        // Active gamepad unplugged → revert to keyboard&mouse.
+        if (device is Gamepad && change == InputDeviceChange.Removed && Gamepad.current == null)
+            InputManager.SetScheme(InputManager.InputScheme.KeyboardMouse);
     }
 }

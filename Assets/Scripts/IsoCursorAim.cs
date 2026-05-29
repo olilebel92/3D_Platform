@@ -12,6 +12,14 @@ using UnityEngine.InputSystem;
 ///
 /// Ground Layers: set to your terrain/floor layer(s). Falls back to all layers
 /// if nothing is hit, then to a horizontal plane at the last known floor height.
+///
+/// ─── Input note ─────────────────────────────────────────────────────────────
+/// This script intentionally reads <c>Mouse.current</c> directly and is an
+/// allowed exception to the "all input via Actions" rule (same class as
+/// <c>CursorManager</c>). Its reads are (1) device-active detection — distinguishing
+/// mouse vs gamepad to claim aim mode, which a unified Look action would defeat —
+/// and (2) pointer position for a screen-to-world raycast, for which the Input
+/// System has no cleaner equivalent. Do NOT "migrate" these to Actions.
 /// </summary>
 public class IsoCursorAim : MonoBehaviour
 {

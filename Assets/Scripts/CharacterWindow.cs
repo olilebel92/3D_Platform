@@ -358,7 +358,7 @@ public class CharacterWindow : MonoBehaviour
         {
             SetLabel(levelLabel,      "Level",      xp.currentLevel.ToString());
             SetLabel(xpLabel,         "Experience", $"{xp.currentXP} / {xp.xpToNextLevel} XP");
-            SetLabel(xpScalingLabel,  "XP Growth",  $"×{xp.xpScalingFactor:F2} per level");
+            SetLabel(xpScalingLabel,  "XP Bonus",   $"×{xp.xpScalingFactor:F2} per level");
             SetLabel(strengthLabel,     "STR", FormatStat(xp.strength,     xp.EffectiveSTR));
             SetLabel(agilityLabel,      "AGI", FormatStat(xp.agility,      xp.EffectiveAGI));
             SetLabel(intelligenceLabel, "INT", FormatStat(xp.intelligence, xp.EffectiveINT));
@@ -428,7 +428,7 @@ public class CharacterWindow : MonoBehaviour
             string regenStr  = equipBonus > 0f
                 ? $"{totalRegen:F1} <color=#C9A84C>(+{equipBonus:F1})</color>"
                 : $"{totalRegen:F1}";
-            SetLabel(regenLabel, "HP Regen/s", regenStr);
+            SetLabel(regenLabel, "HP Regen", regenStr);
         }
         else
             Debug.LogWarning("[CharacterWindow] HealthSystem not found on player!");

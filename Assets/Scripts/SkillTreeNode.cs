@@ -175,7 +175,7 @@ public class SkillTreeNode : ScriptableObject
         AddFlat(agiBonus,               "Agility",          asInt: true);
         AddFlat(intBonus,               "Intelligence",     asInt: true);
         AddFlat(hpBonus,                "Max HP",           asInt: true);
-        AddFlat(hpRegenBonus,           "HP Regen/s");
+        AddFlat(hpRegenBonus,           "HP Regen");
         AddFlat(manaBonus,              "Max Mana",         asInt: true);
         AddFlat(manaRegenBonus,         "Mana Regen/s");
         AddFlat(spellDamageBonus,       "Spell Damage");

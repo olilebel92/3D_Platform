@@ -1,6 +1,7 @@
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.SceneManagement;
 using TMPro;
 using Unity.Netcode;
 
@@ -130,6 +131,13 @@ public class WaveManager : NetworkBehaviour
     private bool gameOver         = false;
     public Transform playerTransform;
 
+    /// <summary>
+    /// Server-only. Players who died this wave, keyed by OwnerClientId → death world
+    /// position. They spectate teammates until a survivor clears the wave, then
+    /// auto-respawn at the recorded position. Pruned on disconnect; never networked.
+    /// </summary>
+    private readonly Dictionary<ulong, Vector3> _deadPlayers = new();
+
     // ─── Ready-Up State ───────────────────────────────────────────────────────
     /// <summary>True while the system is waiting for all players to press R.</summary>
     public bool IsWaitingForReady { get; private set; }
@@ -144,6 +152,26 @@ public class WaveManager : NetworkBehaviour
     {
         if (Instance != null && Instance != this) { Destroy(gameObject); return; }
         Instance = this;
+    }
+
+    // ─── NGO Lifecycle ────────────────────────────────────────────────────────
+
+    public override void OnNetworkSpawn()
+    {
+        // Prune dead-player records when a client disconnects (server-only).
+        if (IsServer && NetworkManager.Singleton != null)
+            NetworkManager.Singleton.OnClientDisconnectCallback += OnClientDisconnected;
+    }
+
+    public override void OnNetworkDespawn()
+    {
+        if (NetworkManager.Singleton != null)
+            NetworkManager.Singleton.OnClientDisconnectCallback -= OnClientDisconnected;
+    }
+
+    void OnClientDisconnected(ulong clientId)
+    {
+        _deadPlayers.Remove(clientId);
     }
 
     void Start()
@@ -222,6 +250,12 @@ public class WaveManager : NetworkBehaviour
             if (gameOver) break;
 
             SetStatus("Wave " + currentWave + " cleared!");
+
+            // ── Respawn players who died this wave, at their death position ───
+            // A survivor cleared the wave, so revive the fallen co-op teammates
+            // in place (full HP, stats intact) before the next wave begins.
+            if (IsNetworkActive() && _deadPlayers.Count > 0)
+                RespawnDeadPlayers();
 
             // ── Full heal — server-side; HealthSystem broadcasts via NetworkVariable.
             if (fullHealAfterWave)
@@ -580,35 +614,127 @@ public class WaveManager : NetworkBehaviour
 
     /// <summary>
     /// Called by HealthSystem.Die() when a player dies.
-    /// In MP the call originates on the owning client — route to server so the
-    /// wave loop (which runs server-side) actually stops.
+    /// Solo: ends the run (death screen shown by HealthSystem).
+    /// MP: runs server-side (Die() is server-authoritative for players). If teammates
+    /// are still alive the dead player spectates and the wave continues; only when
+    /// every player is down do we trigger game-over.
     /// </summary>
-    public void OnPlayerDeath()
+    public void OnPlayerDeath(HealthSystem deadHealth)
     {
         if (gameOver) return;
 
-        if (IsNetworkActive() && !IsServer)
+        // Solo (or no networking): end the run immediately.
+        if (!IsNetworkActive())
         {
-            // Owning client notifies the server
-            NotifyPlayerDeathServerRpc();
+            TriggerGameOver();
+            return;
+        }
+
+        // MP: Die() already runs on the server, so this executes server-side.
+        if (!IsServer)
+        {
+            Debug.LogWarning("[WaveManager] OnPlayerDeath called on a non-server client — ignored.");
+            return;
+        }
+
+        if (deadHealth == null) return;
+        NetworkObject deadNet = deadHealth.GetComponent<NetworkObject>();
+        if (deadNet == null) return;
+
+        ulong cid = deadNet.OwnerClientId;
+        _deadPlayers[cid] = deadHealth.transform.position;
+
+        if (CountLivingPlayers() > 0)
+        {
+            // Co-op: dead player spectates the survivors; the wave keeps going.
+            ClientRpcParams ownerOnly = new ClientRpcParams
+            {
+                Send = new ClientRpcSendParams { TargetClientIds = new[] { cid } }
+            };
+            EnterSpectatorClientRpc(ownerOnly);
         }
         else
         {
-            // Solo, or already on the server
+            // Everyone is down — end the run and show game-over to all players.
             TriggerGameOver();
+            ShowGameOverClientRpc(currentWave);
         }
+    }
+
+    /// <summary>Server-side count of players whose HealthSystem still has HP &gt; 0.</summary>
+    private int CountLivingPlayers()
+    {
+        int alive = 0;
+        foreach (GameObject p in PlayerController.All)
+        {
+            HealthSystem h = p.GetComponent<HealthSystem>();
+            if (h != null && h.currentHealth > 0f) alive++;
+        }
+        return alive;
+    }
+
+    /// <summary>
+    /// Revives every dead player (server-side Heal) and teleports each owner back to
+    /// the spot they died. Skips and drops records for clients that disconnected.
+    /// </summary>
+    private void RespawnDeadPlayers()
+    {
+        foreach (var kv in _deadPlayers)
+        {
+            PlayerController pc = FindPlayerByClientId(kv.Key);
+            if (pc == null) continue; // disconnected while dead
+
+            HealthSystem h = pc.GetComponent<HealthSystem>();
+            if (h != null) h.Heal(h.maxHealth); // revives server-side; NV broadcasts full HP
+
+            ClientRpcParams ownerOnly = new ClientRpcParams
+            {
+                Send = new ClientRpcSendParams { TargetClientIds = new[] { kv.Key } }
+            };
+            pc.RespawnAtPositionClientRpc(kv.Value, ownerOnly);
+        }
+        _deadPlayers.Clear();
+    }
+
+    private static PlayerController FindPlayerByClientId(ulong clientId)
+    {
+        foreach (GameObject p in PlayerController.All)
+        {
+            NetworkObject net = p.GetComponent<NetworkObject>();
+            if (net != null && net.OwnerClientId == clientId)
+                return p.GetComponent<PlayerController>();
+        }
+        return null;
     }
 
     // ─── Server RPCs ──────────────────────────────────────────────────────────
 
+    /// <summary>
+    /// Routed from the game-over screen's Restart button (any client). The host reloads
+    /// the active scene via NGO so the whole session restarts from wave 1.
+    /// </summary>
     [Rpc(SendTo.Server)]
-    private void NotifyPlayerDeathServerRpc()
+    public void RequestRestartServerRpc()
     {
-        if (gameOver) return;
-        TriggerGameOver();
+        if (NetworkManager.Singleton != null && NetworkManager.Singleton.SceneManager != null)
+            NetworkManager.Singleton.SceneManager.LoadScene(gameObject.scene.name, LoadSceneMode.Single);
     }
 
     // ─── Client RPCs ──────────────────────────────────────────────────────────
+
+    /// <summary>Owner-targeted: tell a dead player's client to enter spectator mode.</summary>
+    [ClientRpc]
+    private void EnterSpectatorClientRpc(ClientRpcParams clientRpcParams = default)
+    {
+        DeathScreenManager.Instance?.EnterSpectatorMode();
+    }
+
+    /// <summary>Broadcast: all players are down — show the "You survived X waves" screen.</summary>
+    [ClientRpc]
+    private void ShowGameOverClientRpc(int waves, ClientRpcParams clientRpcParams = default)
+    {
+        DeathScreenManager.Instance?.ShowGameOverScreen(waves);
+    }
 
     /// <summary>
     /// Grants XP to the targeted client's locally-owned player.

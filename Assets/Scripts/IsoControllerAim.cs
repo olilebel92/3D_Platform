@@ -12,6 +12,14 @@ using Unity.Netcode;
 /// Device switching:
 ///   - Any left-stick or right-stick movement claims Gamepad mode.
 ///   - <see cref="IsoCursorAim"/> reclaims Mouse mode when the mouse moves or clicks.
+///
+/// ─── Input note ─────────────────────────────────────────────────────────────
+/// This script intentionally reads <c>Gamepad.current</c> directly and is an
+/// allowed exception to the "all input via Actions" rule (same class as
+/// <c>CursorManager</c>). Its reads are device-active detection (stick magnitude to
+/// claim Gamepad aim mode) plus the gamepad-specific right-stick aim vector — a
+/// unified Look action merges mouse + stick and would defeat that discrimination.
+/// Do NOT "migrate" these to Actions.
 /// </summary>
 public class IsoControllerAim : MonoBehaviour
 {

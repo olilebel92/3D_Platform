@@ -505,6 +505,8 @@ public class LootPickup : NetworkBehaviour
         ItemData item = ResolveCurrentItem();
         if (item == null || ItemTooltip.Instance == null) return;
 
+        // Pointer position for tooltip placement is a device read by design
+        // (allowed exception, like CursorManager) — not a gameplay binding.
         Vector2 screenPos = Mouse.current != null
             ? Mouse.current.position.ReadValue()
             : new Vector2(Screen.width * 0.5f, Screen.height * 0.5f);
@@ -633,6 +635,8 @@ public class LootPickup : NetworkBehaviour
 
     private bool CheckMouseHover()
     {
+        // Pointer position for a screen-to-world hover raycast is a device read by
+        // design (allowed exception, like CursorManager) — not a gameplay binding.
         if (Camera.main == null || Mouse.current == null) return false;
         Ray ray = Camera.main.ScreenPointToRay(Mouse.current.position.ReadValue());
 
@@ -670,7 +674,7 @@ public class LootPickup : NetworkBehaviour
         if (_localFocused != this) return;
 
         // Tab cycles to the next nearby pickup when multiple items overlap.
-        if (_localNearby.Count > 1 && Keyboard.current != null && Keyboard.current.tabKey.wasPressedThisFrame)
+        if (_localNearby.Count > 1 && InputManager.Player.CycleTarget.WasPressedThisFrame())
         {
             CycleLocalFocus();
             return;

@@ -205,6 +205,10 @@ public class EnemyAI : NetworkBehaviour
 
         foreach (GameObject p in players)
         {
+            // Ignore dead players — don't chase or attack a fallen (spectating) teammate.
+            HealthSystem ph = p.GetComponent<HealthSystem>();
+            if (ph != null && (ph.IsDead || ph.currentHealth <= 0f)) continue;
+
             float d = Vector3.Distance(transform.position, p.transform.position);
             if (d < nearestDist)
             {
@@ -213,7 +217,17 @@ public class EnemyAI : NetworkBehaviour
             }
         }
 
-        if (nearest != null && nearest.transform != player)
+        // All players are down (e.g. everyone spectating between deaths) — drop the
+        // target so the enemy idles instead of beating on a dead body.
+        if (nearest == null)
+        {
+            player        = null;
+            _playerHealth = null;
+            _targetNetObj = null;
+            return;
+        }
+
+        if (nearest.transform != player)
         {
             player        = nearest.transform;
             _playerHealth = nearest.GetComponent<HealthSystem>();
