@@ -178,7 +178,7 @@ public class LootPickup : NetworkBehaviour
 
     // ─── Interaction Prompt (LootType.Items only) ─────────────────────────────
     [Header("Interaction Prompt (Items only)")]
-    [Tooltip("World-vertical offset for the 'Press F to pick up' label above the item.")]
+    [Tooltip("World-vertical offset for the 'Press E to pick up' label above the item.")]
     public float interactionLabelHeight = 1.4f;
 
     [Tooltip("World-space font size of the interaction label.")]
@@ -213,11 +213,26 @@ public class LootPickup : NetworkBehaviour
     private static readonly HashSet<LootPickup> _localNearby  = new();
     private static          LootPickup           _localFocused = null;
 
-    // Items and RandomItem loot are interactable — player must press F to collect.
+    // Items and RandomItem loot are interactable — player must press E to collect.
     private bool RequiresInteraction => lootType == LootType.Items || lootType == LootType.RandomItem;
 
     private TextMeshPro _interactionLabel;
     private TextMeshPro _statsLabel;
+    private SpriteRenderer _statsBackground;
+
+    // Shared 1×1 white sprite used to draw the stats-label backdrop (tinted black, semi-transparent).
+    private static Sprite _bgSprite;
+    private static Sprite GetBgSprite()
+    {
+        if (_bgSprite == null)
+        {
+            var tex = new Texture2D(1, 1, TextureFormat.RGBA32, mipChain: false);
+            tex.SetPixel(0, 0, Color.white);
+            tex.Apply();
+            _bgSprite = Sprite.Create(tex, new Rect(0, 0, 1, 1), new Vector2(0.5f, 0.5f), pixelsPerUnit: 1f);
+        }
+        return _bgSprite;
+    }
     private GameObject  _localOwnerInRange;
     private InputAction _interactAction;
 
@@ -473,6 +488,20 @@ public class LootPickup : NetworkBehaviour
         int hudLayer = LayerMask.NameToLayer("HudOverlay");
         if (hudLayer >= 0) obj.layer = hudLayer;
 
+        // Black, slightly-transparent backdrop (matches the hover tooltip feel). Parented to the
+        // label so it billboards with it; sits one sorting step behind the text and is resized to
+        // the rendered text bounds in RefreshStatsLabel.
+        GameObject bg = new GameObject("StatsBg");
+        bg.transform.SetParent(obj.transform, worldPositionStays: false);
+        bg.transform.localPosition = new Vector3(0f, 0f, 0.01f);
+        bg.transform.localRotation = Quaternion.identity;
+        if (hudLayer >= 0) bg.layer = hudLayer;
+
+        _statsBackground = bg.AddComponent<SpriteRenderer>();
+        _statsBackground.sprite       = GetBgSprite();
+        _statsBackground.color        = new Color(0f, 0f, 0f, 0.6f);
+        _statsBackground.sortingOrder = 19999;
+
         obj.SetActive(false);
     }
 
@@ -489,12 +518,28 @@ public class LootPickup : NetworkBehaviour
         }
         _statsLabel.text = BuildStatsText(item);
         _statsLabel.gameObject.SetActive(true);
+        ResizeStatsBackground();
+    }
+
+    // Fits the backdrop sprite to the rendered text bounds (plus padding). The sprite is a 1×1
+    // unit quad (pixelsPerUnit = 1), so localScale maps directly to world size.
+    private void ResizeStatsBackground()
+    {
+        if (_statsBackground == null) return;
+        _statsLabel.ForceMeshUpdate();
+        Bounds b = _statsLabel.textBounds;
+        const float padX = 0.12f, padY = 0.06f;
+        _statsBackground.transform.localScale = new Vector3(
+            Mathf.Max(0.01f, b.size.x + padX),
+            Mathf.Max(0.01f, b.size.y + padY),
+            1f);
+        _statsBackground.transform.localPosition = new Vector3(b.center.x, b.center.y, 0.01f);
     }
 
     private string BuildStatsText(ItemData item)
     {
         string subHeader = item.subType != null
-            ? $"<size=90%><color=#CCCCCC>{item.subType.displayName}</color></size>\n"
+            ? $"<size=90%><color=#FFD200>{item.subType.displayName}</color></size>\n"
             : "";
         return subHeader + item.BuildStatSummary();
     }
@@ -536,9 +581,9 @@ public class LootPickup : NetworkBehaviour
                 string rarName = _generatedItem.rarity != null
                     ? $"<color=#{rarHex}>{_generatedItem.rarity.displayName}</color> "
                     : "";
-                return $"[F] Pick up\n{rarName}{_generatedItem.itemName}";
+                return $"[E] Pick up\n{rarName}{_generatedItem.itemName}";
             }
-            return "[F] Pick up\nRandom Item";
+            return "[E] Pick up\nRandom Item";
         }
 
         ItemData pooled = FindItemInPoolByGuid(CurrentRoll.itemGuid);
@@ -548,9 +593,9 @@ public class LootPickup : NetworkBehaviour
             string rarName = pooled.rarity != null
                 ? $"<color=#{rarHex}>{pooled.rarity.displayName}</color> "
                 : "";
-            return $"[F] Pick up\n{rarName}{pooled.itemName}";
+            return $"[E] Pick up\n{rarName}{pooled.itemName}";
         }
-        return "[F] Pick up\nItem";
+        return "[E] Pick up\nItem";
     }
 
 
@@ -798,11 +843,19 @@ public class LootPickup : NetworkBehaviour
 
     private ItemData FindItemInPoolByGuid(FixedString64Bytes guid)
     {
-        if (itemPool == null || itemPool.Count == 0 || guid.Length == 0) return null;
+        if (guid.Length == 0) return null;
         string g = guid.ToString();
-        foreach (var it in itemPool)
-            if (it != null && it.AssetGuid == g) return it;
-        return null;
+
+        // Local pool first — the authored asset, present on host/SP (and any client
+        // whose prefab ships a populated pool).
+        if (itemPool != null)
+            foreach (var it in itemPool)
+                if (it != null && it.AssetGuid == g) return it;
+
+        // Fallback: global catalog. Enemy ItemPool drops inject itemPool server-side,
+        // but it's a plain field that doesn't replicate — remote clients arrive with an
+        // empty pool and resolve the server-synced GUID against the catalog here.
+        return ItemDataCatalog.Instance != null ? ItemDataCatalog.Instance.GetByGuid(g) : null;
     }
 
     // ─── Reward Logic (shared between solo and MP paths) ──────────────────────

@@ -14,8 +14,8 @@ public enum LootEntryType
     /// <summary>
     /// Picks one ItemData at random from the list and spawns it as a ground pickup.
     /// Requires a LootPickup prefab assigned to lootPickupPrefab.
-    /// Fully supported in singleplayer. In multiplayer, only the host-client receives
-    /// the item correctly; remote-client support requires an ItemDataCatalog (future work).
+    /// Works in singleplayer and multiplayer: remote clients resolve the synced item
+    /// GUID through ItemDataCatalog (see LootPickup.FindItemInPoolByGuid).
     /// </summary>
     ItemPool,
 
