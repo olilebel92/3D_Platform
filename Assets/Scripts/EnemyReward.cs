@@ -244,32 +244,28 @@ public class EnemyReward : NetworkBehaviour
         else
             dropped.transform.position = targetPos;
 
-            // Configure ItemPool pickups before NGO spawns them so the server-side
-            // roll and visual are both applied in OnNetworkSpawn / Start.
-            // NOTE: In multiplayer, remote (non-host) clients will not have itemPool
-            // injected — they'll log a warning and miss the visual. Full MP support
-            // requires a global ItemDataCatalog (future work). Host-client always works.
-            if (result.entryType == LootEntryType.ItemPool && result.chosenItem != null)
+        // Configure ItemPool pickups before NGO spawns them so the server's roll
+        // (RollItemsIndex over this 1-item pool) and the host's visual resolve in
+        // OnNetworkSpawn. itemPool is a plain field and does NOT replicate, so remote
+        // clients arrive with an empty pool and resolve the server-synced item GUID
+        // through ItemDataCatalog instead (see LootPickup.FindItemInPoolByGuid).
+        if (result.entryType == LootEntryType.ItemPool && result.chosenItem != null)
+        {
+            LootPickup pickup = dropped.GetComponent<LootPickup>();
+            if (pickup != null)
             {
-                LootPickup pickup = dropped.GetComponent<LootPickup>();
-                if (pickup != null)
-                {
-                    pickup.lootType = LootType.Items;
-                    pickup.itemPool = new System.Collections.Generic.List<ItemData> { result.chosenItem };
-                }
-                else
-                {
-                    Debug.LogWarning($"[EnemyReward] ItemPool drop prefab '{result.prefab.name}' has no LootPickup component.");
-                }
-
-                if (networkActive)
-                    Debug.LogWarning("[EnemyReward] ItemPool drops in multiplayer only work correctly for the host-client. " +
-                                     "Remote clients require a global ItemDataCatalog (future work).");
+                pickup.lootType = LootType.Items;
+                pickup.itemPool = new System.Collections.Generic.List<ItemData> { result.chosenItem };
             }
+            else
+            {
+                Debug.LogWarning($"[EnemyReward] ItemPool drop prefab '{result.prefab.name}' has no LootPickup component.");
+            }
+        }
 
-            NetworkObject netObj = dropped.GetComponent<NetworkObject>();
-            if (netObj != null && networkActive)
-                netObj.Spawn(destroyWithScene: true); // scene-bound so it's cleared on scene reload/restart
+        NetworkObject netObj = dropped.GetComponent<NetworkObject>();
+        if (netObj != null && networkActive)
+            netObj.Spawn(destroyWithScene: true); // scene-bound so it's cleared on scene reload/restart
     }
 
     // ─── Ground Height Helper ─────────────────────────────────────────────────
